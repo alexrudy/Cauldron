@@ -6,6 +6,6 @@ The local backend stores keyword values in the keyword objects themselves. It su
 Reference/API
 -------------
 
-.. automodapi:: Cauldron.local.service
+.. automodapi:: Cauldron.local.client
 
-.. automodapi:: Cauldron.local.keyword
+.. automodapi:: Cauldron.local.dispatcher
