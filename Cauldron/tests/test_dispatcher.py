@@ -6,36 +6,6 @@ import pytest
 
 from Cauldron.api import _teardown
 
-@pytest.fixture
-def servicename():
-    """Get the service name."""
-    return "testsvc"
-    
-@pytest.fixture
-def config():
-    """DFW configuration."""
-    return None
-    
-@pytest.fixture(params=["local"])
-def backend(request):
-    """The backend name."""
-    from Cauldron import use
-    use(request.param)
-    request.addfinalizer(_teardown)
-    return request.param
-
-@pytest.fixture
-def dispatcher(backend, servicename, config):
-    """Establish the dispatcher for a particular kind of service."""
-    from Cauldron import DFW
-    return DFW.Service(servicename, config)
-    
-@pytest.fixture
-def client(backend, servicename):
-    """Test a client."""
-    from Cauldron import ktl
-    return ktl.Service(servicename)
-
 def test_callbacks(dispatcher, client):
     """Test callback propogation."""
     
