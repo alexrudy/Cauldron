@@ -51,6 +51,10 @@ class ClientKeywordBase(_BaseKeyword):
     Only one method is not supported by the original KTL library, :meth:`stop`, which could easily be subsumed into :meth:`subscribe` with the keyword argument ``start=False``.
     
     """
+    def __init__(self, service, name, type=str):
+        super(ClientKeywordBase, self).__init__(service, name, type)
+        self._callbacks = WeakOrderedSet()
+        
     
     def _ktl_broadcasts(self):
         """Does this keyword support broadcasting?"""
@@ -93,7 +97,7 @@ class ClientKeywordBase(_BaseKeyword):
         """
         Cast to a native python datatype.
         """
-        return self.type(value)
+        return self._type(value)
         
     def clone(self):
         """
@@ -197,8 +201,8 @@ class ClientServiceBase(object):
     
     Services provide a dictionary-like access interface to KTL::
         
-        >>> svc = Service('myktl')
-        >>> svc['mykey']
+        >>> svc = Service('myktl')          # doctest: +SKIP
+        >>> svc['mykey']                    # doctest: +SKIP
         <Keyword service=myktl name=mykey>
     
     Using dictionary indexing always returns a :class:`~Cauldron.base.keyword.Keyword` object.

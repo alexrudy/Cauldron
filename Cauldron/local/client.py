@@ -6,13 +6,15 @@ from ..base import ClientServiceBase, ClientKeywordBase
 from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented
 from ..api import register_client
 
+__all__ = ['Service', 'Keyword']
+
 class Keyword(ClientKeywordBase):
     """A keyword for local dispatcher implementations."""
     
     @property
-    def _source(self):
+    def source(self):
         """The source of knowledge about this keyword."""
-        return self.service[self.name]
+        return self.service._dispatcher[self.name]
         
     def _ktl_reads(self):
         """Is this keyword readable?"""
@@ -21,6 +23,10 @@ class Keyword(ClientKeywordBase):
     def _ktl_writes(self):
         """Is this keyword writable?"""
         return not self.source.readonly
+        
+    def _ktl_monitored(self):
+        """Determine if this keyword is monitored."""
+        return self._update in self.source._consumers
         
     def monitor(self, start=True, prime=True, wait=True):
         if prime:

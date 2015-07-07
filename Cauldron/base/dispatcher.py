@@ -9,7 +9,7 @@ import six
 import weakref
 from ..compat import WeakOrderedSet
 from .core import _BaseKeyword
-from ..exc import CauldronAPINotImplemented
+from ..exc import CauldronAPINotImplemented, NoWriteNecessary
 
 __all__ = ['DispatcherKeyword', 'DispatcherService']
 
@@ -26,7 +26,6 @@ class DispatcherKeyword(_BaseKeyword):
         self.name = name
         self._acting = False
         self._callbacks = WeakOrderedSet()
-        self._checkbacks = WeakOrderedSet()
         self._history = list()
         self.writeonly = False
         self.readonly = False
@@ -70,7 +69,7 @@ class DispatcherKeyword(_BaseKeyword):
         if value == self.value and force is False:
             return
             
-        if not (isinstance(value, six.text_types) or value is None):
+        if not (isinstance(value, six.string_types) or value is None):
             raise TypeError("{0}: Value must be string-like, got {1}".format(self, value))
         
         self.check(value)
@@ -245,7 +244,14 @@ class DispatcherService(object):
         
     def __getitem__(self, name):
         """Get a keyword item."""
-        return self._keywords[name.upper()]
+        try:
+            return self._keywords[name.lower()]
+        except KeyError:
+            return self.__missing__(name.lower())
+        
+    def __missing__(self, key):
+        """What to do with missing keys."""
+        raise KeyError("Service {0} has no keyword {1}.".format(self.name, key))
         
     def __setitem__(self, name, value):
         """Set a keyword instance in this server."""

@@ -33,13 +33,6 @@ class _BaseKeyword(object):
             repr_str += " value={value}".format(value=self._last_value)
         return repr_str + ">"
     
-    def __str__(self):
-        """Make a string."""
-        r = self._ktl_value()
-        if r is None:
-            return "<None>"
-        return r
-    
     @property
     def service(self):
         """The parent service for this keyword.

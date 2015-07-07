@@ -9,6 +9,8 @@ from ..base import ClientServiceBase, ClientKeywordBase
 from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented
 from .common import REDIS_SERVICES_REGISTRY, redis_key_name, check_redis
 
+__all__ = ['Service', 'Keyword']
+
 class Keyword(ClientKeywordBase):
     """A keyword for REDIS dispatcher implementations."""
     

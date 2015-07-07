@@ -9,6 +9,8 @@ from ..base import DispatcherService, DispatcherKeyword
 from ..compat import WeakOrderedSet
 from .common import REDIS_SERVICES_REGISTRY, redis_key_name, get_connection_pool, check_redis
 
+__all__ = ['Service', 'Keyword']
+
 class Service(DispatcherService):
     """REDIS dispatcher service."""
     

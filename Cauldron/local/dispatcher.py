@@ -12,6 +12,8 @@ from ..api import register_dispatcher
 
 import weakref
 
+__all__ = ['Service', 'Keyword']
+
 _registry = weakref.WeakValueDictionary()
 
 class Service(DispatcherService):
@@ -36,6 +38,10 @@ class Service(DispatcherService):
         """To shutdown this service, delete it."""
         pass
         
+    def __missing__(self, key):
+        """Allows the local dispatcher to populate any keyword, whetehr it should exist or not."""
+        keyword = self._keywords[key.lower()] = Keyword(key, self)
+        return keyword
 
 class Keyword(DispatcherKeyword):
     """A keyword"""

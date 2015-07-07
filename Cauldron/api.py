@@ -48,6 +48,8 @@ basename = ".".join(__name__.split(".")[:-1])
 def use(name):
     """Use a particular client name."""
     # We do some hacks here to install the module 'Cauldron.ktl' and 'Cauldron.DFW' only once this API function has been called.
+    if basename + ".ktl" in sys.modules or basename + ".DFW" in sys.modules:
+        raise RuntimeError("You may only call Cauldron.use() once! Refusing to activate again.")
     
     if name not in _client_registry or name not in _dispatcher_registry:
         raise ValueError("The Cauldron backend {0} is not known. Try one of {1!r}".format(
@@ -65,3 +67,15 @@ def use(name):
     Cauldron = sys.modules[basename]
     Cauldron.DFW = DFW
     Cauldron.ktl = ktl
+    
+def _teardown():
+    """Teardown the Cauldron setup. This is good for test fixtures, but not much else."""
+    Cauldron = sys.modules[basename]
+    if hasattr(Cauldron, 'DFW'):
+        del sys.modules[Cauldron.DFW.__name__]
+        del Cauldron.DFW
+    if hasattr(Cauldron, 'ktl'):
+        del sys.modules[Cauldron.ktl.__name__]
+        del Cauldron.ktl
+    
+    
