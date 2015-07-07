@@ -48,7 +48,7 @@ distribute-*.tar.gz
 # Other
 .*.swp
 *~
-
+.eggs/
 # Mac OSX
 .DS_Store
 
