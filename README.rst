@@ -17,11 +17,11 @@ running on a local, non-production machine.
 Installation
 ============
 
-Cauldron is a standard python package which uses setuptools. It uses the :mod:`astropy` setuptools
-which fix some bugs and provide some nice documentation advantages. This does mean that :mod:`Cauldron`
-depends on :mod:`astropy`, though this is an installation and test dependency, not a runtime dependency.
+Cauldron is a standard python package which uses setuptools. It uses the ``astropy`` setuptools
+which fix some bugs and provide some nice documentation advantages. This does mean that `Cauldron`
+depends on ``astropy``, though this is an installation and test dependency, not a runtime dependency.
 
-Cauldron also depends on the :mod:`six` module. Some Cauldron backends depend on other third party modules.
+Cauldron also depends on the ``six`` module. Some Cauldron backends depend on other third party modules.
 To install all third party modules, you can use ``pip``::
     
     $ pip install -r requirements.txt
@@ -64,7 +64,7 @@ can "install" the Cauldron modules into their default place on the system.::
     install()
 
 
-You should do this before your code imports :mod:`ktl` or :mod:`DFW`. This is a very hacky way
+You should do this before your code imports ``ktl`` or ``DFW``. This is a very hacky way
 to install a module at runtime. Then again, most of Cauldron is a giant runtime hack, so your
 mileage may vary.
 
