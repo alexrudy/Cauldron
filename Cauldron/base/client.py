@@ -125,26 +125,29 @@ class ClientKeywordBase(_BaseKeyword):
         raise CauldronAPINotImplemented("The cauldron API does not support some background constructs.")
         
     
-    def callback (self, function, remove=False, preferred=False):
-        ''' Request that a callback *function* be invoked whenever
-            a KTL broadcast is received for this keyword. The callback
-            function should accept as its sole argument a Keyword
-            instance. If *remove* is set to False, the designated
-            *function* will be removed from the set of active callbacks.
-            If *preferred* is set to True, this callback will be
-            remembered as a *preferred* callback, which gets invoked
-            before all other non-preferred callbacks.
-
-            :func:`Keyword.callback` is typically used in conjunction
-            with :func:`Keyword.monitor`, or :func:`Keyword.poll` if
-            the specific KTL keyword does not support broadcasts.
-        '''
+    def callback(self, function, remove=False, preferred=False):
+        """ 
+        Request that a callback *function* be invoked whenever
+        a KTL broadcast is received for this keyword. The callback
+        function should accept as its sole argument a Keyword
+        instance. If *remove* is set to False, the designated
+        *function* will be removed from the set of active callbacks.
+        If *preferred* is set to True, this callback will be
+        remembered as a *preferred* callback, which gets invoked
+        before all other non-preferred callbacks.
+        
+        :func:`Keyword.callback` is typically used in conjunction
+        with :func:`Keyword.monitor`, or :func:`Keyword.poll` if
+        the specific KTL keyword does not support broadcasts.
+        """
         if remove:
             return self._callbacks.discard(function)
         if preferred:
             self._callbacks = WeakOrderedSet([function] + list(self._callbacks))
         else:
             self._callbacks.add(function)
+        
+    
     
     def propagate(self):
         """

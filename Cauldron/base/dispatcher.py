@@ -64,8 +64,14 @@ class DispatcherKeyword(_BaseKeyword):
         """Check that 'value' is appropriate for this keyword. If it is not, raise a value error."""
         pass
         
+    def translate(self, value):
+        """Translate a value into a standard representation."""
+        return value
+        
     def set(self, value, force=False):
         """Set the keyword to the value provided, and broadcast changes."""
+        value = self.translate(value)
+        
         if value == self.value and force is False:
             return
             

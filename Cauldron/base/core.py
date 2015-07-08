@@ -14,8 +14,9 @@ class _BaseKeyword(object):
     """Some common keyword implementation details between the client and dispatcher"""
     
     _ALLOWED_KEYS = None
+    _type = str
     
-    def __init__(self, service, name, type=str):
+    def __init__(self, service, name, type=None):
         super(_BaseKeyword, self).__init__()
         name = str(name).upper()
         self._service = weakref.ref(service)
@@ -23,7 +24,8 @@ class _BaseKeyword(object):
         self._last_value = None
         self._last_read = None
         self._reading = False
-        self._type = type
+        if type is not None:
+            self._type = type
         
     def __repr__(self):
         """Represent this keyword"""
@@ -64,7 +66,7 @@ class _BaseKeyword(object):
         
     def _ktl_binary(self):
         """Return the binary value (Native python type.)"""
-        return self.type(self._ktl_value())
+        return self._type(self._ktl_value())
         
     def _ktl_ascii(self):
         """Return the ascii value (String type.)"""

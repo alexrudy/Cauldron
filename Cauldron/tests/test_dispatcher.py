@@ -28,7 +28,7 @@ def test_check(dispatcher, client):
         raise CheckFailed
     
     from Cauldron import DFW
-    kw = dispatcher['TYPEDKW'] = DFW.Keyword("TYPEDKW", dispatcher)
+    kw = dispatcher['TYPEDKW'] = DFW.Keyword.Keyword("TYPEDKW", dispatcher)
     kw.check = fail_check 
     
     with pytest.raises(CheckFailed):
