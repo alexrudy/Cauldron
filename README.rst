@@ -28,41 +28,41 @@ To install all third party modules, you can use ``pip``::
     
 
 To install Cauldron, navigate to the Cauldron source directory, then do a standard setuptools installation::
-
+    
     $ cd /my/copy/of/cauldron/
     $ python setup.py install
-
+    
 
 Using Cauldron
 ==============
 
 To use Cauldron, you must first select a backend::
-
+    
     import Cauldron
     Cauldron.use("local")
-
+    
 
 Then, where you would have imported a KTL library, you can call::
-
+    
     from Cauldron import ktl
-
+    
 
 or for the python dispatcher framework::
-
+    
     from Cauldron import DFW
-
+    
 
 To use the standard KTL implementation, use the "ktl" backend::
-
+    
     import Cauldron
     Cauldron.use("ktl")
-
+    
 To use existing code which doesn't follow the ``from Cauldron import DFW``-style, you
 can "install" the Cauldron modules into their default place on the system.::
-
+    
     from Cauldron.api import install
     install()
-
+    
 You should do this before your code imports ``ktl`` or ``DFW``. This is a very hacky way
 to install a module at runtime. Then again, most of Cauldron is a giant runtime hack, so your
 mileage may vary.
@@ -76,11 +76,14 @@ the following will work::
 Documentation
 =============
 
-Sphinx documenation is provided in the ``docs/`` folder of the source code. To build it you will need sphinx installed. 
+Sphinx documenation is provided in the ``docs/`` folder of the source code. To build it you will need sphinx installed.
 Then run::
-    
+
     $ cd docs/
     $ make html
-    
 
 
+Limitations
+===========
+
+Cauldron is very limited. I've written it only to replicate the bare minimum of what I need from both ``ktl`` and ``DFW``. If you need more, implement it!
