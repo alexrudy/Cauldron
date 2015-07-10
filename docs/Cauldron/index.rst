@@ -24,6 +24,24 @@ running on a local, non-production machine.
     backends/index
     internals
 
+Installation
+============
+
+Cauldron is a standard python package which uses :mod:`setuptools`. It uses the :mod:`astropy` :mod:`setuptools`
+which fix some bugs and provide some nice documentation advantages. This does mean that :mod:`Cauldron`
+depends on :mod:`astropy`, though this is an installation and test dependency, not a runtime dependency.
+
+Cauldron also depends on the :mod:`six` module. Some Cauldron backends depend on other third party modules.
+To install all third party modules, you can use ``pip``::
+    
+    $ pip install -r requirements.txt
+    
+
+To install Cauldron, use pip::
+    
+    $ pip install git+https://github.com/alexrudy/Cauldron
+    
+
 Using Cauldron
 ==============
 

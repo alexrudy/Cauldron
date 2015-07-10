@@ -76,7 +76,9 @@ the following will work::
 Documentation
 =============
 
-Sphinx documenation is provided in the ``docs/`` folder of the source code. To build it you will need sphinx installed.
+Documentation is available on ReadTheDocs at <http://cauldron.readthedocs.org/en/latest/Cauldron/index.html>.
+
+Sphinx documentation is provided in the ``docs/`` folder of the source code. To build it you will need sphinx installed.
 Then run::
 
     $ cd docs/
