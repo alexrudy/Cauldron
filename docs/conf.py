@@ -126,8 +126,8 @@ html_title = '{0} v{1}'.format(project, release)
 htmlhelp_basename = project + 'doc'
 
 html_theme_options = {
-    'logotext1':'Shane',
-    'logotext2':'AO'
+    'logotext1':'Cauldron',
+    'logotext2':'KTL'
 }
 
 # -- Options for LaTeX output --------------------------------------------------
