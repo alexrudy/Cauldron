@@ -3,9 +3,9 @@ from __future__ import absolute_import
 
 # Initial setup functions for this module.
 # We make sure that the namespace stays very clean!
-from ..api import _guard_use
-_guard_use(msg='importing the ._DFW module', error=ImportError)
-del _guard_use
+from ..api import guard_use
+guard_use(msg='importing the ._DFW module', error=ImportError)
+del guard_use
 
 from ..api import setup_dispatcher
 setup_dispatcher()

@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-Keywords can have differing python types.
+Keywords can have differing python types. The types provide validation and sanitization
+for keyword values.
 
-This module implements those types in a way that meshes well with the parent modules.
+In the KTL python API, keyword types are implemented separately for clients and dispatchers. In this module,
+a single class heirarchy is implemented for clients and dispatchers. Keyword types override parent class methods
+to provide the necessary behavior, though at a minimum, Keyword types simply set the ``_type`` class attribute
+to a python type.
 """
 
 from __future__ import absolute_import
@@ -13,14 +17,14 @@ import sys
 import abc
 import six
 from .exc import CauldronAPINotImplementedWarning
-from .api import _guard_use, get_client, get_dispatcher, register_dispatcher_setup, register_client_setup
+from .api import guard_use, get_client, get_dispatcher, register_dispatcher_setup, register_client_setup
 
-__all__ = ['Basic', 'Keyword', 'Boolean', 'Double', 'Float', 'Integer', 'Enumerated', 'Mask', 'String', 'IntegerArray', 'FloatArray', 'DoubleArray']
+__all__ = ['KeywordType', 'Basic', 'Keyword', 'Boolean', 'Double', 'Float', 'Integer', 'Enumerated', 'Mask', 'String', 'IntegerArray', 'FloatArray', 'DoubleArray', 'dispatcher_keyword', 'client_keyword']
 
 
 _dispatcher = set()
 def dispatcher_keyword(cls):
-    """A decorator to mark classes which should also be exposed in the ktl.Keyword module."""
+    """A decorator to mark classes which should also be exposed in the DFW.Keyword module."""
     _dispatcher.add(cls)
     return cls
 
@@ -38,7 +42,7 @@ def generate_keyword_subclasses(basecls, subclasses):
 @register_client_setup
 def setup_client_keyword_module():
     """Generate the Keyword module"""
-    _guard_use("setting up the ktl.Keyword module")
+    guard_use("setting up the ktl.Keyword module")
     _, basecls = get_client()
     from ._ktl import Keyword
     for kwcls in generate_keyword_subclasses(basecls, _client):
@@ -48,7 +52,7 @@ def setup_client_keyword_module():
 @register_dispatcher_setup
 def setup_dispatcher_keyword_module():
     """Set up the Keyword module"""
-    _guard_use("setting up the DFW.Keyword module")
+    guard_use("setting up the DFW.Keyword module")
     _, basecls = get_dispatcher()
     from ._DFW import Keyword
     for kwcls in generate_keyword_subclasses(basecls, _client):
@@ -56,10 +60,12 @@ def setup_dispatcher_keyword_module():
         Keyword.__all__.append(kwcls.__name__)
 
 @six.add_metaclass(abc.ABCMeta)
-class _MetaClassFix(object): pass
-        
+class KeywordType(object):
+    """A base class for all subclasses of KTL Keyword."""
+    def __init__(self, *args, **kwargs):
+        super(KeywordType, self).__init__(*args, **kwargs)
 
-class _NotImplemented(_MetaClassFix):
+class _NotImplemented(KeywordType):
     """An initializer for not-yet implemented keywords which emits a warning."""
     def __init__(self, *args, **kwargs):
         warnings.warn("{0} Keywords aren't yet implemented. Defaulting to a {1} keyword.".format(self.__class__.__name__, self.__class__.__mro__[1].__name__),
@@ -67,15 +73,19 @@ class _NotImplemented(_MetaClassFix):
         super(_NotImplemented, self).__init__(*args, **kwargs)
 
 @dispatcher_keyword
-class Basic(_MetaClassFix): pass
+class Basic(KeywordType):
+    """The base class for KTL and DFW keywords."""
+    pass
 
 @dispatcher_keyword
 @client_keyword
-class Keyword(Basic): pass
+class Keyword(Basic): 
+    """An alias for :class:`Basic`"""
+    pass
 
 @dispatcher_keyword
 @client_keyword
-class Boolean(Keyword):
+class Boolean(Basic):
     """A boolean-valued keyword."""
     mapping = {True: '1',
            '1': '1',
@@ -114,18 +124,23 @@ class Boolean(Keyword):
         
 @dispatcher_keyword
 class Double(Basic):
-    """Double values."""
+    """A numerical value keyword."""
     _type = float
     
 @dispatcher_keyword
-class Float(Double): pass
+class Float(Double):
+    """A numerical value keyword."""
+    pass
 
 @client_keyword
-class Numeric(Double): pass
+class Numeric(Double):
+    """A numerical value keyword."""
+    pass
 
 @dispatcher_keyword
 @client_keyword
 class Integer(Basic):
+    """An integer value keyword."""
     
     _type = int
     
@@ -150,6 +165,7 @@ class Integer(Basic):
 
 @dispatcher_keyword
 class Enumerated(Integer, _NotImplemented):
+    """An enumerated keyword, which uses an integer as the underlying datatype."""
     pass
     
 
@@ -159,7 +175,9 @@ class Mask(Basic, _NotImplemented):
 
 @dispatcher_keyword
 @client_keyword
-class String(Basic): pass
+class String(Basic): 
+    """An ASCII valued keyword, implemented identically to :class:`Basic`."""
+    pass
 
 @dispatcher_keyword
 class IntegerArray(Basic, _NotImplemented): pass

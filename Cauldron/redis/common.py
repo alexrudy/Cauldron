@@ -44,12 +44,16 @@ def get_global_connection_pool():
     return _global_connection_pool
 
 _connection_pool_settings = {}
-def configure_pool(config):
-    """From a configuration, """
-    if config is None:
-        return
-    _connection_pool_settings.update(dict(
-    host=config.get('redis','host'),
-    port=config.get('redis', 'port'),
-    db=config.get('redis', 'db'), 
-    socket_timeout=None))
+def configure_pool(**kwargs):
+    """Configure the REDIS settings from a ConfigParser object.
+    
+    The REDIS configuration settings must identify the host, port and database.
+    
+    :keyword str host: REDIS host
+    :keyword int port: REDIS port
+    :keyword int db: REDIS database number, usually ``0``.
+    
+    This function will also accept any other arguments to :class:`redis.ConnectionPool`
+    
+    """
+    _connection_pool_settings.update(kwargs)

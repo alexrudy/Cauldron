@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Implements the abstract-base Keyword and Service classes used for clients.
-
+Implements the abstract-base Keyword and Service classes used for clients. 
 This piece of Cauldron is a rough mock of :mod:`ktl`, the client side interface.
+
+The actual implementation of client side features outside of the :class:`ClientKeyword` and :class:`ClientService` classes
+is in the :mod:`_ktl` module.
 """
 from __future__ import absolute_import
 
@@ -14,11 +16,11 @@ import weakref
 import datetime
 from .core import _BaseKeyword
 from ..compat import WeakOrderedSet
-from ..exc import CauldronAPINotImplemented
+from ..utils.helpers import api_not_required, api_not_implemented, api_required, api_override
 
-__all__ = ['ClientKeywordBase', 'ClientServiceBase']
+__all__ = ['ClientKeyword', 'ClientService']
 
-class ClientKeywordBase(_BaseKeyword):
+class ClientKeyword(_BaseKeyword):
     """A keyword object.
     
     Parameters
@@ -52,15 +54,15 @@ class ClientKeywordBase(_BaseKeyword):
     
     """
     def __init__(self, service, name, type=str):
-        super(ClientKeywordBase, self).__init__(service, name, type)
+        super(ClientKeyword, self).__init__(service, name, type)
         self._callbacks = WeakOrderedSet()
         
     
+    @api_not_implemented
     def _ktl_broadcasts(self):
         """Does this keyword support broadcasting?"""
-        raise CauldronAPINotImplemented("The cauldron API does not require support for broadcast checks.")
-        
-        
+        pass
+    
     @abc.abstractmethod
     def _ktl_monitored(self):
         """Monitored?"""
@@ -93,52 +95,51 @@ class ClientKeywordBase(_BaseKeyword):
         """KTL units."""
         return None
         
+    @api_override
     def cast(self, value):
-        """
-        Cast to a native python datatype.
+        """Cast to a native python datatype.
+        
+        When the "binary" value of a keyword is requested, :meth:`cast` is used to convert to the native python type.
         """
         return self._type(value)
         
     def clone(self):
-        """
-        Clone this keyword.
+        """Clone this keyword.
         """
         return self
     
+    @api_not_implemented
     def isAlive(self):
+        """Check that the heartbeats associated with this keyword are themselves alive; if they are, return True, otherwise return False. If no heartbeats are associated with this Keyword instance, a NoHeartbeatsError exception will be raised.
         """
-        Check that the heartbeats associated with this keyword are themselves alive; if they are, return True, otherwise return False. If no heartbeats are associated with this Keyword instance, a NoHeartbeatsError exception will be raised.
-        """
-        raise CauldronAPINotImplemented("The cauldron API does not support hearbeats.")
+        pass
         
-    @abc.abstractmethod
+    @api_required
     def monitor(self, start=True, prime=True, wait=True):
         """
         Subscribe to broadcasts for this KTL keyword. If start is set to False, the subscription will be shut down. If prime is set to False, there will be no priming read of the keyword value; the default behavior is to perform a priming read. If wait is set to False, the priming read (if requested) will not block while waiting for the priming read to complete.
         """
         pass
         
+    @api_not_implemented
     def poll(self, period=1, start=True):
-        """
-        Poll
-        """
-        raise CauldronAPINotImplemented("The cauldron API does not support some background constructs.")
+        """Poll a keyword for updates.
+        
+In circumstances when a KTL keyword cannot (or will not) reliably broadcast updates, polling can be established. If *start* is True, a non-blocking call to :func:`Keyword.read` will be invoked every *period* seconds; if *start* is False, polling for this keyword will be discontinued.
+
+.. warning::
+    
+    Polling keywords is inefficient, as it requires a discrete ktl_read() operation for each polling event for each keyword polled. Using :func:`monitor` is a far better choice if supported by the service's KTL client library.
+
+"""
+        pass
         
     
     def callback(self, function, remove=False, preferred=False):
-        """ 
-        Request that a callback *function* be invoked whenever
-        a KTL broadcast is received for this keyword. The callback
-        function should accept as its sole argument a Keyword
-        instance. If *remove* is set to False, the designated
-        *function* will be removed from the set of active callbacks.
-        If *preferred* is set to True, this callback will be
-        remembered as a *preferred* callback, which gets invoked
-        before all other non-preferred callbacks.
-        
-        :func:`Keyword.callback` is typically used in conjunction
-        with :func:`Keyword.monitor`, or :func:`Keyword.poll` if
-        the specific KTL keyword does not support broadcasts.
+        """Request that a callback *function* be invoked whenever a KTL broadcast is received for this keyword.
+        The callback function should accept as its sole argument a Keyword instance. If *remove* is set to False, the designated *function* will be removed from the set of active callbacks. If *preferred* is set to True, this callback will be remembered as a *preferred* callback, which gets invoked before all other non-preferred callbacks.
+
+        :func:`callback` is typically used in conjunction with :func:`monitor`, or :func:`poll` if the specific KTL keyword does not support broadcasts.
         """
         if remove:
             return self._callbacks.discard(function)
@@ -150,41 +151,38 @@ class ClientKeywordBase(_BaseKeyword):
     
     
     def propagate(self):
-        """
-        Invoke any/all callbacks registered via Keyword.callback(). This is an internal function, invoked after a Keyword instance successfully completes a Keyword.read() call, or a KTL broadcast event occurs.
+        """Invoke any/all callbacks registered via :meth:`callback`. This is an internal function, invoked after a Keyword instance successfully completes a :meth:`read` call, or a KTL broadcast event occurs.
         """
         self._acting = True
         for cb in self._callbacks:
             cb(self)
         self._acting = False
         
-    @abc.abstractmethod
+    @api_required
     def read(self, binary=False, both=False, wait=True, timeout=None):
-        """
-        Perform a ktl_read() operation for this keyword. The default behavior is to do a blocking read and return the ascii representation of the keyword value. If binary is set to True, only the binary representation will be returned; If both is set to True, both representations will be returned in a (binary, ascii) tuple. If wait is set to False, the KTL read operation will be performed in a background thread, and any resulting updates would trigger any callbacks registered via Keyword.callback(). If a timeout is specified (in seconds), and wait is set to True, Keyword.read() will raise a TimeoutException if the timeout expires before a response is received.
+        """Perform a ktl_read() operation for this keyword. The default behavior is to do a blocking read and return the ascii representation of the keyword value. If binary is set to True, only the binary representation will be returned; If both is set to True, both representations will be returned in a (binary, ascii) tuple. If wait is set to False, the KTL read operation will be performed in a background thread, and any resulting updates would trigger any callbacks registered via :meth:`callback`. If a timeout is specified (in seconds), and wait is set to True, :meth:`read` will raise a TimeoutException if the timeout expires before a response is received.
         """
         pass
         
     def subscribe(self, start=True, prime=True, wait=True):
-        """
-        Subscribe to broadcasts for this KTL keyword. If start is set to False, the subscription will be shut down. If prime is set to False, there will be no priming read of the keyword value; the default behavior is to perform a priming read. If wait is set to False, the priming read (if requested) will not block while waiting for the priming read to complete.
+        """Subscribe to broadcasts for this KTL keyword. If start is set to False, the subscription will be shut down. If prime is set to False, there will be no priming read of the keyword value; the default behavior is to perform a priming read. If wait is set to False, the priming read (if requested) will not block while waiting for the priming read to complete.
         """
         return self.monitor(start=start, prime=prime, wait=wait)
         
+    @api_not_implemented
     def waitfor(self, expression, timeout=None, case=False):
-        """Wait for a particular expression to be true."""
-        raise CauldronAPINotImplemented("The Cauldron API does not support expression syntax.")
+        """Wait for a particular expression to be true.
+        """
+        pass
         
-    @abc.abstractmethod
+    @api_required
     def wait(self, timeout=None, operator=None, value=None, sequence=None, reset=False, case=False):
-        """
-        Wait for the Keyword to receive a new value, or if sequence is set, wait for the designated write operation to complete. If value is set, with or without operator being set, Keyword.wait() effectively acts as a wrapper to Keyword.waitFor(). If reset is set to True, the notification flag will be cleared before waiting against it– this is dangerous, as this introduces a race condition between the arrival of the event itself, and the invocation of Keyword.wait(). If the event occurs first, the caller may wind up waiting indefinitely. If timeout (in whole or partial seconds) is set, Keyword.wait() will return False if no update occurs before the timeout expires. Otherwise, Keyword.wait() returns True to indicate that the wait completed successfully.
+        """Wait for the Keyword to receive a new value, or if sequence is set, wait for the designated write operation to complete. If value is set, with or without operator being set, :meth:`wait` effectively acts as a wrapper to :meth:`waitFor`. If reset is set to True, the notification flag will be cleared before waiting against it– this is dangerous, as this introduces a race condition between the arrival of the event itself, and the invocation of :meth:`wait`. If the event occurs first, the caller may wind up waiting indefinitely. If timeout (in whole or partial seconds) is set, :meth:`wait` will return False if no update occurs before the timeout expires. Otherwise, :meth:`wait` returns True to indicate that the wait completed successfully.
         """
         
-    @abc.abstractmethod
+    @api_required
     def write(self, value, wait=True, binary=False, timeout=None):
-        """
-        Perform a KTL write for this keyword. value is the new value to write to the keyword. If binary is set to True, value will be interpreted as a binary representation; the default behavior is to interpret value as an ascii representation. The behavior of timeout is the same as for Keyword.read().
+        """Perform a KTL write for this keyword. value is the new value to write to the keyword. If binary is set to True, value will be interpreted as a binary representation; the default behavior is to interpret value as an ascii representation. The behavior of timeout is the same as for :meth:`read`.
         """
     
     def _update(self, value):
@@ -196,7 +194,7 @@ class ClientKeywordBase(_BaseKeyword):
 
 
 @six.add_metaclass(abc.ABCMeta)
-class ClientServiceBase(object):
+class ClientService(object):
     """A Cauldron-based service.
     
     :param name: The KTL service name.
@@ -212,7 +210,7 @@ class ClientServiceBase(object):
     
     """
     def __init__(self, name, populate=False):
-        super(ClientServiceBase, self).__init__()
+        super(ClientService, self).__init__()
         self._keywords = {}
         self.name = name.lower()
         if populate:
@@ -238,7 +236,7 @@ class ClientServiceBase(object):
             self._populate_one(key)
         
         
-    @abc.abstractmethod
+    @api_required
     def has_keyword(self, keyword):
         """Determines if this service has a keyword.
         
@@ -251,6 +249,7 @@ class ClientServiceBase(object):
         return self.has_keyword(keyword)
         
     
+    @api_not_implemented
     def heartbeat(self, keyword, period=5):
         """Identify keyword (either a keyword name, or a Keyword instance) as a heartbeat keyword for this Service. A heartbeat keyword should broadcast regularly to indicate that the KTL service is functional. period should be set to the maximum expected interval (in seconds) between heartbeat broadcasts.
         
@@ -258,9 +257,9 @@ class ClientServiceBase(object):
         
         Multiple heartbeats may be specified for a single Service instance. This is desirable if distinct dispatchers provide subsets of the keywords within a single KTL service. The failure of any heartbeat will trigger a full resuscitate operation; no attempt is made to distinguish between Keyword instances serviced by distinct dispatchers.
         """
-        raise CauldronAPINotImplemented("The Cauldron API does not support heartbeats.")
+        pass
         
-    @abc.abstractmethod
+    @api_required
     def keywords(self):
         """List all keywords available in this Service instance."""
         pass
@@ -271,9 +270,9 @@ class ClientServiceBase(object):
         
     
     def read(self, keyword):
-        """Read a keyword"""
+        """Read a keyword, passes through to the keyword implementation's :meth:`Keyword.read`."""
         return self._keywords[keyword].read()
     
     def write(self, keyword, value):
-        """Write a keyword value."""
+        """Write a keyword value, passes through to the keyword implementation's :meth:`Keyword.write`."""
         return self._keywords[keyword].write(value)

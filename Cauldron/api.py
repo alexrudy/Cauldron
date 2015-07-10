@@ -8,6 +8,8 @@ from __future__ import absolute_import
 import types
 import sys
 
+__all__ = ['install', 'use', 'teardown']
+
 CAULDRON_SETUP = False
 
 BASENAME = ".".join(__name__.split(".")[:-1])
@@ -58,7 +60,18 @@ def register_dispatcher(service_class, keyword_class):
     _dispatcher_registry[name] = (service_class, keyword_class)
 
 def use(name):
-    """Use a particular client name."""
+    """Activae a KTL backend in Cauldron.
+    
+    :param str name: The name of the KTL backend to use.
+    
+    You should only call this function once per interpreter session. It will raise a :exc:`RuntimeError` if it is called when Cauldron has been already set up. After this call, it is safe to make imports from Cauldron KTL API modules::
+        
+        import Cauldron
+        Cauldron.use("local")
+        from Cauldron import ktl
+        
+    
+    """
     global CAULDRON_SETUP, _client, _dispatcher
     # We do some hacks here to install the module 'Cauldron.ktl' and 'Cauldron.DFW' only once this API function has been called.
     if CAULDRON_SETUP:
@@ -100,16 +113,24 @@ def setup_ktl_backend():
     
 def get_client():
     """Get the client pair."""
-    _guard_use("accessing the client Keyword/Service pair")
+    guard_use("accessing the client Keyword/Service pair")
     return _client
     
 def get_dispatcher():
     """Get the dispatcher pair"""
-    _guard_use("accessing the dispatcher Keyword/Service pair")
+    guard_use("accessing the dispatcher Keyword/Service pair")
     return _dispatcher
     
-def _teardown():
-    """Teardown the Cauldron setup. This is good for test fixtures, but not much else."""
+def teardown():
+    """Remove the Cauldron setup from the sys.modules cache, and prepare for another call to :func:`use`.
+    
+    This method can be used to reset the state of the Cauldron module and backend. This is most appropriate in a test environemnt.
+    
+    .. warning:: 
+        It is not guaranteed to replace modules which are currently imported and active. In fact, it suffers from many of the same problems faced
+        by the builtin :func:`reload`, and to a greater extent, makes very little effort to ensure that python objects
+        which have already been created and belong to the Cauldron API are handled correctly.
+    """
     global CAULDRON_SETUP, _client, _dispatcher
     try:
         Cauldron = sys.modules[BASENAME]
@@ -130,13 +151,21 @@ def _teardown():
     
     
 def install():
-    """Install the Cauldron modules in the global namespace, so that they will intercept root-level imports."""
+    """Install the Cauldron modules in the global namespace, so that they will intercept root-level imports.
+    
+    This method performs a runtime hack to try to make the Cauldron versions of ``ktl`` and ``DFW`` the ones which are
+    accessed when a python module performs ``import ktl`` or ``import DFW``. If either module has already been imported
+    in python, then this function will send a RuntimeWarning to that effect and do nothing.
+    
+    .. note:: It is preferable to use :ref:`cauldron-style`, of the form ``from Cauldron import ktl``, as this will properly ensure that the Cauldron backend is invoked and not the KTL backend.
+    """
     if 'ktl' in sys.modules or "DFW" in sys.modules:
+        warnings.warn("'ktl' or 'DFW' already in sys.modules. Skipping 'install()'")
         return
     sys.modules['ktl'] = sys.modules[BASENAME + ".ktl"]
     sys.modules['DFW'] = sys.modules[BASENAME + ".DFW"]
 
-def _guard_use(msg='doing this', error=RuntimeError):
+def guard_use(msg='doing this', error=RuntimeError):
     """Guard against using a Cauldron module when we haven't yet specified the backend."""
     if not CAULDRON_SETUP:
         raise error("You must call Cauldron.use() before {0} in order to set the Cauldron backend.".format(msg))

@@ -2,13 +2,13 @@
 
 import weakref
 from .dispatcher import Service as Dispatcher
-from ..base import ClientServiceBase, ClientKeywordBase
+from ..base import ClientService, ClientKeyword
 from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented
 from ..api import register_client
 
 __all__ = ['Service', 'Keyword']
 
-class Keyword(ClientKeywordBase):
+class Keyword(ClientKeyword):
     """A keyword for local dispatcher implementations."""
     
     @property
@@ -45,7 +45,7 @@ class Keyword(ClientKeywordBase):
         if not wait or timeout is not None:
             warnings.warn("Cauldron.local doesn't support asynchronous reads.", CauldronAPINotImplementedWarning)
         
-        self._update(self.source.value)
+        self._update(self.source.update())
         return self._current_value(binary=binary, both=both)
         
     def write(self, value, wait=True, binary=False, timeout=None):
@@ -70,7 +70,7 @@ class Keyword(ClientKeywordBase):
     def wait(self, timeout=None, operator=None, value=None, sequence=None, reset=False, case=False):
         raise CauldronAPINotImplemented("Asynchronous operations are not supported for Cauldron.local")
 
-class Service(ClientServiceBase):
+class Service(ClientService):
     """A local service client."""
     
     def __init__(self, name, populate=False):

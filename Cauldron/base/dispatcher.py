@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
-
-# -*- coding: utf-8 -*-
+"""
+Implements the abstract-base Keyword and Service classes used for dispatchers. 
+This piece of Cauldron is a rough mock of :mod:`DFW`, the dispatcher side interface.
+"""
 
 from __future__ import absolute_import
 
@@ -10,6 +12,7 @@ import weakref
 from ..compat import WeakOrderedSet
 from .core import _BaseKeyword
 from ..exc import CauldronAPINotImplemented, NoWriteNecessary
+from ..utils.helpers import api_not_required, api_not_implemented, api_required, api_override
 
 __all__ = ['DispatcherKeyword', 'DispatcherService']
 
@@ -60,16 +63,22 @@ class DispatcherKeyword(_BaseKeyword):
             return self._callbacks.discard(function)
         self._callbacks.add(function)
         
+    @api_override
     def check(self, value):
         """Check that 'value' is appropriate for this keyword. If it is not, raise a value error."""
         pass
         
+    @api_override
     def translate(self, value):
         """Translate a value into a standard representation."""
         return value
         
     def set(self, value, force=False):
-        """Set the keyword to the value provided, and broadcast changes."""
+        """Set the keyword to the value provided, and broadcast changes.
+        
+        :param value: The keywrod value.
+        :param bool force: Whether to force the change, or ignore repeatedly setting a keyword to the same value.
+        """
         value = self.translate(value)
         
         if value == self.value and force is False:
@@ -108,14 +117,16 @@ class DispatcherKeyword(_BaseKeyword):
         """An internal method to be used to actually broadcast the value via the service."""
         pass
         
+    @api_override
     def preread(self):
-        """Take some action before this value is read."""
+        """Take some action before this value is read. Called at the start of :meth:`update`."""
         pass
         
+    @api_override
     def prewrite(self, value):
-        """Any actions which need to occur before a value is written.
+        """Any actions which need to occur before a value is written. Called to adjust the value in :meth:`modify`.
         
-        This can raise NoWriteNecessary if a write is not necessary.
+        This can raise :exc:`NoWriteNecessary` if a write is not necessary.
         """
         if self.value == value:
             raise NoWriteNecessary("Value unchanged")
@@ -123,22 +134,25 @@ class DispatcherKeyword(_BaseKeyword):
         self.check(value)
         return value
     
+    @api_override
     def write(self, value):
-        """Write the value to the authority source"""
+        """Write the value to the authority source. Called to adjust the value in :meth:`modify`."""
         pass
         
+    @api_override
     def read(self):
-        """Read the value from the authority source."""
+        """Read the value from the authority source. Called to get the value for :meth:`update`."""
         return self.value
     
+    @api_not_implemented
     def schedule(self, appointment=None, cancel=False):
         """Schedule an update."""
-        raise CauldronAPINotImplemented("The Cauldron API does not implement .schedule.")
+        pass
     
+    @api_not_implemented
     def period(self, period):
         """How often a keyword should be updated."""
-        raise CauldronAPINotImplemented("The Cauldron API does not implement .period.")
-    
+        pass
     
     def _propogate(self):
         """Propagate the change to any waiting callbacks."""
@@ -147,17 +161,20 @@ class DispatcherKeyword(_BaseKeyword):
             callback(self)
         self._acting = False
         
+    @api_override
     def postwrite(self, value):
         """Take some action post-write."""
         self.set(value)
         
+    @api_override
     def postread(self, value):
-        """Take some action post-read."""
+        """Take some action post-read. Called at the end of :meth:`update`."""
         self.set(value)
         return value
         
+    
     def modify(self, value):
-        """Modify values."""
+        """Modify this keyword's value. This is the public function which should be called to change a keyword value."""
         try:
             value = self.prewrite(value)
         except NoWriteNecessary:
@@ -167,12 +184,13 @@ class DispatcherKeyword(_BaseKeyword):
         self.postwrite(value)
         
     def update(self):
-        """Update the value by performing a read."""
+        """Update the value by performing a read. This is the public function which should be called when the keyword is read."""
         self.preread()
         value = self.read()
         
         if value is not None:
-            self.postread()
+            return self.postread(value)
+        return value
 
 
 @six.add_metaclass(abc.ABCMeta)
@@ -220,8 +238,9 @@ class DispatcherService(object):
         self.status_keyword = keyword
         return True
     
+    @api_override
     def setupOrphans(self):
-        """Override this method to set up orphaned keyword values"""
+        """Set up orphaned keywords, that is keywords which aren't attached to a specific keyword class."""
         pass
     
     def begin(self):
@@ -288,7 +307,7 @@ class DispatcherService(object):
         """The list of available keywords"""
         return list(sorted(self._keywords.keys()))
         
-    @abc.abstractmethod
+    @api_required
     def shutdown(self):
         """Shutdown this keyword server."""
         pass

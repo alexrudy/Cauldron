@@ -47,9 +47,9 @@ def config():
 @pytest.fixture(params=["local"])
 def backend(request):
     """The backend name."""
-    from Cauldron.api import use, _teardown
+    from Cauldron.api import use, teardown
     use(request.param)
-    request.addfinalizer(_teardown)
+    request.addfinalizer(teardown)
     return request.param
 
 @pytest.fixture

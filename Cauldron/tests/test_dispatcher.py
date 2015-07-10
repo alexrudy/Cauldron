@@ -4,8 +4,6 @@ Test clients.
 """
 import pytest
 
-from Cauldron.api import _teardown
-
 def test_callbacks(dispatcher, client):
     """Test callback propogation."""
     
@@ -51,5 +49,17 @@ def test_period(dispatcher, client):
     """Fail with period tests."""
     dispatcher["MODE"].period(10)
     
-
+def test_teardown(servicename):
+    """Check that teardown really does tear things down."""
+    from Cauldron.api import teardown, use
+    use("local")
+    from Cauldron.DFW import Service
+    svc = Service(servicename+"2", None)
+    svc['MYKEYWORD'].modify('10')
+    teardown()
+    del svc
+    use("local")
+    from Cauldron.DFW import Service
+    svc2 = Service(servicename+"2", None)
+    assert svc2['MYKEYWORD'].read() == None
     

@@ -5,13 +5,13 @@ REDIS client tools
 from __future__ import absolute_import
 
 import weakref
-from ..base import ClientServiceBase, ClientKeywordBase
+from ..base import ClientService, ClientKeyword
 from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented
 from .common import REDIS_SERVICES_REGISTRY, redis_key_name, check_redis
 
 __all__ = ['Service', 'Keyword']
 
-class Keyword(ClientKeywordBase):
+class Keyword(ClientKeyword):
     """A keyword for REDIS dispatcher implementations."""
     
     def _ktl_reads(self):
@@ -72,7 +72,7 @@ class Keyword(ClientKeywordBase):
     def wait(self, timeout=None, operator=None, value=None, sequence=None, reset=False, case=False):
         raise CauldronAPINotImplemented("Asynchronous operations are not supported for Cauldron.redis")
 
-class Service(ClientServiceBase):
+class Service(ClientService):
     """A Redis service client."""
     
     def __init__(self, name, populate=False, connection_pool=None):
