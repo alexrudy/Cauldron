@@ -139,9 +139,11 @@ def teardown():
     This method can be used to reset the state of the Cauldron module and backend. This is most appropriate in a test environemnt.
     
     .. warning:: 
-        It is not guaranteed to replace modules which are currently imported and active. In fact, it suffers from many of the same problems faced
-        by the builtin :func:`reload`, and to a greater extent, makes very little effort to ensure that python objects
-        which have already been created and belong to the Cauldron API are handled correctly.
+        It is not guaranteed to replace modules which are currently imported and active. In fact, it suffers from many 
+        of the same problems faced by the builtin :func:`reload`, and to a greater extent, makes very little effort to 
+        ensure that python objects which have already been created and belong to the Cauldron API are handled correctly. 
+        It is likely that if you call this method with instances of Keyword or Service still active in your application,
+        those instances will become unusable.
     """
     global CAULDRON_SETUP, _client, _dispatcher
     try:
