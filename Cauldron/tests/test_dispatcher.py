@@ -34,7 +34,6 @@ def test_check(dispatcher, client):
     
     with pytest.raises(CheckFailed):
         kw.modify("10")
-        
     
 
 def test_modfiy(dispatcher, client):
@@ -42,7 +41,6 @@ def test_modfiy(dispatcher, client):
     dispatcher['MODE'].modify("16xTest")
     assert "16xTest" == client['MODE'].read()
     assert "16xTest" == dispatcher['MODE'].read()
-    
 
 @pytest.mark.xfail
 def test_period(dispatcher, client):
@@ -50,7 +48,7 @@ def test_period(dispatcher, client):
     dispatcher["MODE"].period(10)
     
 def test_teardown(servicename):
-    """Check that teardown really does tear things down."""
+    """Check that teardown really does tear things down, in local mode."""
     from Cauldron.api import teardown, use
     use("local")
     from Cauldron.DFW import Service
@@ -58,6 +56,7 @@ def test_teardown(servicename):
     svc['MYKEYWORD'].modify('10')
     teardown()
     del svc
+    
     use("local")
     from Cauldron.DFW import Service
     svc2 = Service(servicename+"2", None)
