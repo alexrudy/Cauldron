@@ -83,7 +83,6 @@ def use(name):
             name, list(backends)))
     
     CAULDRON_SETUP = True
-    
     # Set up the LROOT KTL installation differently
     if name in KTL_DEFAULT_NAMES:
         return setup_ktl_backend()
@@ -95,12 +94,12 @@ def use(name):
     
     Cauldron = sys.modules[BASENAME]
     # Install the client side libraries.
-    from . import _ktl as ktl
-    Cauldron.ktl = sys.modules[BASENAME + ".ktl"] = ktl
+    from . import _ktl
+    Cauldron.ktl = sys.modules[BASENAME + ".ktl"] = _ktl
     
     # Install the dispatcher side libraries.
-    from . import _DFW as DFW
-    Cauldron.DFW = sys.modules[BASENAME + ".DFW"] = DFW
+    from . import _DFW
+    Cauldron.DFW = sys.modules[BASENAME + ".DFW"] = _DFW
     
 def setup_ktl_backend():
     """Set up the KTL backend."""
@@ -121,6 +120,19 @@ def get_dispatcher():
     guard_use("accessing the dispatcher Keyword/Service pair")
     return _dispatcher
     
+def _expunge_module(module_name):
+    """Given a module name, expunge it from sys.modules."""
+    mod = sys.modules[module_name]
+    if mod is None:
+        del sys.modules[module_name]
+    else:
+        try:
+            if BASENAME in mod.__file__:
+                del sys.modules[module_name]
+        except:
+            pass
+    del mod
+    
 def teardown():
     """Remove the Cauldron setup from the sys.modules cache, and prepare for another call to :func:`use`.
     
@@ -135,15 +147,21 @@ def teardown():
     try:
         Cauldron = sys.modules[BASENAME]
         if hasattr(Cauldron, 'DFW'):
-            sys.modules.pop(BASENAME+".DFW", None)
+            for module_name in sys.modules.keys():
+                if "DFW" in module_name and module_name.startswith(BASENAME):
+                    _expunge_module(module_name)
             del Cauldron.DFW
         if hasattr(Cauldron, 'ktl'):
-            sys.modules.pop(BASENAME+".ktl", None)
+            for module_name in sys.modules.keys():
+                if "ktl" in module_name and module_name.startswith(BASENAME):
+                    _expunge_module(module_name)
             del Cauldron.ktl
         if "ktl" in sys.modules:
             del sys.modules['ktl']
         if "DFW" in sys.modules:
             del sys.modules["DFW"]
+    except:
+        raise
     finally:
         _client = None
         _dispatcher = None
@@ -159,6 +177,7 @@ def install():
     
     .. note:: It is preferable to use :ref:`cauldron-style`, of the form ``from Cauldron import ktl``, as this will properly ensure that the Cauldron backend is invoked and not the KTL backend.
     """
+    guard_use("installing Cauldron", error=RuntimeError)
     if 'ktl' in sys.modules or "DFW" in sys.modules:
         warnings.warn("'ktl' or 'DFW' already in sys.modules. Skipping 'install()'")
         return
