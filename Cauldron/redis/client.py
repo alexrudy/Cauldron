@@ -8,6 +8,8 @@ import weakref
 from ..base import ClientService, ClientKeyword
 from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented
 from .common import REDIS_SERVICES_REGISTRY, redis_key_name, check_redis
+from ..api import register_client
+
 
 __all__ = ['Service', 'Keyword']
 
@@ -97,4 +99,4 @@ class Service(ClientService):
         keyword = self._keywords[key] = Keyword(self, key)
         return keyword
     
-    
+register_client(Service, Keyword)

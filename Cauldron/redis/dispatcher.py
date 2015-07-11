@@ -8,6 +8,7 @@ from __future__ import absolute_import
 from ..base import DispatcherService, DispatcherKeyword
 from ..compat import WeakOrderedSet
 from .common import REDIS_SERVICES_REGISTRY, redis_key_name, get_connection_pool, check_redis
+from ..api import register_dispatcher
 
 __all__ = ['Service', 'Keyword']
 
@@ -67,4 +68,5 @@ class Keyword(DispatcherKeyword):
                 #TODO: respond with the error to the stream.
                 pass
     
-    
+
+register_dispatcher(Service, Keyword)
