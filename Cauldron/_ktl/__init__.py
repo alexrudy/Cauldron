@@ -12,9 +12,9 @@ from ..api import guard_use
 guard_use(msg='importing the ._ktl module', error=ImportError)
 del guard_use
 
-from ..api import setup_client
-setup_client()
-del setup_client
+from ..registry import client
+client.setup()
+del client
 # Done with initial setup.
 
 from .Keyword import Keyword

@@ -8,7 +8,7 @@ The local interface is process-local. It is lightweight, and good for testing en
 
 from ..base import DispatcherService, DispatcherKeyword
 from ..compat import WeakOrderedSet
-from ..api import register_dispatcher
+from .. import registry
 
 import weakref
 
@@ -16,6 +16,7 @@ __all__ = ['Service', 'Keyword']
 
 _registry = weakref.WeakValueDictionary()
 
+@registry.dispatcher.service_for("local")
 class Service(DispatcherService):
     """Local dispatcher service."""
     
@@ -43,6 +44,7 @@ class Service(DispatcherService):
         keyword = self._keywords[key.lower()] = Keyword(key, self)
         return keyword
 
+@registry.dispatcher.keyword_for("local")
 class Keyword(DispatcherKeyword):
     """A keyword"""
     def __init__(self, name, service, initial=None, period=None):
@@ -54,5 +56,3 @@ class Keyword(DispatcherKeyword):
         for consumer in self._consumers:
             consumer(value)
     
-
-register_dispatcher(Service, Keyword)

@@ -8,6 +8,8 @@ from __future__ import absolute_import
 import types
 import sys
 
+from . import registry
+
 __all__ = ['install', 'use', 'teardown']
 
 CAULDRON_SETUP = False
@@ -15,49 +17,6 @@ CAULDRON_SETUP = False
 BASENAME = ".".join(__name__.split(".")[:-1])
 
 KTL_DEFAULT_NAMES = set(['ktl', 'DFW'])
-
-_client_registry = {}
-_client = None
-_client_setup_functions = []
-_dispatcher_registry = {}
-_dispatcher = None
-_dispatcher_setup_functions = []
-
-# Setup Registries
-def register_client_setup(func):
-    """Register a client setup function."""
-    _client_setup_functions.append(func)
-    return func
-
-def register_dispatcher_setup(func):
-    """Register a dispathcer setup function."""
-    _dispatcher_setup_functions.append(func)
-    return func
-
-def setup_dispatcher():
-    """Set up the dispatcher module."""
-    for func in _dispatcher_setup_functions:
-        func()
-    
-
-def setup_client():
-    """Set up the client module"""
-    for func in _client_setup_functions:
-        func()
-    
-
-# Class Registries.
-def register_client(service_class, keyword_class):
-    """Register a particular client service class."""
-    name = service_class.__module__.split(".")[-2]
-    assert name not in KTL_DEFAULT_NAMES, "Backend name '{0}' is reserved for the default KTL backend".format(name)
-    _client_registry[name] = (service_class, keyword_class)
-
-def register_dispatcher(service_class, keyword_class):
-    """docstring for register_dispatcher"""
-    name = service_class.__module__.split(".")[-2]
-    assert name not in KTL_DEFAULT_NAMES, "Backend name '{0}' is reserved for the default KTL backend".format(name)
-    _dispatcher_registry[name] = (service_class, keyword_class)
 
 def use(name):
     """Activae a KTL backend in Cauldron.
@@ -72,13 +31,12 @@ def use(name):
         
     
     """
-    global CAULDRON_SETUP, _client, _dispatcher
+    global CAULDRON_SETUP
     # We do some hacks here to install the module 'Cauldron.ktl' and 'Cauldron.DFW' only once this API function has been called.
     if CAULDRON_SETUP:
         raise RuntimeError("You may only call Cauldron.use() once! Refusing to activate again.")
     
-    backends = set(_client_registry.keys() + _dispatcher_registry.keys()).union(KTL_DEFAULT_NAMES)
-    if name not in backends:
+    if name not in registry.keys():
         raise ValueError("The Cauldron backend {0} is not known. Try one of {1!r}".format(
             name, list(backends)))
     
@@ -87,10 +45,8 @@ def use(name):
     if name in KTL_DEFAULT_NAMES:
         return setup_ktl_backend()
     
-    # Set up the default installation, install modules.
-    # Modules will call their own setup functions inside.
-    _client = _client_registry[name]
-    _dispatcher = _dispatcher_registry[name]
+    registry.client.use(name)
+    registry.dispatcher.use(name)
     
     Cauldron = sys.modules[BASENAME]
     # Install the client side libraries.
@@ -109,16 +65,6 @@ def setup_ktl_backend():
     
     import DFW
     sys.modules[BASENAME + ".DFW"] = Cauldron.DFW = DFW
-    
-def get_client():
-    """Get the client pair."""
-    guard_use("accessing the client Keyword/Service pair")
-    return _client
-    
-def get_dispatcher():
-    """Get the dispatcher pair"""
-    guard_use("accessing the dispatcher Keyword/Service pair")
-    return _dispatcher
     
 def _expunge_module(module_name):
     """Given a module name, expunge it from sys.modules."""
@@ -165,8 +111,8 @@ def teardown():
     except:
         raise
     finally:
-        _client = None
-        _dispatcher = None
+        registry.client.teardown()
+        registry.dispatcher.teardown()
         CAULDRON_SETUP = False
     
     
@@ -191,17 +137,15 @@ def guard_use(msg='doing this', error=RuntimeError):
     if not CAULDRON_SETUP:
         raise error("You must call Cauldron.use() before {0} in order to set the Cauldron backend.".format(msg))
         
-@register_client_setup
+@registry.client.setup_for('all')
 def setup_client_service_module():
     """Set up the client Service module."""
     from ._ktl import Service
-    s, c = get_client()
-    Service.Service = s
+    Service.Service = registry.client.Service
     
-@register_dispatcher_setup
+@registry.dispatcher.setup_for('all')
 def setup_dispatcher_service_module():
-    """Set up the dispathcer Service module."""
+    """Set up the dispatcher Service module."""
     from ._DFW import Service
-    s, c = get_dispatcher()
-    Service.Service = s
+    Service.Service = registry.dispatcher.Service
 

@@ -4,10 +4,11 @@ import weakref
 from .dispatcher import Service as Dispatcher
 from ..base import ClientService, ClientKeyword
 from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented
-from ..api import register_client
+from .. import registry
 
 __all__ = ['Service', 'Keyword']
 
+@registry.client.keyword_for("local")
 class Keyword(ClientKeyword):
     """A keyword for local dispatcher implementations."""
     
@@ -70,6 +71,7 @@ class Keyword(ClientKeyword):
     def wait(self, timeout=None, operator=None, value=None, sequence=None, reset=False, case=False):
         raise CauldronAPINotImplemented("Asynchronous operations are not supported for Cauldron.local")
 
+@registry.client.service_for("local")
 class Service(ClientService):
     """A local service client."""
     
@@ -90,5 +92,4 @@ class Service(ClientService):
         keyword = self._keywords[key] = Keyword(self, key)
         return keyword
 
-register_client(Service, Keyword)
     

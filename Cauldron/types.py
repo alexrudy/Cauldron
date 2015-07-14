@@ -17,7 +17,8 @@ import sys
 import abc
 import six
 from .exc import CauldronAPINotImplementedWarning
-from .api import guard_use, get_client, get_dispatcher, register_dispatcher_setup, register_client_setup
+from .api import guard_use
+from . import registry
 
 __all__ = ['KeywordType', 'Basic', 'Keyword', 'Boolean', 'Double', 'Float', 'Integer', 'Enumerated', 'Mask', 'String', 'IntegerArray', 'FloatArray', 'DoubleArray', 'dispatcher_keyword', 'client_keyword']
 
@@ -39,21 +40,21 @@ def generate_keyword_subclasses(basecls, subclasses):
     for subclass in subclasses:
         yield type(subclass.__name__, (subclass, basecls), dict())
 
-@register_client_setup
+@registry.client.setup_for('all')
 def setup_client_keyword_module():
     """Generate the Keyword module"""
     guard_use("setting up the ktl.Keyword module")
-    _, basecls = get_client()
+    basecls = registry.client.Keyword
     from ._ktl import Keyword
     for kwcls in generate_keyword_subclasses(basecls, _client):
         setattr(Keyword, kwcls.__name__, kwcls)
         Keyword.__all__.append(kwcls.__name__)
     
-@register_dispatcher_setup
+@registry.dispatcher.setup_for('all')
 def setup_dispatcher_keyword_module():
     """Set up the Keyword module"""
     guard_use("setting up the DFW.Keyword module")
-    _, basecls = get_dispatcher()
+    basecls = registry.dispatcher.Keyword
     from ._DFW import Keyword
     for kwcls in generate_keyword_subclasses(basecls, _client):
         setattr(Keyword, kwcls.__name__, kwcls)

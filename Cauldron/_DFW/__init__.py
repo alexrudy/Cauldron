@@ -7,9 +7,9 @@ from ..api import guard_use
 guard_use(msg='importing the ._DFW module', error=ImportError)
 del guard_use
 
-from ..api import setup_dispatcher
-setup_dispatcher()
-del setup_dispatcher
+from ..registry import dispatcher
+dispatcher.setup()
+del dispatcher
 # Done with initial setup.
 
 from . import Keyword

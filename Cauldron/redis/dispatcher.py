@@ -8,10 +8,11 @@ from __future__ import absolute_import
 from ..base import DispatcherService, DispatcherKeyword
 from ..compat import WeakOrderedSet
 from .common import REDIS_SERVICES_REGISTRY, redis_key_name, get_connection_pool, check_redis
-from ..api import register_dispatcher
+from .. import registry
 
 __all__ = ['Service', 'Keyword']
 
+@registry.dispatcher.service_for("redis")
 class Service(DispatcherService):
     """REDIS dispatcher service."""
     
@@ -47,6 +48,7 @@ class Service(DispatcherService):
         self.redis.srem(REDIS_SERVICES_REGISTRY, self.name)
     
 
+@registry.dispatcher.keyword_for("redis")
 class Keyword(DispatcherKeyword):
     """A keyword"""
     
@@ -69,4 +71,3 @@ class Keyword(DispatcherKeyword):
                 pass
     
 
-register_dispatcher(Service, Keyword)

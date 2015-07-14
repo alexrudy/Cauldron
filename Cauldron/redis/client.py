@@ -8,11 +8,11 @@ import weakref
 from ..base import ClientService, ClientKeyword
 from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented
 from .common import REDIS_SERVICES_REGISTRY, redis_key_name, check_redis
-from ..api import register_client
-
+from .. import registry
 
 __all__ = ['Service', 'Keyword']
 
+@registry.client.keyword_for("redis")
 class Keyword(ClientKeyword):
     """A keyword for REDIS dispatcher implementations."""
     
@@ -74,6 +74,7 @@ class Keyword(ClientKeyword):
     def wait(self, timeout=None, operator=None, value=None, sequence=None, reset=False, case=False):
         raise CauldronAPINotImplemented("Asynchronous operations are not supported for Cauldron.redis")
 
+@registry.client.service_for("redis")
 class Service(ClientService):
     """A Redis service client."""
     
@@ -99,4 +100,3 @@ class Service(ClientService):
         keyword = self._keywords[key] = Keyword(self, key)
         return keyword
     
-register_client(Service, Keyword)
