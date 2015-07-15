@@ -7,8 +7,6 @@ Cauldron Internals
 
 .. automodapi:: Cauldron.exc
 
-.. automodapi:: Cauldron.compat
-
 KTL API Features
 ----------------
 
@@ -19,6 +17,4 @@ Within these special hidden modules, you may use relative imports to import the 
 API Setup Functions
 -------------------
 
-.. autofunction:: Cauldron.api.register_client_setup
-
-.. autofunction:: Cauldron.api.register_dispatcher_setup
+.. automodapi:: Cauldron.registry

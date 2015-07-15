@@ -6,17 +6,36 @@ A registry of setup and teardown functions for dispatchers and clients.
 import collections
 from .compat import WeakOrderedSet
 
-__all__ = ['client', 'dispatcher', 'keys']
+__all__ = ['client', 'dispatcher', 'keys', 'teardown', 'Registry']
 
-class _Registry(object):
-    """A registry of setup and teardown functions."""
-    def __init__(self):
-        super(_Registry, self).__init__()
+class Registry(object):
+    """A registry of setup and teardown functions.
+    
+    This module contains two :class:`Registry` instances: ``client`` and ``dispatcher``.
+    They serve as the setup and teardown registries for the KTL client and disptachetr
+    side APIs. Additional setup or teardown functions can be registered using :meth:`setup_for`
+    and :meth:`teardown_for`. The base keyword and service classes for a particular backend can
+    be set using :meth:`keyword_for` and :meth:`service_for`. All of these methods are decorators
+    and can be used as such in the appropriate places::
+        
+        from Cauldron import registry
+        
+        @regsitry.client.setup_for("mybackend")
+        def mysetup():
+            # Do some setup work here!
+            pass
+        
+    
+    """
+    def __init__(self, doc=None):
+        super(Registry, self).__init__()
         self._setup = collections.defaultdict(WeakOrderedSet)
         self._teardown = collections.defaultdict(WeakOrderedSet)
         self._keyword = {}
         self._service = {}
         self._backend = None
+        if doc is not None:
+            self.__doc__ = doc
         
     def keys(self):
         """Return the active and available registry keys."""
@@ -114,8 +133,8 @@ class _Registry(object):
         self._backend = None
         
 
-client = _Registry()
-dispatcher = _Registry()
+client = Registry(doc="A registry of setup and teardown functions to support the KTL client interface.")
+dispatcher = Registry(doc="A registry of setup and teardown functions to support the KTL dispatcher interface.")
 
 def keys():
     """Keys available in both registries."""
