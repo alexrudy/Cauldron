@@ -8,7 +8,7 @@ import functools
 import weakref
 from .events import _DescriptorEvent, _KeywordListener
 
-__all__ = ['KeywordDescriptor']
+__all__ = ['KeywordDescriptor', 'DescriptorBase']
 
 def descriptor__get__(f):
     """A getter for descriptors."""
