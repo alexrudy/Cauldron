@@ -1,6 +1,9 @@
 Cauldron
 --------
 
+.. image:: https://travis-ci.org/alexrudy/Cauldron.svg
+    :target: https://travis-ci.org/alexrudy/Cauldron
+
 Cauldron is a library to remove the dependency on the "Keck Telescope Libary", KTL.
 
 KTL is a system used by UC Observatories for both Lick and Keck Observatories. It is primarily
