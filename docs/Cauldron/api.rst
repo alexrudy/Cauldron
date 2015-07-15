@@ -1,4 +1,4 @@
-.. module:: Cauldron.api
+.. currentmodule:: Cauldron.api
 
 Cauldron User's API
 *******************
