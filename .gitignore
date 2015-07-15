@@ -52,8 +52,6 @@ distribute-*.tar.gz
 # Mac OSX
 .DS_Store
 
-docs/ktl.pdf
-
 *.rdb
 html/*
 *.prof
