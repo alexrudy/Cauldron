@@ -17,7 +17,6 @@ try:
     del PYTEST_HEADER_MODULES['h5py']
     del PYTEST_HEADER_MODULES['Scipy']
     del PYTEST_HEADER_MODULES['Matplotlib']
-    PYTEST_HEADER_MODULES['redis'] = 'redis'
 except NameError:  # needed to support Astropy < 1.0
     pass
 
@@ -45,8 +44,10 @@ try:
     from .redis.common import configure_pool
     configure_pool(host='localhost', port=6379, db=0)
 except Exception as e:
+    # If, for any reason, REDIS is not available, just don't test against it.
     pass
 else:
+    PYTEST_HEADER_MODULES['redis'] = 'redis'
     available_backends.append("redis")
 
 @pytest.fixture
