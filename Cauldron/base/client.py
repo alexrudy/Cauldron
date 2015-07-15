@@ -3,7 +3,7 @@
 Implements the abstract-base Keyword and Service classes used for clients. 
 This piece of Cauldron is a rough mock of :mod:`ktl`, the client side interface.
 
-The actual implementation of client side features outside of the :class:`ClientKeyword` and :class:`ClientService` classes
+The actual implementation of client side features outside of the :class:`Keyword` and :class:`Service` classes
 is in the :mod:`_ktl` module.
 """
 from __future__ import absolute_import
@@ -18,9 +18,9 @@ from .core import _BaseKeyword
 from ..compat import WeakOrderedSet
 from ..utils.helpers import api_not_required, api_not_implemented, api_required, api_override
 
-__all__ = ['ClientKeyword', 'ClientService']
+__all__ = ['Keyword', 'Service']
 
-class ClientKeyword(_BaseKeyword):
+class Keyword(_BaseKeyword):
     """A keyword object.
     
     Parameters
@@ -54,7 +54,7 @@ class ClientKeyword(_BaseKeyword):
     
     """
     def __init__(self, service, name, type=str):
-        super(ClientKeyword, self).__init__(service, name, type)
+        super(Keyword, self).__init__(service, name, type)
         self._callbacks = WeakOrderedSet()
         
     
@@ -194,7 +194,7 @@ In circumstances when a KTL keyword cannot (or will not) reliably broadcast upda
 
 
 @six.add_metaclass(abc.ABCMeta)
-class ClientService(object):
+class Service(object):
     """A Cauldron-based service.
     
     :param name: The KTL service name.
@@ -210,7 +210,7 @@ class ClientService(object):
     
     """
     def __init__(self, name, populate=False):
-        super(ClientService, self).__init__()
+        super(Service, self).__init__()
         self._keywords = {}
         self.name = name.lower()
         if populate:

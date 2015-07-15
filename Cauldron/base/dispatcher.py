@@ -14,15 +14,15 @@ from .core import _BaseKeyword
 from ..exc import CauldronAPINotImplemented, NoWriteNecessary
 from ..utils.helpers import api_not_required, api_not_implemented, api_required, api_override
 
-__all__ = ['DispatcherKeyword', 'DispatcherService']
+__all__ = ['Keyword', 'Service']
 
-class DispatcherKeyword(_BaseKeyword):
+class Keyword(_BaseKeyword):
     """A dispatcher-based keyword, which should own its own values."""
     
     _ALLOWED_KEYS = set(['value', 'name', 'readonly', 'writeonly'])
     
     def __init__(self, name, service, initial=None, period=None):
-        super(DispatcherKeyword, self).__init__(name=name, service=service)
+        super(Keyword, self).__init__(name=name, service=service)
         name = str(name).upper()
         if name in service:
             raise ValueError("keyword named '%s' already in exists." % name)
@@ -194,10 +194,10 @@ class DispatcherKeyword(_BaseKeyword):
 
 
 @six.add_metaclass(abc.ABCMeta)
-class DispatcherService(object):
+class Service(object):
     """A dispatcher is a KTL service server-side. It owns the values."""
     def __init__(self, name, config, setup=None, dispatcher=None):
-        super(DispatcherService, self).__init__()
+        super(Service, self).__init__()
         
         self.dispatcher = dispatcher
         self.name = name.lower()
@@ -280,7 +280,7 @@ class DispatcherService(object):
         
     def __setitem__(self, name, value):
         """Set a keyword instance in this server."""
-        if not isinstance(value, DispatcherKeyword):
+        if not isinstance(value, Keyword):
             raise TypeError("value must be a Keyword instance.")
         
         #TODO: Make this work with keyword validation.
