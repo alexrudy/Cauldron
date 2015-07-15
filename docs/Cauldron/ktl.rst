@@ -34,11 +34,11 @@ KTL Clients can read and write to keyword values. In python, KTL clients are imp
 
 To use a client in the object-oriented fashion, initialize a service, and access that service like a dictionary of keywords::
     
-    >>> from Cauldron.ktl import Service
-    >>> svc = Service("MyCauldronService")
-    >>> kwd = svs["MYKEYWORD"]
-    >>> kwd.write(10)
-    >>> print(kwd.read())
+    >>> from Cauldron.ktl import Service # doctest: +SKIP
+    >>> svc = Service("MyCauldronService") # doctest: +SKIP
+    >>> kwd = svs["MYKEYWORD"] # doctest: +SKIP
+    >>> kwd.write(10) # doctest: +SKIP
+    >>> print(kwd.read()) # doctest: +SKIP
     10
     
 
