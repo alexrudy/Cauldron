@@ -9,6 +9,7 @@ from __future__ import absolute_import
 import abc
 import six
 import weakref
+import logging
 from ..compat import WeakOrderedSet
 from .core import _BaseKeyword
 from ..exc import CauldronAPINotImplemented, NoWriteNecessary
@@ -200,6 +201,8 @@ class Service(object):
     def __init__(self, name, config, setup=None, dispatcher=None):
         super(Service, self).__init__()
         
+        self.log = logging.getLogger("DFW.Service")
+        
         self.dispatcher = dispatcher
         self.name = name.lower()
         
@@ -252,6 +255,9 @@ class Service(object):
             if keyword is None:
                 continue
             if keyword.initial is not None:
+                
+                # Ensure that if this keyword was already written to,
+                # we don't overwrite the already written value.
                 if keyword.value is not None:
                     initial = keyword.value
                 else:
@@ -260,8 +266,8 @@ class Service(object):
                 try:
                     keyword.set(initial)
                 except ValueError as e:
-                    self.log(logging.ERROR, "Bad initial value '%s' for '%s'", initial, keyword.name)
-                    self.log(logging.ERROR, e)
+                    self.log.error("Bad initial value '%s' for '%s'", initial, keyword.name)
+                    self.log.error(e)
         
         self._begin()
         
