@@ -155,12 +155,12 @@ class Integer(Basic):
     def check(self, value):
         """Check range against allowed KTL values."""
         super(Integer, self).check(value)
-        if not (self.minimum < value < self.maximum):
+        if not (self.minimum < self.cast(value) < self.maximum):
             raise ValueError("Keyword {0} must have integer values in range {1} to {2}".format(self.name, self.minimum, self.maximum))
         
     def increment(self, amount=1):
         """Increment the integer value."""
-        value = int(self.value) if self.value is not None else 0
+        value = self.cast(self.value) if self.value is not None else 0
         self.set(str(value + int(amount)))
         
 
