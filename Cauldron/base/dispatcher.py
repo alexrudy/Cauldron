@@ -22,11 +22,10 @@ class Keyword(_BaseKeyword):
     _ALLOWED_KEYS = set(['value', 'name', 'readonly', 'writeonly'])
     
     def __init__(self, name, service, initial=None, period=None):
-        super(Keyword, self).__init__(name=name, service=service)
         name = str(name).upper()
+        super(Keyword, self).__init__(name=name, service=service)
         if name in service:
-            raise ValueError("keyword named '%s' already in exists." % name)
-        self.name = name
+            raise ValueError("keyword named '%s' already exists." % name)
         self._acting = False
         self._callbacks = WeakOrderedSet()
         self._history = list()
@@ -40,6 +39,8 @@ class Keyword(_BaseKeyword):
         
         if period is not None:
             self.period(period)
+        
+        service[self.name] = self
     
     @property
     def full_name(self):
@@ -223,11 +224,13 @@ class Service(object):
         
         self.begin()
     
+    def __repr__(self):
+        """Represent this object"""
+        return "<{0} name='{1}' at {2}>".format(self.__class__.__name__, self.name, hex(id(self)))
+    
     def keywords(self):
-        """Return the keywords."""
-        keywords = self._keywords.keys()
-        keywords.sort()
-        return keywords
+        """The list of available keywords"""
+        return list(sorted(self._keywords.keys()))
         
     def setStatusKeyword(self, keyword):
         """Set the status keyword value."""
@@ -269,10 +272,11 @@ class Service(object):
         
     def __getitem__(self, name):
         """Get a keyword item."""
+        name = str(name).upper()
         try:
-            return self._keywords[name.lower()]
+            return self._keywords[name]
         except KeyError:
-            return self.__missing__(name.lower())
+            return self.__missing__(name)
         
     def __missing__(self, key):
         """What to do with missing keys."""
@@ -283,6 +287,8 @@ class Service(object):
         if not isinstance(value, Keyword):
             raise TypeError("value must be a Keyword instance.")
         
+        name = str(name).upper()
+        
         #TODO: Make this work with keyword validation.
         # if name not in self._keywords:
         #     raise KeyError("service '%s' does not have a keyword '%s'" % (self.name, name))
@@ -291,6 +297,10 @@ class Service(object):
             raise RuntimeError("cannot set keyword '%s' twice" % (name))
         
         self._keywords[name] = value
+        
+    def __contains__(self, name):
+        """Check for name in self"""
+        return str(name).upper() in self._keywords
         
     def __iter__(self):
         """Iterator over self."""
@@ -302,10 +312,6 @@ class Service(object):
             value = keyword['value']
             if value != None:
                 keyword._broadcast(value)
-        
-    def keywords(self):
-        """The list of available keywords"""
-        return list(sorted(self._keywords.keys()))
         
     @api_required
     def shutdown(self):

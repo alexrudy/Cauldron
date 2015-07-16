@@ -76,7 +76,7 @@ class Service(ClientService):
     """A local service client."""
     
     def __init__(self, name, populate=False):
-        self._dispatcher = Dispatcher.get(name.lower())
+        self._dispatcher = Dispatcher.get(name)
         super(Service, self).__init__(name, populate)
     
     def has_keyword(self, name):
@@ -89,7 +89,8 @@ class Service(ClientService):
         
     def __missing__(self, key):
         """Populate and return a missing key."""
-        keyword = self._keywords[key] = Keyword(self, key)
+        keyword = Keyword(self, key)
+        self._keywords[keyword.name] = keyword
         return keyword
 
     

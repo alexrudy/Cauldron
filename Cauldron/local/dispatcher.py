@@ -16,6 +16,11 @@ __all__ = ['Service', 'Keyword']
 
 _registry = weakref.WeakValueDictionary()
 
+@registry.dispatcher.teardown_for("local")
+def clear():
+    """Clear the registry."""
+    _registry.clear()
+
 @registry.dispatcher.service_for("local")
 class Service(DispatcherService):
     """Local dispatcher service."""
@@ -24,10 +29,11 @@ class Service(DispatcherService):
     def get(cls, name):
         """Get a dispatcher for a service."""
         #TODO: Support inverse client startup ordering.
+        name = str(name).lower()
         return _registry[name]
     
     def __init__(self, name, config, setup=None, dispatcher=None):
-        if name.lower() in _registry:
+        if str(name).lower() in _registry:
             raise ValueError("Cannot have two services with name {0} in local registry.".format(name))
         super(Service, self).__init__(name, config, setup, dispatcher)
         
@@ -41,8 +47,7 @@ class Service(DispatcherService):
         
     def __missing__(self, key):
         """Allows the local dispatcher to populate any keyword, whetehr it should exist or not."""
-        keyword = self._keywords[key.lower()] = Keyword(key, self)
-        return keyword
+        return Keyword(key, self)
 
 @registry.dispatcher.keyword_for("local")
 class Keyword(DispatcherKeyword):

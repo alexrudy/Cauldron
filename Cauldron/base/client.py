@@ -56,7 +56,6 @@ class Keyword(_BaseKeyword):
     def __init__(self, service, name, type=str):
         super(Keyword, self).__init__(service, name, type)
         self._callbacks = WeakOrderedSet()
-        
     
     @api_not_implemented
     def _ktl_broadcasts(self):
@@ -216,19 +215,22 @@ class Service(object):
         if populate:
             self._populate()
     
+    def __repr__(self):
+        """Represent this object"""
+        return "<Service name='{0}' at {1}>".format(self.name, hex(id(self)))
+    
     def __getitem__(self, key):
         """Return a keyword."""
-        if key in self._keywords:
-            return self._keywords[key]
+        if key.upper() in self._keywords:
+            return self._keywords[key.upper()]
         elif self.has_keyword(key):
-            self._populate_one(key)
-            return self._keywords[key]
+            return self.__missing__(key.upper())
         else:
-            return self.__missing__(key)
+            raise KeyError("{0} has no key '{1}'".format(self, key.upper()))
     
     def __missing__(self, key):
         """Handle a missing key."""
-        raise KeyError("{0} has no key '{1}'".format(self, key))
+        raise KeyError("{0} has no key '{1}'".format(self, key.upper()))
     
     def _populate(self):
         """Populate all of the instantiated keywords here."""
@@ -271,8 +273,8 @@ class Service(object):
     
     def read(self, keyword):
         """Read a keyword, passes through to the keyword implementation's :meth:`Keyword.read`."""
-        return self._keywords[keyword].read()
+        return self[keyword].read()
     
     def write(self, keyword, value):
         """Write a keyword value, passes through to the keyword implementation's :meth:`Keyword.write`."""
-        return self._keywords[keyword].write(value)
+        return self[keyword].write(value)

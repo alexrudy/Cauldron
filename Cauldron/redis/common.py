@@ -24,7 +24,7 @@ def redis_key_name(service, keyword=None):
         _service = keyword.service.name
         _keyword = keyword.name
     else:
-        _service, _keyword = str(_service).lower(), str(_keyword).lower()
+        _service, _keyword = str(_service).lower(), str(_keyword).upper()
     return "{0}.{1}.{2}".format(__name__, _service, _keyword)
     
 def get_connection_pool(connection_pool):
