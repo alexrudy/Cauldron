@@ -45,6 +45,12 @@ BASENAME = ".".join(__name__.split(".")[:-1])
 
 KTL_DEFAULT_NAMES = set(['ktl', 'DFW'])
 
+STRICT_KTL_XML = _Setting("STRICT_KTL_XML", False)
+
+def use_strict_xml():
+    """Use strict XML settings."""
+    STRICT_KTL_XML.value = True
+
 def use(name):
     """Activae a KTL backend in Cauldron.
     
@@ -150,6 +156,7 @@ def teardown():
     except: # pragma: no cover
         raise
     finally:
+        STRICT_KTL_XML.value = False
         CAULDRON_SETUP.value = False
     
     
