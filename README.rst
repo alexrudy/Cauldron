@@ -79,7 +79,7 @@ the following will work::
 Documentation
 =============
 
-Documentation is available on ReadTheDocs at <http://cauldron.readthedocs.org/en/latest/Cauldron/index.html>.
+Documentation is available on ReadTheDocs at http://cauldron.readthedocs.org/en/latest/Cauldron/index.html.
 
 Sphinx documentation is provided in the ``docs/`` folder of the source code. To build it you will need sphinx installed.
 Then run::
