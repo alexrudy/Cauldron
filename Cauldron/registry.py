@@ -27,8 +27,9 @@ class Registry(object):
         
     
     """
-    def __init__(self, doc=None):
+    def __init__(self, name, doc=None):
         super(Registry, self).__init__()
+        self.name = name
         self._setup = collections.defaultdict(WeakOrderedSet)
         self._teardown = collections.defaultdict(WeakOrderedSet)
         self._keyword = {}
@@ -36,6 +37,11 @@ class Registry(object):
         self._backend = None
         if doc is not None:
             self.__doc__ = doc
+            
+    @property
+    def backend(self):
+        """Get the backend name."""
+        return self._backend
         
     def keys(self):
         """Return the active and available registry keys."""
@@ -133,8 +139,8 @@ class Registry(object):
         self._backend = None
         
 
-client = Registry(doc="A registry of setup and teardown functions to support the KTL client interface.")
-dispatcher = Registry(doc="A registry of setup and teardown functions to support the KTL dispatcher interface.")
+client = Registry("client", doc="A registry of setup and teardown functions to support the KTL client interface.")
+dispatcher = Registry("dispatcher", doc="A registry of setup and teardown functions to support the KTL dispatcher interface.")
 
 def keys():
     """Keys available in both registries."""
