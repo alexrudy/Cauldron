@@ -4,7 +4,9 @@ Test clients.
 """
 import pytest
 
-def test_callbacks(dispatcher, client):
+pytestmark = pytest.mark.usefixtures("teardown_cauldron")
+
+def test_callbacks(dispatcher):
     """Test callback propogation."""
     
     class CallbackRecieved(Exception): pass
@@ -16,10 +18,10 @@ def test_callbacks(dispatcher, client):
     dispatcher['MODE'].callback(cb)
     
     with pytest.raises(CallbackRecieved):
-        client['MODE'].write('1')
+        dispatcher['MODE'].modify('1')
         
     dispatcher['MODE'].callback(cb, remove=True)
-    client['MODE'].write('1')
+    dispatcher['MODE'].modify('1')
         
 def test_check(dispatcher, client):
     """Test that check accepts only values of the correct type, etc."""
@@ -70,7 +72,7 @@ def test_initialize_with_period(dispatcher):
     DFW.Keyword.Keyword("keyword", dispatcher, period=10)
 
 @pytest.mark.xfail
-def test_period(dispatcher, client):
+def test_period(dispatcher):
     """Fail with period tests."""
     dispatcher["KEYWORD"].period(10)
     
@@ -102,6 +104,7 @@ def test_setup_function(backend, servicename, config):
         
     service = DFW.Service(servicename, config, setup=setup)
     assert "KEYWORD" in service
+    del service
     
 def test_service_setitem(dispatcher):
     """Test a dispatcher service's setitem."""
@@ -155,7 +158,7 @@ def test_write_before_begin(backend, servicename, config):
     assert "KEYWORD" in service
     assert service['KEYWORD']['value'] == str(10)
 
-def test_teardown(servicename):
+def test_teardown(servicename, teardown_cauldron):
     """Check that teardown really does tear things down, in local mode."""
     from Cauldron.api import teardown, use
     use("local")

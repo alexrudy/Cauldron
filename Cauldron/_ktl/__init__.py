@@ -17,7 +17,4 @@ client.setup()
 del client
 # Done with initial setup.
 
-from .Keyword import Keyword
-from .Service import Service
-
 __all__ = ['Service', 'Keyword']

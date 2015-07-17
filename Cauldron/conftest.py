@@ -69,12 +69,18 @@ def fail_if_not_teardown():
     """Fail if teardown has not happedned properly."""
     from Cauldron.api import teardown
     teardown()
-    failures = ["DFW", "ktl"]
+    failures = ["DFW", "ktl", "_DFW", "_ktl"]
     for module in sys.modules:
         for failure in failures:
-            if failure in module:
+            if failure in module.split("."):
                 mod = sys.modules[module]
                 pytest.fail("Module {0}/{1} not properly torn down.".format(module, sys.modules[module]))
+    try:
+        from Cauldron import DFW
+    except ImportError as e:
+        pass
+    else:
+        pytest.fail("Shouldn't be able to import DFW now!")
     
 @pytest.fixture(scope='function')
 def teardown_cauldron(request):
@@ -89,7 +95,9 @@ def backend(request):
     """The backend name."""
     from Cauldron.api import use, teardown
     use(request.param)
-    request.addfinalizer(teardown)
+    request.addfinalizer(fail_if_not_teardown)
+    if request.param == "redis":
+        request.addfinalizer(clear_registry)
     return request.param
 
 @pytest.fixture

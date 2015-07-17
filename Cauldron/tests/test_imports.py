@@ -11,11 +11,21 @@ pytestmark = pytest.mark.usefixtures("teardown_cauldron")
 
 def test_guard():
     """Test that imports are guarded."""
+    from Cauldron.api import use, teardown
+    
     with pytest.raises(ImportError):
         from Cauldron import ktl
     with pytest.raises(ImportError):
         from Cauldron import DFW
-        
+    use("local")
+    from Cauldron import DFW, ktl
+    del DFW, ktl
+    teardown()
+    with pytest.raises(ImportError):
+        from Cauldron import ktl
+    with pytest.raises(ImportError):
+        from Cauldron import DFW
+    
 def test_reuse():
     """Test calling use twice."""
     from Cauldron.api import use, teardown
@@ -29,6 +39,7 @@ def test_dangling_imports():
     from Cauldron.api import use
     use("local")
     from Cauldron import ktl, DFW
+    
     
 def test_teardown():
     """Test that imports are guarded after calling .teardown()"""
@@ -46,7 +57,7 @@ def test_teardown():
         from Cauldron import ktl
     with pytest.raises(ImportError):
         from Cauldron import DFW
-        
+    
     assert "DFW" not in sys.modules
     assert "ktl" not in sys.modules
 

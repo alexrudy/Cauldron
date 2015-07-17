@@ -7,12 +7,30 @@ from __future__ import absolute_import
 
 import types
 import sys
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
 
 from . import registry
 
-__all__ = ['install', 'use', 'teardown']
+__all__ = ['install', 'use', 'teardown', 'use_strict_xml']
 
-CAULDRON_SETUP = False
+class _Setting(object):
+    """A settings object, which can be passed around by value."""
+    def __init__(self, name, value):
+        super(_Setting, self).__init__()
+        self.name = name
+        self.value = value
+    
+    def __repr__(self):
+        """Represent this value"""
+        return "<Setting {0}={1}>".format(self.name, self.value)
+    
+    def __nonzero__(self):
+        """Cast this setting to it's own boolean value."""
+        return bool(self.value)
+
+CAULDRON_SETUP = _Setting("CAULDRON_SETUP", False)
 
 BASENAME = ".".join(__name__.split(".")[:-1])
 
@@ -31,7 +49,6 @@ def use(name):
         
     
     """
-    global CAULDRON_SETUP
     # We do some hacks here to install the module 'Cauldron.ktl' and 'Cauldron.DFW' only once this API function has been called.
     if CAULDRON_SETUP:
         raise RuntimeError("You may only call Cauldron.use() once! Refusing to activate again.")
@@ -40,7 +57,9 @@ def use(name):
         raise ValueError("The Cauldron backend {0} is not known. Try one of {1!r}".format(
             name, list(backends)))
     
-    CAULDRON_SETUP = True
+    # Allow imports of backend modules now.
+    CAULDRON_SETUP.value = True
+    
     # Set up the LROOT KTL installation differently
     if name in KTL_DEFAULT_NAMES:
         return setup_ktl_backend()
@@ -51,10 +70,18 @@ def use(name):
     Cauldron = sys.modules[BASENAME]
     # Install the client side libraries.
     from . import _ktl
+    from ._ktl.Keyword import Keyword
+    from ._ktl.Service import Service
+    _ktl.Keyword = Keyword
+    _ktl.Service = Service
     Cauldron.ktl = sys.modules[BASENAME + ".ktl"] = _ktl
     
     # Install the dispatcher side libraries.
     from . import _DFW
+    from ._DFW.Service import Service
+    from ._DFW import Keyword
+    _DFW.Service = Service
+    _DFW.Keyword = Keyword
     Cauldron.DFW = sys.modules[BASENAME + ".DFW"] = _DFW
     
 def setup_ktl_backend():
@@ -73,11 +100,14 @@ def _expunge_module(module_name):
         del sys.modules[module_name]
     else:
         try:
-            if BASENAME in mod.__file__:
-                del sys.modules[module_name]
+            del sys.modules[module_name]
         except:
             pass
     del mod
+    
+def _is_target_module(name, module_name):
+    """Check a module name."""
+    return (name in module_name.split(".") or "_{0}".format(name) in module_name.split(".")) and module_name.startswith(BASENAME)
     
 def teardown():
     """Remove the Cauldron setup from the sys.modules cache, and prepare for another call to :func:`use`.
@@ -91,19 +121,20 @@ def teardown():
         It is likely that if you call this method with instances of Keyword or Service still active in your application,
         those instances will become unusable.
     """
-    global CAULDRON_SETUP, _client, _dispatcher
+    registry.client.teardown()
+    registry.dispatcher.teardown()
     try:
         Cauldron = sys.modules[BASENAME]
         if hasattr(Cauldron, 'DFW'):
-            for module_name in sys.modules.keys():
-                if "DFW" in module_name and module_name.startswith(BASENAME):
-                    _expunge_module(module_name)
             del Cauldron.DFW
+        for module_name in sys.modules.keys():
+            if _is_target_module("DFW", module_name):
+                _expunge_module(module_name)
         if hasattr(Cauldron, 'ktl'):
-            for module_name in sys.modules.keys():
-                if "ktl" in module_name and module_name.startswith(BASENAME):
-                    _expunge_module(module_name)
             del Cauldron.ktl
+        for module_name in sys.modules.keys():
+            if _is_target_module("ktl", module_name):
+                _expunge_module(module_name)
         if "ktl" in sys.modules:
             del sys.modules['ktl']
         if "DFW" in sys.modules:
@@ -111,9 +142,7 @@ def teardown():
     except:
         raise
     finally:
-        registry.client.teardown()
-        registry.dispatcher.teardown()
-        CAULDRON_SETUP = False
+        CAULDRON_SETUP.value = False
     
     
 def install():
@@ -143,6 +172,32 @@ def setup_client_service_module():
     from ._ktl import Service
     Service.Service = registry.client.Service
     
+@registry.client.teardown_for("all")
+def teardown_client_service_module():
+    """Remove the service from the client module."""
+    try:
+        _ktls = sys.modules[BASENAME + "._ktl.Service"]
+        del _ktls.Service
+        _ktl = sys.modules[BASENAME + "._ktl"]
+        del _ktl.Service
+        del _ktl.Keyword
+    except KeyError as e:
+        pass
+    
+    
+@registry.dispatcher.teardown_for("all")
+def teardown_dispatcher_service_module():
+    """Remove the service from the dispatcher module."""
+    try:
+        _DFWs = sys.modules[BASENAME + "._DFW.Service"]
+        del _DFWs.Service
+        _DFW = sys.modules[BASENAME + "._DFW"]
+        del _DFW.Service
+        del _DFW.Keyword
+    except KeyError as e:
+        pass
+    
+
 @registry.dispatcher.setup_for('all')
 def setup_dispatcher_service_module():
     """Set up the dispatcher Service module."""

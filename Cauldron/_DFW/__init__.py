@@ -12,6 +12,4 @@ dispatcher.setup()
 del dispatcher
 # Done with initial setup.
 
-from . import Keyword
-from .Service import Service
 __all__ = ['Keyword', 'Service']
