@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 from . import registry
 
-__all__ = ['install', 'use', 'teardown', 'use_strict_xml']
+__all__ = ['install', 'use', 'teardown']
 
 class _Setting(object):
     """A settings object, which can be passed around by value."""
