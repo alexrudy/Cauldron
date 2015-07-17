@@ -1,0 +1,22 @@
+<?xml version="1.0" ?>
+<bundle name="DISP1" service="testsvc" xmlns:xsi="http://www.w3.org/2001/XML-Schema-instance">
+	<dispatcher>
+		<name>+service+_dispatch_1</name>
+	</dispatcher>
+	<keyword>
+		<name>LOOP</name>
+		<type>enumerated</type>
+		<help level="brief">Control loop mode</help>
+		<help level="verbose">Control loop mode.</help>
+		<values>
+			<entry>
+				<key>0</key>
+				<value>Open</value>
+			</entry>
+			<entry>
+				<key>1</key>
+				<value>Closed</value>
+			</entry>
+		</values>
+	</keyword>
+</bundle>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<index service="testsvc">
+	<directories>
+	</directories>
+	<files>
+		<file>
+			<name>Dispatcher 1</name>
+			<location>dispatcher1.xml</location>
+			<comment>Keywords for dispatcher #1 state.</comment>
+		</file>
+		<file>
+			<name>messages</name>
+			<location>messages.xml</location>
+			<comment>Music message numbers</comment>
+		</file>
+		<file>
+			<name>keyword_ids</name>
+			<location>keyword_ids.xml</location>
+			<comment>Keyword-keyid mapping</comment>
+		</file>
+	</files>
+</index>
