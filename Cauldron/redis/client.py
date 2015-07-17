@@ -7,7 +7,7 @@ from __future__ import absolute_import
 import weakref
 from ..base import ClientService, ClientKeyword
 from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented
-from .common import REDIS_SERVICES_REGISTRY, redis_key_name, check_redis
+from .common import REDIS_SERVICES_REGISTRY, redis_key_name, check_redis, get_connection_pool
 from .. import registry
 
 __all__ = ['Service', 'Keyword']
@@ -41,6 +41,10 @@ class Keyword(ClientKeyword):
             self.service._start()
         else:
             self.service.pubsub.unsubscribe(self._redis_sub_name)
+            
+    def _ktl_monitored(self):
+        """Determine if this keyword is monitored."""
+        return self._redis_sub_name in self.service.pubsub.channels
         
     def read(self, binary=False, both=False, wait=True, timeout=None):
         """Read a value, synchronously, always."""
@@ -51,7 +55,7 @@ class Keyword(ClientKeyword):
         if not wait or timeout is not None:
             warnings.warn("Cauldron.redis doesn't support asynchronous reads.", CauldronAPINotImplementedWarning)
         
-        self._update(self.source.redis.get(redis_key_name(self)))
+        self._update(self.service.redis.get(redis_key_name(self)))
         return self._current_value(binary=binary, both=both)
         
     def write(self, value, wait=True, binary=False, timeout=None):
@@ -69,7 +73,7 @@ class Keyword(ClientKeyword):
             pass
         
         #TODO: Typechecking? Error munging?
-        self.source.redis.publish(redis_key_name(self), value)
+        self.service.redis.publish(redis_key_name(self), value)
         
     def wait(self, timeout=None, operator=None, value=None, sequence=None, reset=False, case=False):
         raise CauldronAPINotImplemented("Asynchronous operations are not supported for Cauldron.redis")
@@ -80,8 +84,7 @@ class Service(ClientService):
     
     def __init__(self, name, populate=False, connection_pool=None):
         redis = check_redis()
-        if connection_pool is None:
-            connection_pool = get_connection_pool()
+        connection_pool = get_connection_pool(connection_pool)
         self.redis = redis.StrictRedis(connection_pool=connection_pool)
         self.pubsub = redis.StrictRedis(connection_pool=connection_pool).pubsub()
         super(Service, self).__init__(name, populate)

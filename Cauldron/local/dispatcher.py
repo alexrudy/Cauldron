@@ -34,7 +34,7 @@ class Service(DispatcherService):
     
     def __init__(self, name, config, setup=None, dispatcher=None):
         if str(name).lower() in _registry:
-            raise ValueError("Cannot have two services with name {0} in local registry.".format(name))
+            raise ValueError("Cannot have two services with name '{0}' in local registry.".format(name))
         super(Service, self).__init__(name, config, setup, dispatcher)
         
     def _begin(self):
