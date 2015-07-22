@@ -2,7 +2,7 @@
 from __future__ import absolute_import
 
 import weakref
-from ...compat import WeakOrderedSet
+from ...compat import WeakOrderedSet, WeakSet
 
 class _DescriptorEvent(object):
     """Manage events attached to a keyword descriptor."""
@@ -14,8 +14,18 @@ class _DescriptorEvent(object):
         
     def listen(self, func):
         """Listen to a function."""
+        if not hasattr(func, '_listens'):
+            func._listens = WeakSet()
+        func._listens.add(self)
         self.callbacks.add(func)
         
+    def bind(self, obj):
+        """Bind this event to a particular set of instance methods."""
+        pass
+        
+    def __repr__(self):
+        return "<{0} name={1}>".format(self.__class__.__name__, self.name)
+    
     def propagate(self, obj, keyword, *args, **kwargs):
         """Propagate a listener event through to the keyword."""
         for callback in self.callbacks:
@@ -37,7 +47,7 @@ class _KeywordListener(object):
         self.keyword = weakref.ref(keyword)
         self.instance = weakref.ref(instance)
         setattr(keyword, event.name, self)
-        
+    
     def __call__(self, *args, **kwargs):
         """Ensure that the dispatcher fires before the keyword's own implementation."""
         event = self.event()
