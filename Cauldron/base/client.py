@@ -53,6 +53,9 @@ class Keyword(_BaseKeyword):
     Only one method is not supported by the original KTL library, :meth:`stop`, which could easily be subsumed into :meth:`subscribe` with the keyword argument ``start=False``.
     
     """
+    
+    _ALLOWED_KEYS = ['ascii', 'binary', 'broadcasts', 'name', 'monitored', 'monitor', 'populated', 'reads', 'writes', 'timestamp', 'units']
+    
     def __init__(self, service, name, type=str):
         super(Keyword, self).__init__(service, name, type)
         self._callbacks = WeakOrderedSet()
