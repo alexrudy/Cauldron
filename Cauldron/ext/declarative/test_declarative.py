@@ -15,16 +15,19 @@ def cls():
         @mykeyword.callback
         def callback(self, keyword):
             """Changed value callback"""
+            print("Calling 'callback'")
             self.called.add("callback")
         
         @mykeyword.prewrite
         def prewrite(self, keyword, value):
             """Pre-write listener."""
+            print("Calling 'prewrite'")
             self.called.add("prewrite")
         
         @mykeyword.preread
         def preread(self, keyword):
             """Pre-read listener."""
+            print("Calling 'preread'")
             self.called.add("preread")
             
     return DescriptorTestClass
@@ -34,7 +37,9 @@ def test_descriptor_basics(dispatcher, cls):
     
     instance = cls()
     
+    print("Starting bind.")
     instance.bind(dispatcher)
+    print("Bind done.")
     
     instance.mykeyword = "Hello"
     
