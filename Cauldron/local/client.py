@@ -3,7 +3,7 @@
 import weakref
 from .dispatcher import Service as Dispatcher
 from ..base import ClientService, ClientKeyword
-from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented
+from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented, ServiceNotStarted
 from .. import registry
 
 __all__ = ['Service', 'Keyword']
@@ -76,7 +76,10 @@ class Service(ClientService):
     """A local service client."""
     
     def __init__(self, name, populate=False):
-        self._dispatcher = Dispatcher.get(name)
+        try:
+            self._dispatcher = Dispatcher.get(name)
+        except KeyError:
+            raise ServiceNotStarted("Service '{0!s}' is not started.".format(name))
         super(Service, self).__init__(name, populate)
     
     def has_keyword(self, name):

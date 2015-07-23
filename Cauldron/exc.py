@@ -3,7 +3,7 @@
 Exceptions and warnings.
 """
 
-__all__ = ['NoWriteNecessary', 'CauldronWarning', 'CauldronException', 'CauldronAPINotImplemented']
+__all__ = ['NoWriteNecessary', 'CauldronWarning', 'CauldronException', 'CauldronAPINotImplemented', 'ServiceNotStarted']
 
 try:
     from DFW.Keyword import NoWriteNecessary
@@ -22,4 +22,8 @@ class CauldronAPINotImplemented(CauldronException, NotImplementedError):
     pass
     
 class CauldronAPINotImplementedWarning(CauldronWarning):
+    pass
+    
+class ServiceNotStarted(CauldronException, KeyError):
+    """Exception raised when starting a client which requires a dispatcher, and the dispatcher has not started."""
     pass

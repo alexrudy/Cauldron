@@ -46,7 +46,7 @@ class Service(DispatcherService):
         pass
         
     def __missing__(self, key):
-        """Allows the local dispatcher to populate any keyword, whetehr it should exist or not."""
+        """Allows the local dispatcher to populate any keyword, whether it should exist or not."""
         return Keyword(key, self)
 
 @registry.dispatcher.keyword_for("local")
