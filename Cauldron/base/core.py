@@ -76,12 +76,20 @@ class _BaseKeyword(object):
         """Maybe perform a read operation, if one is not already in progress."""
         if not self._reading and self._last_value is None:
             self.read()
+            
+    @contextlib.contextmanager
+    def _read(self):
+        """Context manager for reading"""
+        _reading, self._reading = self._reading, True
+        yield
+        self._reading = _reading
     
     def _current_value(self, both=False, binary=False):
         """Respond with the current value."""
-        if both:
-            return (self._ktl_binary(), self._ktl_ascii())
-        if binary:
-            return self._ktl_binary()
-        return self._ktl_ascii()
+        with self._read():
+            if both:
+                return (self._ktl_binary(), self._ktl_ascii())
+            if binary:
+                return self._ktl_binary()
+            return self._ktl_ascii()
     
