@@ -8,6 +8,7 @@ import six
 import abc
 import time
 import weakref
+import contextlib
 
 @six.add_metaclass(abc.ABCMeta)
 class _BaseKeyword(object):
