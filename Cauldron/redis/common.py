@@ -42,6 +42,11 @@ def get_global_connection_pool():
     if _global_connection_pool is None:
         _global_connection_pool = redis.ConnectionPool(**_connection_pool_settings)
     return _global_connection_pool
+    
+def set_global_connection_pool(connection_pool):
+    """Set the module-level connection pool for REDIS services"""
+    global _global_connection_pool
+    _global_connection_pool = connection_pool
 
 _connection_pool_settings = {}
 def configure_pool(**kwargs):

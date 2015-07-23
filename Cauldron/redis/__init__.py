@@ -2,6 +2,6 @@
 from __future__ import absolute_import
 from . import client
 from . import dispatcher
-from .common import configure_pool
+from .common import configure_pool, set_global_connection_pool
 
-__all__ = ['client', 'dispatcher', 'configure_pool']
+__all__ = ['client', 'dispatcher', 'configure_pool', 'set_global_connection_pool']
