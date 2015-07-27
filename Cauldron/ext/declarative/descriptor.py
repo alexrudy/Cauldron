@@ -124,7 +124,7 @@ class KeywordDescriptor(object):
     def __get__(self, obj, objtype=None):
         """Getter"""
         try:
-            return self.type(self.keyword(obj).update())
+            return self.type(self.keyword.update())
         except NotBoundError:
             return self.type(getattr(obj, self._attr, self._initial))
         
@@ -197,7 +197,7 @@ class KeywordDescriptor(object):
         """Get the Keyword instance."""
         try:
             return self._service[self.name]
-        except AttributeError:
+        except (AttributeError, TypeError):
             raise ServiceNotBound("No service is bound to {0}".format(self))
         
 
