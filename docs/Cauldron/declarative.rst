@@ -30,13 +30,13 @@ An example declarative class using keywords is below::
         
 
 
-To use this declarative class, you must bind an instance of it to a service object::
+To use this declarative class, you must bind the class to a KTL Service object::
 
     from Cauldron import DFW
-    athingy = Thing()
     svc = DFW.Service("THINGYSERVICE", conifg=None)
-    athingy.bind(svc)
-
+    Thing.set_service(svc)
+    athingy = Thing()
+    
     print(athingy.enabled)
     athingy.enabled = False
 

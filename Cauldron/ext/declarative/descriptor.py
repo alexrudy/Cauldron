@@ -6,9 +6,14 @@ from __future__ import absolute_import
 
 import functools
 import weakref
-from .events import _DescriptorEvent, _KeywordListener
+from .events import _DescriptorEvent, _KeywordEvent
+from ...exc import CauldronException
 
-__all__ = ['KeywordDescriptor', 'DescriptorBase']
+__all__ = ['KeywordDescriptor', 'DescriptorBase', 'ServiceNotBound']
+
+class ServiceNotBound(CauldronException):
+    """Error raised when a service is not bound to a descriptor."""
+    pass
 
 def descriptor__get__(f):
     """A getter for descriptors."""
@@ -29,10 +34,25 @@ class IntegrityError(Exception):
     
 
 class DescriptorBase(object):
-    """A keyword descriptor base class which assists in binding descriptors to keywords."""
+    """A keyword descriptor base class which assists in binding descriptors to keywords.
+    
+    There are two stages to binding:
+    1. Set the DFW Service for these keywords via :meth:`set_service`. This can be done at the class level.
+    2. Bind an instance to the the service. This can be done at __init__ time.
+    """
+    
+    def __init__(self, *args, **kwargs):
+        """This inializer tries to bind the instance, if it can."""
+        super(DescriptorBase, self).__init__(*args, **kwargs)
+        try:
+            self.bind()
+        except ServiceNotBound as e:
+            # We swallow this exception, because the instance may not be
+            # bound to a service.
+            pass
     
     @classmethod
-    def _keyword_descriptors(cls):
+    def keyword_descriptors(cls):
         """Find all of the keyword descriptors."""
         for var in dir(cls):
             try:
@@ -43,22 +63,33 @@ class DescriptorBase(object):
                 # We don't know what happened here, but there are lots of ways
                 # to override class-level attribute access and screw this up.
                 pass
-            
-    def bind(self, service):
+    
+    @classmethod
+    def set_service(cls, service):
+        """Set the service for the underlying descriptors."""
+        for desc in cls.keyword_descriptors():
+            desc.service = service
+        
+    
+    def bind(self, service=None):
         """Bind a service to the descriptors in this class."""
-        cls = self.__class__
-        for desc in self._keyword_descriptors():
-            desc.bind(self, service)
+        try:
+            for desc in self.keyword_descriptors():
+                desc.bind(self, service)
+        except ServiceNotBound:
+            raise ServiceNotBound("In order to bind this object's keyword descriptors, "
+            "you must set the appropriate service via the bind(service=...) method.")
 
 class KeywordDescriptor(object):
     """A descriptor which maintains a relationship with a keyword.
     
     The descriptor should be used as a class level variable. It can be accessed as
-    a regular instance variable, where it will return the result of :func:`update`
-    operations. Setting the instance variable will result in a modify operation.
+    a regular instance variable, where it will return the result of :meth:`Keyword.update`
+    operations. Setting the instance variable will result in a :meth:`Keyword.modify` operation.
     """
     
     _EVENTS = ['preread', 'read', 'postread', 'prewrite', 'write', 'postwrite', 'check']
+    _service = None
     
     def __init__(self, name, initial=None, type=lambda v : v, doc=None, readonly=False, writeonly=False):
         super(KeywordDescriptor, self).__init__()
@@ -69,11 +100,25 @@ class KeywordDescriptor(object):
             raise ValueError("Keyword {0} cannot be 'readonly' and 'writeonly'.".format(self.name))
         self.readonly = readonly
         self.writeonly = writeonly
+        
+        # Prepare the events interface.
+        self._events = []
         for event in self._EVENTS:
-            setattr(self, event, _DescriptorEvent(event))
+            evt = _DescriptorEvent(event)
+            setattr(self, event, evt)
+            self._events.append(evt)
+            
+        # We handle 'callback' separately, as it triggers on the keyword's _propogate method.
+        #TODO: We should check that this works with DFW and ktl builtins, its kind of a hack
+        # here
         self.callback = _DescriptorEvent("_propogate")
         self._attr = "_{0}_{1}".format(self.__class__.__name__, self.name)
         self._initial = initial
+        self._events.append(self.callback)
+        
+    def __repr__(self):
+        """Represent"""
+        return "<{0} name={1}{2}>".format(self.__class__.__name__, self.name, " bound to {0}".format(self.service) if self.service is not None else "")
         
     @descriptor__get__
     def __get__(self, obj, objtype=None):
@@ -124,19 +169,36 @@ class KeywordDescriptor(object):
             event = getattr(self, event_name)
             event.listeners[obj] = _KeywordListener(service[self.name], obj, event)
         self.callback.listeners[obj] = _KeywordListener(service[self.name], obj, self.callback)
+        return self.type(self.keyword.update())
         
+    def __set__(self, obj, value):
+        """Set the value."""
+        return self.keyword.modify(self.type(value))
         
-    def keyword(self, obj):
+    @property
+    def service(self):
+        """The service"""
+        return self._service
+    
+    @service.setter
+    def service(self, value):
+        """Set the service via a weakreference proxy."""
+        self._service = weakref.proxy(value)
+        
+    def bind(self, obj, service=None):
+        """Bind a service to this instance."""
+        if service is not None:
+            self.service = service
+        for event in self._events:
+            _KeywordEvent(self.keyword, obj, event)
+        
+    @property
+    def keyword(self):
         """Get the Keyword instance."""
-        # It is better to ask forgiveness than permission.
-        # We only raise a NotBoundError if the instance doesn't
-        # have a weakreference to the service.
         try:
-            return obj._service()[self.name]
+            return self._service[self.name]
         except AttributeError:
-            if not hasattr(obj, "_service"):
-                raise NotBoundError("Instance {0!r} is not bound to a service.".format(obj))
-            raise
+            raise ServiceNotBound("No service is bound to {0}".format(self))
         
 
     

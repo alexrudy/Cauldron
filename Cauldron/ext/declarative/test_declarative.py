@@ -2,7 +2,8 @@
 
 import pytest
 
-from .descriptor import KeywordDescriptor, DescriptorBase
+from .descriptor import KeywordDescriptor, DescriptorBase, ServiceNotBound
+from .events import _KeywordEvent
 
 @pytest.fixture
 def cls():
@@ -10,7 +11,10 @@ def cls():
     
     class DescriptorTestClass(DescriptorBase):
         mykeyword = KeywordDescriptor("MYKEYWORD")
-        called = set()
+        
+        def __init__(self):
+            super(DescriptorTestClass, self).__init__()
+            self.called = set()
     
         @mykeyword.callback
         def callback(self, keyword):
@@ -36,6 +40,7 @@ def test_descriptor_basics(dispatcher, cls):
     """Test basic features of the descriptor protocol"""
     
     instance = cls()
+    newinstance = cls()    
     
     print("Starting bind.")
     instance.bind(dispatcher)
@@ -43,15 +48,13 @@ def test_descriptor_basics(dispatcher, cls):
     
     instance.mykeyword = "Hello"
     
+    assert len(newinstance.called) == 0
     assert len(cls.mykeyword.callback.callbacks) == 1
     
     cb_name = [ cb.__name__ for cb in cls.mykeyword.callback.callbacks ][0]
     assert cb_name == "callback"
     
-    assert len(cls.mykeyword.callback.listeners) == 1
-    listener = cls.mykeyword.callback.listeners[instance]
-    assert listener.func
-    
+    assert cls.mykeyword.keyword == dispatcher["MYKEYWORD"]
     
     assert "callback" in instance.called
     assert "prewrite" in instance.called
@@ -65,5 +68,17 @@ def test_descriptor_basics(dispatcher, cls):
     del instance
     
     assert len(cls.mykeyword.callback.callbacks) == 1
-    assert len(cls.mykeyword.callback.listeners) == 0
+    assert newinstance.mykeyword == "Hello"
     
+    newinstance.mykeyword = "Goodbye"
+    
+def test_bind(dispatcher, cls):
+    """Test the bind method"""
+    
+    instance = cls()
+    with pytest.raises(ServiceNotBound):
+        instance.bind()
+        
+    instance.bind(dispatcher)
+    
+    instance.bind()
