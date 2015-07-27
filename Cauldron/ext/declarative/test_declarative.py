@@ -2,7 +2,7 @@
 
 import pytest
 
-from .descriptor import KeywordDescriptor, DescriptorBase, ServiceNotBound
+from .descriptor import KeywordDescriptor, DescriptorBase, ServiceNotBound, IntegrityError
 from .events import _KeywordEvent
 
 @pytest.fixture
@@ -10,8 +10,8 @@ def cls():
     """Descriptor test class, defined at runtime to prevent import problems."""
     
     class DescriptorTestClass(DescriptorBase):
-        mykeyword = KeywordDescriptor("MYKEYWORD")
-        
+        mykeyword = KeywordDescriptor("MYKEYWORD", initial="SomeValue")
+        typedkeyword = KeywordDescriptor("TYPEDKEYWORD", type=int, initial=10)
         def __init__(self):
             super(DescriptorTestClass, self).__init__()
             self.called = set()
@@ -82,3 +82,114 @@ def test_bind(dispatcher, cls):
     instance.bind(dispatcher)
     
     instance.bind()
+    
+def test_class_bind(dispatcher, cls):
+    """Test class-level bind."""
+    cls.bind(dispatcher)
+    instance = cls()
+    instance.mykeyword = "Hello"
+    
+    assert "callback" in instance.called
+    assert "prewrite" in instance.called
+    assert "preread" not in instance.called
+    assert dispatcher["MYKEYWORD"]["value"] == "Hello"
+    assert "preread" not in instance.called
+    
+    value = instance.mykeyword
+    assert "preread" in instance.called
+    
+def test_class_bind_no_arguments(cls):
+    """Test class-level bind with no service specified."""
+    with pytest.raises(ServiceNotBound):
+        cls.bind()
+    
+def test_initial(dispatcher, cls):
+    """Test the integrity checking for keywords."""
+    instance = cls()
+    assert instance.mykeyword == "SomeValue"
+    instance.bind(dispatcher)
+    assert instance.mykeyword == "SomeValue"
+    
+def test_initial_set_value(dispatcher, cls):
+    """docstring for test_initial_set_value"""
+    instance = cls()
+    assert instance.mykeyword == "SomeValue"
+    instance.mykeyword = "SomeValue2"
+    assert instance.mykeyword == "SomeValue2"
+    instance.bind(dispatcher)
+    assert instance.mykeyword == "SomeValue2"
+    assert dispatcher['MYKEYWORD']['value'] == "SomeValue2"
+    
+def test_initial_collision(dispatcher, cls):
+    """Test an initial value collision."""
+    instance = cls()
+    dispatcher["MYKEYWORD"].modify("SomeValue3")
+    
+    with pytest.raises(IntegrityError):
+        instance.bind(dispatcher)
+    
+def test_initial_no_value(dispatcher, cls):
+    """Test the initial value case when there is no initial value."""
+    cls.mykeyword._initial = None
+    instance = cls()
+    dispatcher['MYKEYWORD'].modify("SomeValue3")
+    
+    instance.bind(dispatcher)
+    assert instance.mykeyword == "SomeValue3"
+    
+def test_initial_typed(dispatcher, cls):
+    """Test the initial value when it should cause a type error."""
+    instance = cls()
+    cls.typedkeyword._initial = "SomeValue"
+    with pytest.raises(ValueError):
+        instance.bind(dispatcher)
+    
+def test_initial_failed_type(dispatcher, cls):
+    """docstring for test_initial_failed_type"""
+    instance = cls()
+    cls.typedkeyword._initial = object()
+    with pytest.raises(TypeError):
+        instance.bind(dispatcher)
+    
+def test_readonly_and_writeonly():
+    """Test making a keyword descriptor both readonly and writeonly."""
+    with pytest.raises(ValueError):
+        KeywordDescriptor("SOMEKEYWORD", readonly=True, writeonly=True)
+    
+def test_readonly(dispatcher):
+    """Test a read-only keyword"""
+    kwd = KeywordDescriptor("SOMEKEYWORD", readonly=True)
+    kwd.service = dispatcher
+    dispatcher["SOMEKEYWORD"].modify("SomeValue")
+    assert kwd.__get__(object(), object) == "SomeValue"
+    with pytest.raises(ValueError):
+        kwd.__set__(None, "value")
+        
+def test_writeonly(dispatcher):
+    """docstring for test_writeonly"""
+    kwd = KeywordDescriptor("SOMEKEYWORD", writeonly=True)
+    kwd.service = dispatcher
+    dispatcher["SOMEKEYWORD"].modify("SomeValue")
+    kwd.__set__(object(), "value")
+    assert dispatcher["SOMEKEYWORD"]['value'] == "value"
+    with pytest.raises(ValueError):
+        kwd.__get__(object(), object)
+        
+def test_event_class_reprs(dispatcher, cls):
+    """Test the REPR methods of event classes."""
+    from .events import _KeywordEvent, _DescriptorEvent, _KeywordListener
+    
+    kwd = dispatcher["SOMEKEYWORD"]
+    instance = cls()
+    
+    de = _DescriptorEvent("preread")
+    assert repr(de) == "<_DescriptorEvent name=preread>"
+    
+    ke = _KeywordEvent(kwd, instance, de)
+    expected = "<_KeywordEvent name=preread at "
+    assert repr(ke)[:len(expected)] == expected
+    
+    kl = _KeywordListener(kwd, instance, de)
+    expected = "<_KeywordListener name=preread at "
+    assert repr(kl)[:len(expected)] == expected
+    

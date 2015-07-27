@@ -5,6 +5,8 @@ import weakref
 import functools
 from ...compat import WeakOrderedSet, WeakSet
 
+__all__ = ['_DescriptorEvent', '_KeywordEvent', '_KeywordListener']
+
 class _DescriptorEvent(object):
     """Manage events attached to a keyword descriptor."""
     def __init__(self, name):
@@ -18,10 +20,6 @@ class _DescriptorEvent(object):
             func._listens = WeakSet()
         func._listens.add(self)
         self.callbacks.add(func)
-        
-    def bind(self, obj):
-        """Bind this event to a particular set of instance methods."""
-        pass
         
     def __repr__(self):
         return "<{0} name={1}>".format(self.__class__.__name__, self.name)
