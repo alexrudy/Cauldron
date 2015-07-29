@@ -69,6 +69,7 @@ def test_contains(dispatcher):
 def test_keyword_contains(dispatcher):
     """Test the 'in' for keywords"""
     keyword = dispatcher['KEYWORD']
+    assert "Some" not in keyword
     keyword.modify("SomeValue")
     assert "omeV" in keyword
     assert "Other" not in keyword

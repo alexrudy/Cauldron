@@ -30,6 +30,14 @@ class _Setting(object):
     def __nonzero__(self):
         """Cast this setting to it's own boolean value."""
         return bool(self.value)
+        
+    def on(self):
+        """Turn this setting on."""
+        self.value = True
+    
+    def off(self):
+        """Turn this setting off."""
+        self.value = False
 
 CAULDRON_SETUP = _Setting("CAULDRON_SETUP", False)
 

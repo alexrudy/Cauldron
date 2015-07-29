@@ -18,3 +18,13 @@ def test_setting():
     from Cauldron.api import _Setting
     MYSETTING = _Setting("MYSETTING", True)
     assert repr(MYSETTING) == "<Setting MYSETTING=True>"
+    
+def test_setting_toggles():
+    """Test the Setting toggles."""
+    from Cauldron.api import _Setting
+    MYSETTING = _Setting("MYSETTING", True)
+    assert MYSETTING
+    MYSETTING.off()
+    assert not MYSETTING
+    MYSETTING.on()
+    assert MYSETTING
