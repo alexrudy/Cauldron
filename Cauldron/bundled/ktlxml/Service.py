@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from . import version
 version.append ('$Revision: 90117 $')
 del version
@@ -21,7 +22,8 @@ class Service:
 
         keyword_xml will be a standard XML node.
     '''
-
+    
+    keywords = None
 
     def __init__ (self, service, directory=None):
 
@@ -78,7 +80,7 @@ class Service:
 
     def __repr__ (self):
 
-        return self.keywords.__repr__ ()
+        return "<xml.Service %s>" % repr(self.keywords)
 
 
     def __str__ (self):
@@ -114,7 +116,7 @@ class Service:
         return keywords
 
     keys = list
-    keywords = list
+    # keywords = list
 
 
 # end of class Service

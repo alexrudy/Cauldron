@@ -57,6 +57,9 @@ else:
     PYTEST_HEADER_MODULES['redis'] = 'redis'
     available_backends.append("redis")
 
+import pkg_resources
+import os
+
 @pytest.fixture
 def servicename():
     """Get the service name."""
@@ -74,9 +77,11 @@ def check_teardown(request):
 
 def fail_if_not_teardown():
     """Fail if teardown has not happedned properly."""
-    from Cauldron.api import teardown
+    from Cauldron.api import teardown, CAULDRON_SETUP
     teardown()
     failures = ["DFW", "ktl", "_DFW", "_ktl"]
+    if CAULDRON_SETUP:
+        pytest.fail("Cauldron is marked as 'setup'.")
     for module in sys.modules:
         for failure in failures:
             if failure in module.split("."):
@@ -89,18 +94,22 @@ def fail_if_not_teardown():
     else:
         pytest.fail("Shouldn't be able to import DFW now!")
     
+    import threading
+    if threading.active_count() > 1:
+        for thread in threading.enumerate():
+            print(thread)
+        pytest.fail("Threads left alive!")
+    
 @pytest.fixture(scope='function')
 def teardown_cauldron(request):
     """docstring for teardown_cauldron"""
-    from Cauldron.api import teardown
-    teardown()
     request.addfinalizer(fail_if_not_teardown)
     return None
 
 @pytest.fixture(params=available_backends)
 def backend(request):
     """The backend name."""
-    from Cauldron.api import use, teardown
+    from Cauldron.api import use, teardown, CAULDRON_SETUP
     use(request.param)
     request.addfinalizer(fail_if_not_teardown)
     if request.param == "redis":
@@ -108,13 +117,27 @@ def backend(request):
     return request.param
 
 @pytest.fixture
-def dispatcher(backend, servicename, config):
+def dispatcher(request, backend, servicename, config):
     """Establish the dispatcher for a particular kind of service."""
     from Cauldron import DFW
-    return DFW.Service(servicename, config)
+    svc = DFW.Service(servicename, config)
+    request.addfinalizer(lambda : svc.shutdown())
+    return svc
     
 @pytest.fixture
 def client(backend, servicename):
     """Test a client."""
     from Cauldron import ktl
     return ktl.Service(servicename)
+
+@pytest.fixture
+def xmldir():
+    """XML Directory for testing."""
+    path = pkg_resources.resource_filename("Cauldron", "data/testsvc/")
+    return os.path.abspath(path)
+
+@pytest.fixture
+def xmlvar(xmldir):
+    """docstring for xmlvar"""
+    reldir = os.environ['RELDIR'] = os.path.dirname(os.path.dirname(xmldir))
+    return reldir

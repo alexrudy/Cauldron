@@ -48,24 +48,24 @@ elif '/data/lroot' != '':
 # $(RELDIR)/lib/python and $(RELDIR)/lib should be in sys.path in order to
 # safely import the ktl module.
 
-reldir_lib = os.path.join (os.environ['RELDIR'], 'lib')
-reldir_lib_python = os.path.join (reldir_lib, 'python')
-
-if reldir_lib_python in sys.path:
-    pass
-else:
-    sys.path.append (reldir_lib_python)
-
-if reldir_lib in sys.path:
-    pass
-else:
-    sys.path.append (reldir_lib)
-
-
-# Done with the safety dance, clean up the module namespace.
-
-del reldir_lib
-del reldir_lib_python
+# reldir_lib = os.path.join (os.environ['RELDIR'], 'lib')
+# reldir_lib_python = os.path.join (reldir_lib, 'python')
+#
+# if reldir_lib_python in sys.path:
+#     pass
+# else:
+#     sys.path.append (reldir_lib_python)
+#
+# if reldir_lib in sys.path:
+#     pass
+# else:
+#     sys.path.append (reldir_lib)
+#
+#
+# # Done with the safety dance, clean up the module namespace.
+#
+# del reldir_lib
+# del reldir_lib_python
 del os
 del sys
 

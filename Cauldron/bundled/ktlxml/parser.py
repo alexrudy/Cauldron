@@ -1,8 +1,8 @@
-import version
+from . import version
 version.append ('$Revision: 85832 $')
 del version
 
-import get
+from . import get
 
 import xml.dom.minidom
 import os
