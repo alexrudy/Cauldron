@@ -41,7 +41,7 @@ class Keyword(ClientKeyword):
         """Read a value, synchronously, always."""
         
         if not self['reads']:
-            raise NotImplementedError("Keyword '{0}' does not support reads.".format(self.name))
+            raise ValueError("Keyword '{0}' does not support reads, it is write-only.".format(self.name))
         
         if not wait or timeout is not None:
             warnings.warn("Cauldron.local doesn't support asynchronous reads.", CauldronAPINotImplementedWarning)
@@ -52,7 +52,7 @@ class Keyword(ClientKeyword):
     def write(self, value, wait=True, binary=False, timeout=None):
         """Write a value"""
         if not self['writes']:
-            raise NotImplementedError("Keyword '{0}' does not support reads.".format(self.name))
+            raise ValueError("Keyword '{0}' does not support writes, it is read-only.".format(self.name))
         
         if not wait or timeout is not None:
             warnings.warn("Cauldron.local doesn't support asynchronous writes.", CauldronAPINotImplementedWarning)

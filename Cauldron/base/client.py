@@ -63,12 +63,12 @@ class Keyword(_BaseKeyword):
     @api_not_implemented
     def _ktl_broadcasts(self):
         """Does this keyword support broadcasting?"""
-        pass
+        pass # pragma: no cover
     
     @abc.abstractmethod
     def _ktl_monitored(self):
         """Monitored?"""
-        pass
+        pass # pragma: no cover
         
     def _ktl_monitor(self):
         """Delegate to monitored."""
@@ -81,12 +81,12 @@ class Keyword(_BaseKeyword):
     @abc.abstractmethod
     def _ktl_reads(self):
         """Can we read?"""
-        pass
+        pass # pragma: no cover
         
     @abc.abstractmethod
     def _ktl_writes(self):
         """Can we read?"""
-        pass
+        pass # pragma: no cover
         
     def _ktl_timestamp(self):
         """Time stamp from the last KTL read."""
@@ -95,7 +95,7 @@ class Keyword(_BaseKeyword):
         
     def _ktl_units(self):
         """KTL units."""
-        return None
+        return None # pragma: no cover
         
     @api_override
     def cast(self, value):
@@ -114,14 +114,14 @@ class Keyword(_BaseKeyword):
     def isAlive(self):
         """Check that the heartbeats associated with this keyword are themselves alive; if they are, return True, otherwise return False. If no heartbeats are associated with this Keyword instance, a NoHeartbeatsError exception will be raised.
         """
-        pass
+        pass # pragma: no cover
         
     @api_required
     def monitor(self, start=True, prime=True, wait=True):
         """
         Subscribe to broadcasts for this KTL keyword. If start is set to False, the subscription will be shut down. If prime is set to False, there will be no priming read of the keyword value; the default behavior is to perform a priming read. If wait is set to False, the priming read (if requested) will not block while waiting for the priming read to complete.
         """
-        pass
+        pass # pragma: no cover
         
     @api_not_implemented
     def poll(self, period=1, start=True):
@@ -134,7 +134,7 @@ In circumstances when a KTL keyword cannot (or will not) reliably broadcast upda
     Polling keywords is inefficient, as it requires a discrete ktl_read() operation for each polling event for each keyword polled. Using :func:`monitor` is a far better choice if supported by the service's KTL client library.
 
 """
-        pass
+        pass # pragma: no cover
         
     
     def callback(self, function, remove=False, preferred=False):
@@ -164,7 +164,7 @@ In circumstances when a KTL keyword cannot (or will not) reliably broadcast upda
     def read(self, binary=False, both=False, wait=True, timeout=None):
         """Perform a ktl_read() operation for this keyword. The default behavior is to do a blocking read and return the ascii representation of the keyword value. If binary is set to True, only the binary representation will be returned; If both is set to True, both representations will be returned in a (binary, ascii) tuple. If wait is set to False, the KTL read operation will be performed in a background thread, and any resulting updates would trigger any callbacks registered via :meth:`callback`. If a timeout is specified (in seconds), and wait is set to True, :meth:`read` will raise a TimeoutException if the timeout expires before a response is received.
         """
-        pass
+        pass # pragma: no cover
         
     def subscribe(self, start=True, prime=True, wait=True):
         """Subscribe to broadcasts for this KTL keyword. If start is set to False, the subscription will be shut down. If prime is set to False, there will be no priming read of the keyword value; the default behavior is to perform a priming read. If wait is set to False, the priming read (if requested) will not block while waiting for the priming read to complete.
@@ -175,17 +175,19 @@ In circumstances when a KTL keyword cannot (or will not) reliably broadcast upda
     def waitfor(self, expression, timeout=None, case=False):
         """Wait for a particular expression to be true.
         """
-        pass
+        pass # pragma: no cover
         
     @api_required
     def wait(self, timeout=None, operator=None, value=None, sequence=None, reset=False, case=False):
         """Wait for the Keyword to receive a new value, or if sequence is set, wait for the designated write operation to complete. If value is set, with or without operator being set, :meth:`wait` effectively acts as a wrapper to :meth:`waitFor`. If reset is set to True, the notification flag will be cleared before waiting against it– this is dangerous, as this introduces a race condition between the arrival of the event itself, and the invocation of :meth:`wait`. If the event occurs first, the caller may wind up waiting indefinitely. If timeout (in whole or partial seconds) is set, :meth:`wait` will return False if no update occurs before the timeout expires. Otherwise, :meth:`wait` returns True to indicate that the wait completed successfully.
         """
+        pass # pragma: no cover
         
     @api_required
     def write(self, value, wait=True, binary=False, timeout=None):
         """Perform a KTL write for this keyword. value is the new value to write to the keyword. If binary is set to True, value will be interpreted as a binary representation; the default behavior is to interpret value as an ascii representation. The behavior of timeout is the same as for :meth:`read`.
         """
+        pass # pragma: no cover
     
     def _update(self, value):
         """An internal callback to handle value updates."""
@@ -231,14 +233,14 @@ class Service(object):
         else:
             raise KeyError("{0} has no key '{1}'".format(self, key.upper()))
     
-    def __missing__(self, key):
+    def __missing__(self, key): # pragma: no cover
         """Handle a missing key."""
         raise KeyError("{0} has no key '{1}'".format(self, key.upper()))
     
     def _populate(self):
         """Populate all of the instantiated keywords here."""
         for key in self.keywords():
-            self._populate_one(key)
+            self.__missing__(key)
         
         
     @api_required
@@ -247,12 +249,15 @@ class Service(object):
         
         ``keyword`` can be either a Keyword instance, or a case-insensitive string.
         """
-        pass
+        pass # pragma: no cover
         
     def has_key(self, keyword):
         """alias for :meth:`has_keyword`"""
         return self.has_keyword(keyword)
         
+    def __contains__(self, keyword):
+        """alias for :meth:`has_keyword`"""
+        return self.has_keyword(keyword)
     
     @api_not_implemented
     def heartbeat(self, keyword, period=5):
@@ -262,12 +267,12 @@ class Service(object):
         
         Multiple heartbeats may be specified for a single Service instance. This is desirable if distinct dispatchers provide subsets of the keywords within a single KTL service. The failure of any heartbeat will trigger a full resuscitate operation; no attempt is made to distinguish between Keyword instances serviced by distinct dispatchers.
         """
-        pass
+        pass # pragma: no cover
         
     @api_required
     def keywords(self):
         """List all keywords available in this Service instance."""
-        pass
+        pass # pragma: no cover
     
     def populated(self):
         """Returns a list of all keywords (as keyword names) that are instantiated as Keyword instances within this Service instance. A Keyword instance is not created until it is deliberately requested."""
