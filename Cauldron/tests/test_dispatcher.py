@@ -66,9 +66,22 @@ def test_contains(dispatcher):
     assert "keyword" in dispatcher
     
 
+def test_keyword_contains(dispatcher):
+    """Test the 'in' for keywords"""
+    keyword = dispatcher['KEYWORD']
+    keyword.modify("SomeValue")
+    assert "omeV" in keyword
+    assert "Other" not in keyword
+    
+def test_update_no_value(dispatcher):
+    """Test an update with no value."""
+    keyword = dispatcher['KEYWORD']
+    assert keyword.update() is None
+
 @pytest.mark.xfail
 def test_initialize_with_period(dispatcher):
     """Test the dispatcher keyword's period argument."""
+    from Cauldron import DFW
     DFW.Keyword.Keyword("keyword", dispatcher, period=10)
 
 @pytest.mark.xfail
@@ -172,4 +185,24 @@ def test_teardown(servicename, teardown_cauldron):
     from Cauldron.DFW import Service
     svc2 = Service(servicename+"2", None)
     assert svc2['MYKEYWORD'].read() == None
+    
+def test_getitem_interface(dispatcher):
+    """Test the getitem interface to dispatcher keywords."""
+    keyword = dispatcher['MYKEYWORD']
+    keyword.modify("SomeValue")
+    
+    assert keyword['value'] == "SomeValue"
+    assert keyword['name'] == "MYKEYWORD"
+    assert keyword['readonly'] == False
+    assert keyword['writeonly'] == False
+    
+    with pytest.raises(KeyError):
+        keyword['some-other-key']
+    with pytest.raises(KeyError):
+        keyword[1]
+    
+def test_keyword_fullname(dispatcher):
+    """Test a keyword fullname."""
+    keyword = dispatcher['MYKEYWORD']
+    assert keyword.full_name == "{0}.MYKEYWORD".format(dispatcher.name)
     

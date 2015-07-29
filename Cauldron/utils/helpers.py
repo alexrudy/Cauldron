@@ -30,7 +30,12 @@ def api_not_required(func):
     
     """)
     
-    return func
+    @functools.wraps(func)
+    def api_not_required(*args, **kwargs):
+        """Sub-function to handle API not implmeneted."""
+        raise CauldronAPINotImplemented("The Cauldron API does require support of '{0}'.".format(func.__name__))
+    
+    return api_not_required
     
 def api_required(func):
     """A decorator to mark a function as abstract and requiring a backend implementation."""

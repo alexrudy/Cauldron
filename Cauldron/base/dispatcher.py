@@ -43,11 +43,6 @@ class Keyword(_BaseKeyword):
         
         service[self.name] = self
     
-    @property
-    def full_name(self):
-        """Full name"""
-        return "{0}.{1}".format(self.service.name, self.name)
-    
     def __contains__ (self, value):
         
         if self.value == None:
@@ -57,6 +52,14 @@ class Keyword(_BaseKeyword):
             return True
             
         return False
+        
+    def _ktl_readonly(self):
+        """Read only key."""
+        return self.readonly
+        
+    def _ktl_writeonly(self):
+        """Write only key."""
+        return self.writeonly
     
     def callback(self, function, remove=False):
         """Register a function to be called whenever this keyword is
@@ -68,7 +71,7 @@ class Keyword(_BaseKeyword):
     @api_override
     def check(self, value):
         """Check that 'value' is appropriate for this keyword. If it is not, raise a value error."""
-        pass
+        pass # pragma: no cover
         
     @api_override
     def translate(self, value):
@@ -117,12 +120,12 @@ class Keyword(_BaseKeyword):
     @abc.abstractmethod
     def _broadcast(self, value):
         """An internal method to be used to actually broadcast the value via the service."""
-        pass
+        pass # pragma: no cover
         
     @api_override
     def preread(self):
         """Take some action before this value is read. Called at the start of :meth:`update`."""
-        pass
+        pass # pragma: no cover
         
     @api_override
     def prewrite(self, value):
@@ -139,7 +142,7 @@ class Keyword(_BaseKeyword):
     @api_override
     def write(self, value):
         """Write the value to the authority source. Called to adjust the value in :meth:`modify`."""
-        pass
+        pass # pragma: no cover
         
     @api_override
     def read(self):
@@ -149,12 +152,12 @@ class Keyword(_BaseKeyword):
     @api_not_implemented
     def schedule(self, appointment=None, cancel=False):
         """Schedule an update."""
-        pass
+        pass # pragma: no cover
     
     @api_not_implemented
     def period(self, period):
         """How often a keyword should be updated."""
-        pass
+        pass # pragma: no cover
     
     def _propogate(self):
         """Propagate the change to any waiting callbacks."""
@@ -313,7 +316,7 @@ class Service(object):
         return six.itervalues(self._keywords)
     
     def broadcast(self):
-        """Called to broadcast all values to ensure that the keyword server matches the keyword inits."""
+        """Called to broadcast all values to ensure that the keyword server matches the keyword."""
         for keyword in self:
             value = keyword['value']
             if value != None:
@@ -322,7 +325,7 @@ class Service(object):
     @api_required
     def shutdown(self):
         """Shutdown this keyword server."""
-        pass
+        pass # pragma: no cover
         
     def __del__(self):
         """When this service is deleted, shut it down."""
