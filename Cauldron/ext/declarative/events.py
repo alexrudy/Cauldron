@@ -4,6 +4,7 @@ from __future__ import absolute_import
 import weakref
 import functools
 from ...compat import WeakOrderedSet, WeakSet
+from ...utils.callbacks import Callbacks
 
 __all__ = ['_DescriptorEvent', '_KeywordEvent', '_KeywordListener']
 
@@ -12,7 +13,7 @@ class _DescriptorEvent(object):
     def __init__(self, name):
         super(_DescriptorEvent, self).__init__()
         self.name = name
-        self.callbacks = WeakOrderedSet()
+        self.callbacks = Callbacks()
         
     def listen(self, func):
         """Listen to a function."""
@@ -24,12 +25,13 @@ class _DescriptorEvent(object):
     def __repr__(self):
         return "<{0} name={1}>".format(self.__class__.__name__, self.name)
     
-    def propagate(self, obj, keyword, *args, **kwargs):
+    def propagate(self, instance, keyword, *args, **kwargs):
         """Propagate a listener event through to the keyword."""
         for callback in self.callbacks:
-            # This requires an unbound method which should be called as a bound method.
-            #TODO: Sleuth method type at runtime.
-            callback(obj, keyword, *args, **kwargs)
+            try:
+                callback(keyword, *args, **kwargs)
+            except TypeError:
+                callback.bound(instance)(keyword, *args, **kwargs)
             
     def __call__(self, func):
         """Use the event as a descriptor."""
