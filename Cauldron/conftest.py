@@ -131,13 +131,27 @@ def client(backend, servicename):
     return ktl.Service(servicename)
 
 @pytest.fixture
-def xmldir():
+def xmldir(request):
     """XML Directory for testing."""
     path = pkg_resources.resource_filename("Cauldron", "data/testsvc/")
+    os.environ['RELDIR'] = ""
+    request.addfinalizer(xmlteardown)
     return os.path.abspath(path)
 
 @pytest.fixture
-def xmlvar(xmldir):
-    """docstring for xmlvar"""
+def xmlvar(request, xmldir):
+    """XML directory, and ensure it is set to the right environment variable."""
     reldir = os.environ['RELDIR'] = os.path.dirname(os.path.dirname(xmldir))
+    request.addfinalizer(xmlteardown)
     return reldir
+    
+def xmlteardown():
+    """Remove XML from the environment."""
+    os.environ.pop('RELDIR', None)
+    
+@pytest.fixture
+def strictxml(xmlvar):
+    """Turn on strict xml"""
+    from Cauldron.api import STRICT_KTL_XML
+    STRICT_KTL_XML.on()
+    return xmlvar

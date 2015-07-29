@@ -40,38 +40,38 @@ def check_dispatcher_XML(service, name):
 def get_initial_XML(xml, name):
     """docstring for get_initial_XML"""
     keyword_xml = xml[name]
-
+    
     initial = None
-
+    
     for element in keyword_xml.childNodes:
         if element.nodeName != 'serverside' and \
            element.nodeName != 'server-side':
             continue
-
+            
         server_xml = element
-
+        
         for element in server_xml.childNodes:
             if element.nodeName != 'initialize':
                 continue
-
+                
             # TODO: this loop could check to see if
             # there is more than one initial value,
             # rather than immediately halting the
             # iteration.
-
+            
             try:
                 initial = ktlxml.getValue (element, 'value')
             except ValueError:
                 continue
-
+                
             # Found a value, stop the iteration.
             break
-
-
+            
+            
         if initial != None:
             # Found a value, stop the iteration.
             break
-
+            
     return initial
 
 class Keyword(_BaseKeyword):
@@ -82,7 +82,7 @@ class Keyword(_BaseKeyword):
     def __init__(self, name, service, initial=None, period=None):
         name = str(name).upper()
         super(Keyword, self).__init__(name=name, service=service)
-        if name in service:
+        if service.get(name, None) is not None:
             raise ValueError("keyword named '%s' already exists." % name)
         self._acting = False
         self._callbacks = WeakOrderedSet()
@@ -91,10 +91,16 @@ class Keyword(_BaseKeyword):
         self.readonly = False
         self._period = None
         
-        if service.xml is not None:
-            check_dispatcher_XML(service, name)
-            if initial is not None:
-                initial = get_initial_XML(service.xml, name)
+        try:
+            if service.xml is not None:
+                check_dispatcher_XML(service, name)
+                if initial is None:
+                    initial = get_initial_XML(service.xml, name)
+        except Exception as e:
+            if STRICT_KTL_XML:
+                raise
+            else:
+                warnings.warn("XML setup for keyword {0} failed. {1}".format(name, e), CauldronXMLWarning)
         
         # Handle XML-specified initial values here.
         self.initial = str(initial)
@@ -351,9 +357,12 @@ class Service(object):
         """Get a keyword item."""
         name = str(name).upper()
         try:
-            return self._keywords[name]
+            keyword = self._keywords[name]
         except KeyError:
             return self.__missing__(name)
+        if keyword is None:
+            return self.__missing__(name)
+        return keyword
         
     def __missing__(self, key):
         """What to do with missing keys."""
@@ -380,12 +389,16 @@ class Service(object):
     def __contains__(self, name):
         """Check for name in self"""
         if self.xml is not None:
-            return str(name).upper() in self.xml and (STRICT_KTL_XML or str(name).upper() in self._keywords)
+            return (str(name).upper() in self.xml and STRICT_KTL_XML) or (str(name).upper() in self._keywords and not STRICT_KTL_XML)
         return str(name).upper() in self._keywords
         
     def __iter__(self):
         """Iterator over self."""
         return six.itervalues(self._keywords)
+    
+    def get(self, name, default=None):
+        """Get a keyword."""
+        return self._keywords.get(str(name).upper(), default)
     
     def broadcast(self):
         """Called to broadcast all values to ensure that the keyword server matches the keyword."""

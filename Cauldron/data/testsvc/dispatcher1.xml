@@ -18,5 +18,11 @@
 				<value>Closed</value>
 			</entry>
 		</values>
+		<serverside>
+			<initialize>
+				<use_cache>True</use_cache>
+				<value>Open</value>
+			</initialize>
+		</serverside>
 	</keyword>
 </bundle>
