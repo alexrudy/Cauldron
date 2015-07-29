@@ -55,3 +55,5 @@ distribute-*.tar.gz
 *.rdb
 html/*
 *.prof
+*.ipynb
+.ipynb-checkpoints/*
