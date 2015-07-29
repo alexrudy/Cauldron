@@ -8,6 +8,7 @@ from __future__ import absolute_import
 import types
 import sys
 import logging
+import warnings
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -55,13 +56,13 @@ def use(name):
     
     if name not in registry.keys():
         raise ValueError("The Cauldron backend {0} is not known. Try one of {1!r}".format(
-            name, list(backends)))
+            name, list(registry.keys())))
     
     # Allow imports of backend modules now.
     CAULDRON_SETUP.value = True
     
     # Set up the LROOT KTL installation differently
-    if name in KTL_DEFAULT_NAMES:
+    if name in KTL_DEFAULT_NAMES: # pragma: no cover
         return setup_ktl_backend()
     
     registry.client.use(name)
@@ -84,7 +85,7 @@ def use(name):
     _DFW.Keyword = Keyword
     Cauldron.DFW = sys.modules[BASENAME + ".DFW"] = _DFW
     
-def setup_ktl_backend():
+def setup_ktl_backend(): # pragma: no cover
     """Set up the KTL backend."""
     Cauldron = sys.modules[BASENAME]
     import ktl
@@ -101,7 +102,7 @@ def _expunge_module(module_name):
     else:
         try:
             del sys.modules[module_name]
-        except:
+        except: # pragma: no cover
             pass
     del mod
     
@@ -121,8 +122,7 @@ def teardown():
         It is likely that if you call this method with instances of Keyword or Service still active in your application,
         those instances will become unusable.
     """
-    registry.client.teardown()
-    registry.dispatcher.teardown()
+    registry.teardown()
     try:
         Cauldron = sys.modules[BASENAME]
         if hasattr(Cauldron, 'DFW'):
@@ -139,7 +139,7 @@ def teardown():
             del sys.modules['ktl']
         if "DFW" in sys.modules:
             del sys.modules["DFW"]
-    except:
+    except: # pragma: no cover
         raise
     finally:
         CAULDRON_SETUP.value = False
@@ -155,7 +155,7 @@ def install():
     .. note:: It is preferable to use :ref:`cauldron-style`, of the form ``from Cauldron import ktl``, as this will properly ensure that the Cauldron backend is invoked and not the KTL backend.
     """
     guard_use("installing Cauldron", error=RuntimeError)
-    if 'ktl' in sys.modules or "DFW" in sys.modules:
+    if 'ktl' in sys.modules or "DFW" in sys.modules: # pragma: no cover
         warnings.warn("'ktl' or 'DFW' already in sys.modules. Skipping 'install()'")
         return
     sys.modules['ktl'] = sys.modules[BASENAME + ".ktl"]
