@@ -15,7 +15,7 @@ import time
 import weakref
 import datetime
 from .core import _BaseKeyword
-from ..compat import WeakOrderedSet
+from ..utils.callbacks import Callbacks
 from ..utils.helpers import api_not_required, api_not_implemented, api_required, api_override
 
 __all__ = ['Keyword', 'Service']
@@ -58,7 +58,7 @@ class Keyword(_BaseKeyword):
     
     def __init__(self, service, name, type=str):
         super(Keyword, self).__init__(service, name, type)
-        self._callbacks = WeakOrderedSet()
+        self._callbacks = Callbacks()
     
     @api_not_implemented
     def _ktl_broadcasts(self):
@@ -146,7 +146,7 @@ In circumstances when a KTL keyword cannot (or will not) reliably broadcast upda
         if remove:
             return self._callbacks.discard(function)
         if preferred:
-            self._callbacks = WeakOrderedSet([function] + list(self._callbacks))
+            self._callbacks = self._callbacks.prepend(function)
         else:
             self._callbacks.add(function)
         

@@ -7,7 +7,7 @@ The local interface is process-local. It is lightweight, and good for testing en
 """
 
 from ..base import DispatcherService, DispatcherKeyword
-from ..compat import WeakOrderedSet
+from ..utils.callbacks import Callbacks
 from .. import registry
 
 import weakref
@@ -54,7 +54,7 @@ class Keyword(DispatcherKeyword):
     """A keyword"""
     def __init__(self, name, service, initial=None, period=None):
         super(Keyword, self).__init__(name, service, initial, period)
-        self._consumers = WeakOrderedSet()
+        self._consumers = Callbacks()
     
     def _broadcast(self, value):
         """Notify consumers that this value has changed."""

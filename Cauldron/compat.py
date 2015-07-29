@@ -31,6 +31,6 @@ class WeakOrderedSet(WeakSet, object):
     def __init__(self, values=()):
         super(WeakOrderedSet, self).__init__()
         self.data = OrderedSet()
-        for elem in values:
+        for elem in values: # pragma: no cover
             self.add(elem)
         
