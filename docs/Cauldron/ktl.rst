@@ -34,28 +34,28 @@ KTL Clients can read and write to keyword values. In python, KTL clients are imp
 
 To use a client in the object-oriented fashion, initialize a service, and access that service like a dictionary of keywords::
     
-    >>> from Cauldron.ktl import Service # doctest: +SKIP
-    >>> svc = Service("MyCauldronService") # doctest: +SKIP
-    >>> kwd = svs["MYKEYWORD"] # doctest: +SKIP
-    >>> kwd.write(10) # doctest: +SKIP
-    >>> print(kwd.read()) # doctest: +SKIP
-    10
+    >>> from Cauldron.api import use, teardown; teardown(); use("mock")
+    >>> from Cauldron.ktl import Service
+    >>> svc = Service("MyCauldronService")
+    >>> kwd = svc["MYKEYWORD"]
+    >>> kwd.write(10)
+    >>> kwd.read()
+    '10'
     
 
 The available methods for :class:`Service <Cauldron.base.client.ClientService>` and :class:`Keyword <Cauldron.base.client.ClientKeyword>` are documented in :mod:`Cauldron.base`. Using the Client library requires that the dispatcher-side of the library is running somewhere.
+
+.. note:: The line ``from Cauldron.api import use, teardown; teardown(); use("mock")`` in the above example is used only to ensure that these examples run smoothly in any setup. For more information, see :func:`Cauldron.api.use` and :func:`Cauldron.api.teardown`
 
 Dispatchers
 ===========
 
 KTL Dispatchers provide the source of values, and respond to requests to read and write from a particular keyword. Dispatchers must repsond to all requests, but don't have to do anything on a given request, including saving a given keyword value. Using a dispatcher is a little more complicated. To start a dispatcher, you must define a function which will be called with a single argument, the :class:`Service <Cauldron.base.dispatcher.DispatcherService>` instance, and will create all of the required :class:`Keyword <Cauldron.base.dispatcher.DispatcherKeyword>` instances::
     
-    from Cauldron.DFW import Service, Keyword
-    
-    def setup(service):
-        Keyword("MYKEYWORD", service)
-        
-    service = Service('MyCauldronService', 'path/to/stdiosvc.conf', setup, 'name-of-dispatcher')
-    
-    kwd = service["MYKEYWORD"]
-    kwd.modify("hello")
+    >>> from Cauldron.DFW import Service, Keyword
+    >>> def setup(service):
+    ...     Keyword.Keyword("MYKEYWORD", service)
+    >>> service = Service('MyService', 'path/to/stdiosvc.conf', setup, 'name-of-dispatcher')
+    >>> kwd = service["MYKEYWORD"]
+    >>> kwd.modify("hello")
     
