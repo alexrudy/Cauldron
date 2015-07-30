@@ -1,16 +1,17 @@
 [run]
-source = {packagename}
+source = Cauldron
 omit =
-   {packagename}/_astropy_init*
-   {packagename}/conftest*
-   {packagename}/cython_version*
-   {packagename}/setup_package*
-   {packagename}/*/setup_package*
-   {packagename}/*/*/setup_package*
-   {packagename}/tests/*
-   {packagename}/*/tests/*
-   {packagename}/*/*/tests/*
-   {packagename}/version*
+   Cauldron/_astropy_init*
+   Cauldron/conftest*
+   Cauldron/cython_version*
+   Cauldron/setup_package*
+   Cauldron/*/setup_package*
+   Cauldron/*/*/setup_package*
+   Cauldron/tests/*
+   Cauldron/*/tests/*
+   Cauldron/*/*/tests/*
+   Cauldron/version*
+   Cauldron/bundled/*
 
 [report]
 exclude_lines =
