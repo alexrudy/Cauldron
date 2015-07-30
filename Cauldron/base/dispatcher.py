@@ -38,7 +38,11 @@ def check_dispatcher_XML(service, name):
     
 
 def get_initial_XML(xml, name):
-    """docstring for get_initial_XML"""
+    """Get the keyword's initial value from the XML configuraton.
+    
+    :param xml: The XML tree containing keywords.
+    :param name: Name of the keyword.
+    """
     keyword_xml = xml[name]
     
     initial = None
@@ -61,7 +65,7 @@ def get_initial_XML(xml, name):
             
             try:
                 initial = ktlxml.getValue (element, 'value')
-            except ValueError:
+            except ValueError: # pragma: no cover
                 continue
                 
             # Found a value, stop the iteration.
@@ -350,8 +354,9 @@ class Service(object):
         
     @abc.abstractmethod
     def _begin(self):
-        """Implementation-dependent startup tasks."""
-        pass
+        """Implementation-dependent startup tasks should be handled here. This method is called
+        when :meth:`begin` is done setting initial keyword values."""
+        pass # pragma: no cover
         
     def __getitem__(self, name):
         """Get a keyword item."""
