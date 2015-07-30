@@ -9,36 +9,43 @@ descriptors can also set event listeners for various Keyword methods, such as :m
 
 An example declarative class using keywords is below::
 
-    from Cauldron.ext.declarative import KeywordDescriptor, DescriptorBase
-
-    class Thing(DescriptorBase):
-
-        enabled = KeywordDescriptor("THINGPOWER")
-
-        @enabled.write
-        def adjust_power(self, keyword, value):
-            if bool(value):
-                # TURN ON THE THING
-                pass
-            else:
-                # TURN OFF THE THING
-                pass
-                
-        @enabled.check
-        def check_power(self, keyword, value):
-            bool(value)
+    >>> from Cauldron.ext.declarative import KeywordDescriptor, DescriptorBase
+    >>> class Thing(DescriptorBase):
+    ... 
+    ...     enabled = KeywordDescriptor("THINGPOWER")
+    ... 
+    ...     @enabled.write
+    ...     def adjust_power(self, keyword, value):
+    ...         if bool(value):
+    ...             # TURN ON THE THING
+    ...             pass
+    ...         else:
+    ...             # TURN OFF THE THING
+    ...             pass
+    ...         
+    ...     @enabled.check
+    ...     def check_power(self, keyword, value):
+    ...         bool(value)
         
 
 
 To use this declarative class, you must bind the class to a KTL Service object::
-
-    from Cauldron import DFW
-    svc = DFW.Service("THINGYSERVICE", conifg=None)
-    Thing.set_service(svc)
-    athingy = Thing()
     
-    print(athingy.enabled)
-    athingy.enabled = False
+    >>> from Cauldron import use
+    >>> use("local")
+    >>> from Cauldron import DFW
+    >>> svc = DFW.Service("THINGYSERVICE", config=None)
+    >>> Thing.bind(svc)
+    >>> athingy = Thing()
+    >>> athingy.enabled = True
+    >>> athingy.enabled
+    'True'
+    >>> anotherthingy = Thing()
+    >>> anotherthingy.enabled
+    'True'
+    >>> athingy.enabled = False
+    >>> anotherthingy.enabled
+    'False'
 
 
 Events

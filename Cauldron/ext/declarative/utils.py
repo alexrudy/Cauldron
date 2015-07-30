@@ -36,5 +36,6 @@ class hybridmethod(object):
     def classmethod(self, clsmethod):
         """A decorator to set the class mehtod."""
         self._classmethod = clsmethod
+        functools.update_wrapper(self._classmethod, self._method)
         return self
         

@@ -22,9 +22,15 @@ class IntegrityError(CauldronException):
 class DescriptorBase(object):
     """A keyword descriptor base class which assists in binding descriptors to keywords.
     
-    There are two stages to binding:
-    1. Set the DFW Service for these keywords via :meth:`set_service`. This can be done at the class level.
+    This class should be used as a base class for any class that will use :class:`KeywordDescriptor` to
+    describe :mod:`Cauldron` keywords as attributes.
+    
+    This class provides a :meth:`bind` method to associate a :mod:`Cauldron` Service with the descriptors
+    on this class. There are two stages to binding:
+    
+    1. Set the DFW Service for these keywords via :meth:`bind`. This can be done at the class level.
     2. Bind an instance to the the service. This can be done at __init__ time.
+    
     """
     
     def __init__(self, *args, **kwargs):
@@ -39,7 +45,7 @@ class DescriptorBase(object):
     
     @classmethod
     def keyword_descriptors(cls):
-        """Find all of the keyword descriptors."""
+        """Iterate over the keyword descriptors which are members of this class."""
         for var in dir(cls):
             try:
                 member = getattr(cls, var)
@@ -86,6 +92,29 @@ class KeywordDescriptor(object):
     The descriptor should be used as a class level variable. It can be accessed as
     a regular instance variable, where it will return the result of :meth:`Keyword.update`
     operations. Setting the instance variable will result in a :meth:`Keyword.modify` operation.
+    
+    Parameters
+    ----------
+    name : str
+        Keyword name. Case-insensitive, will be translated to upper case.
+    
+    initial : str
+        Keyword initial value, should be a string. If not set, no initial value is used
+        and the descriptor will return ``None`` before the keyword is bound.
+    
+    type : function
+        A function which converts an inbound value to the appropraite python type. The python type
+        returned by this function should be suitable for use as a string to modify the keyword.
+        
+    doc : str
+        The docstring for this keyword descriptor.
+    
+    readonly : bool
+        Set this keyword descriptor to be read-only.
+        
+    writeonly : bool
+        Set this keyword descriptor to be write-only.
+    
     """
     
     _EVENTS = ['preread', 'read', 'postread', 'prewrite', 'write', 'postwrite', 'check']
@@ -116,6 +145,7 @@ class KeywordDescriptor(object):
         
         self._attr = "_{0}_{1}".format(self.__class__.__name__, self.name)
         self._initial = initial
+        self._real_initial = initial
         self._events.append(self.callback)
         
     def __repr__(self):
@@ -142,7 +172,33 @@ class KeywordDescriptor(object):
             return setattr(obj, self._attr, self.type(value))
         
     def bind(self, obj, service=None):
-        """Bind a service to this instance."""
+        """Bind a service to this descriptor, and the descriptor to an instance.
+        
+        Binding an instance of :class:`DescriptorBase` to this descriptor activates
+        the listening of events attached to the underlying keyword object.
+        
+        Binding an instance of :class:`DescriptorBase` to this descriptor will cause
+        the descriptor to resolve the initial value of the keyword. This initial value
+        will be taken from the instance itself, if the descriptor was modified before
+        it was bound to this instnace, or the initial value as set by this descriptor
+        will be used. When the initial value conflicts with a value already written
+        to the underlying keyword, :exc:`IntegrityError` will be raised.
+        
+        If this descriptor has already been bound to any one instance, the descriptor
+        level initial value will not be used, and instead only an instance-level initial
+        value may be used.
+        
+        Parameters
+        ----------
+        obj : object
+            The python instance which owns this descriptor. This is used to bind
+            instance method callbacks to changes in this descriptor's value.
+        
+        service : :class:`DFW.Service.Service`
+            The DFW Service to be used for this descriptor. May also be set via the
+            :attr:`service` attribute.
+        
+        """
         if service is not None:
             self.service = service
         
@@ -170,6 +226,11 @@ class KeywordDescriptor(object):
                 pass
             else:
                 raise IntegrityError("Keyword {0!r} has a value {1!r}, and descriptor has initial value {2!r} which do not match.".format(keyword, keyword['value'], initial))
+            
+            # Once we've bound an initial value, we set it to None
+            # so that the descriptor-level initial value can't be invoked multiple times.
+            self._initial = None
+            # The original value is still available via ._real_initial, if it is required.
         
         # Clean up the instance initial values.
         try:
@@ -183,7 +244,7 @@ class KeywordDescriptor(object):
         
     @property
     def service(self):
-        """The service"""
+        """The DFW Service associated with this descriptor."""
         return self._service
     
     @service.setter
@@ -193,7 +254,7 @@ class KeywordDescriptor(object):
         
     @property
     def keyword(self):
-        """Get the Keyword instance."""
+        """The keyword instance for this descriptor."""
         try:
             return self._service[self.name]
         except (AttributeError, TypeError, weakref.ReferenceError):
