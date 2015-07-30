@@ -77,7 +77,7 @@ class Service(ClientService):
     
     def __init__(self, name, populate=False):
         try:
-            self._dispatcher = Dispatcher.get(name)
+            self._dispatcher = Dispatcher.get_service(name)
         except KeyError:
             raise ServiceNotStarted("Service '{0!s}' is not started.".format(name))
         super(Service, self).__init__(name, populate)

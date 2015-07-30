@@ -26,7 +26,7 @@ class Service(DispatcherService):
     """Local dispatcher service."""
     
     @classmethod
-    def get(cls, name):
+    def get_service(cls, name):
         """Get a dispatcher for a service."""
         #TODO: Support inverse client startup ordering.
         name = str(name).lower()

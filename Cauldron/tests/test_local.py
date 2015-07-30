@@ -19,5 +19,5 @@ def test_duplicate_services(Service):
     svc = Service("MYSERVICE", config=None)
     with pytest.raises(ValueError):
         svc2 = Service("MYSERVICE", config=None)
-    svc3 = Service.get("MYSERVICE")
+    svc3 = Service.get_service("MYSERVICE")
     assert svc3 is svc
