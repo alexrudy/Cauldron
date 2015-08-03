@@ -34,11 +34,8 @@ from .local.client import Service as LCService
 class Service(LCService):
     """Local Service"""
     def __init__(self, name, populate=False):
-        try:
-            self._dispatcher = MDService.get_service(name)
-        except KeyError:
-            raise ServiceNotStarted("Service '{0!s}' is not started.".format(name))
-        super(MCService, self).__init__(name, populate)
+        self._dispatcher = MDService.get_service(name)
+        super(LCService, self).__init__(name, populate)
         
     def has_keyword(self, name):
         """Check for the existence of a keyword."""
@@ -49,4 +46,4 @@ from .local.client import Keyword as LCKeyword
 registry.client.keyword_for("mock", LCKeyword)
 
 # Clean up the namespace.
-del LDService, LCService, LDKeyword, LCKeyword
+del LDService, LDKeyword, LCKeyword
