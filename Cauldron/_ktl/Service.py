@@ -5,11 +5,3 @@ The :class:`Service` will be added here by the runtime backend selection utiltie
 
 __all__ = ['Service']
 
-cache = {}
-def cached(service):
-    """Cache service sting names."""
-    try:
-        return cache[service]
-    except KeyError:
-        svc = cache[service] = Service(service, populate=False)
-    return svc

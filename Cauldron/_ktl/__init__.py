@@ -11,10 +11,14 @@ from __future__ import absolute_import
 from ..api import guard_use
 guard_use(msg='importing the ._ktl module', error=ImportError)
 del guard_use
+# Done with initial setup.
+__all__ = ['Service', 'Keyword']
 
+# From here on down we are doing things in the import order that KTL would do them.
+from . import procedural
+
+# This line imports Keyword and Service.Service into the local namespace
 from ..registry import client
 client.setup()
 del client
-# Done with initial setup.
 
-__all__ = ['Service', 'Keyword']
