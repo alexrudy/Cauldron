@@ -146,7 +146,7 @@ In circumstances when a KTL keyword cannot (or will not) reliably broadcast upda
         if remove:
             return self._callbacks.discard(function)
         if preferred:
-            self._callbacks = self._callbacks.prepend(function)
+            self._callbacks.prepend(function)
         else:
             self._callbacks.add(function)
         

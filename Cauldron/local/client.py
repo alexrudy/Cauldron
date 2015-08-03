@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 
+from __future__ import absolute_import
+
 import weakref
+import warnings
+
 from .dispatcher import Service as Dispatcher
 from ..base import ClientService, ClientKeyword
 from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented, ServiceNotStarted
@@ -60,7 +64,7 @@ class Keyword(ClientKeyword):
         # User-facing convenience to make writes smoother.
         try:
             value = self.cast(value)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError): #pragma: no cover
             pass
         
         #TODO: Typechecking? Error munging?

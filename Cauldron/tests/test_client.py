@@ -65,48 +65,7 @@ def test_timestamp(service, client):
     client["KEYWORD"].read()
     assert isinstance(client['KEYWORD']['timestamp'], float)
 
-class DidMonitor(Exception):
-    pass
 
-def test_monitor(service, client):
-    """Test monitoring"""
-    
-    def monitor(keyword):
-        """Monitor"""
-        monitor.monitored = True
-        print("Monitored!")
-    
-    monitor.monitored = False
-    
-    client["KEYWORD"].callback(monitor)
-    client["KEYWORD"].monitor(prime=False)
-    assert len(client['KEYWORD']._callbacks) == 1
-    assert not monitor.monitored
-    assert len(service["KEYWORD"]._consumers) == 1
-    service["KEYWORD"].modify("SomeValue")
-    assert monitor.monitored
-    client["KEYWORD"].callback(monitor, remove=True)
-    assert len(client['KEYWORD']._callbacks) == 0
-    client["KEYWORD"].callback(monitor, preferred=True)
-    
-def test_subscribe(service, client):
-    """Test monitoring"""
-    
-    def monitor(keyword):
-        """Monitor"""
-        monitor.monitored = True
-        print("Monitored!")
-    
-    monitor.monitored = False
-    
-    client["KEYWORD"].callback(monitor)
-    client["KEYWORD"].subscribe(prime=False)
-    assert len(client['KEYWORD']._callbacks) == 1
-    assert not monitor.monitored
-    assert len(service["KEYWORD"]._consumers) == 1
-    service["KEYWORD"].modify("SomeValue")
-    assert monitor.monitored
-    
 def test_populated(service, client):
     """Test populated."""
     keyword = client["KEYWORD"]
