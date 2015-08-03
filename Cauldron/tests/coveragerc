@@ -12,6 +12,9 @@ omit =
    Cauldron/*/*/tests/*
    Cauldron/version*
    Cauldron/bundled/*
+   Cauldron/utils/_weakrefset*
+   Cauldron/compat*
+   Cauldron/redis/*
 
 [report]
 exclude_lines =
