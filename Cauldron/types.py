@@ -64,7 +64,10 @@ def setup_dispatcher_keyword_module():
 
 @six.add_metaclass(abc.ABCMeta)
 class KeywordType(object):
-    """A base class for all subclasses of KTL Keyword."""
+    """A base class for all subclasses of KTL Keyword which implement a type specialization.
+    
+    The name of each type specialization is available as the :attr:`KTL_TYPE` class attribute.
+    """
     KTL_TYPE = None
     
     def __init__(self, *args, **kwargs):
