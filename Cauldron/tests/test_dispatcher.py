@@ -207,3 +207,9 @@ def test_keyword_fullname(dispatcher):
     keyword = dispatcher['MYKEYWORD']
     assert keyword.full_name == "{0}.MYKEYWORD".format(dispatcher.name)
     
+def test_strict_xml(backend, servicename, xmlvar):
+    """Test the XML validation in strict mode."""
+    from Cauldron.api import use_strict_xml
+    use_strict_xml()
+    from Cauldron.DFW import Service
+    svc = Service(servicename, None)

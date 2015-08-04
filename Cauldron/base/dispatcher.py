@@ -10,12 +10,73 @@ import abc
 import six
 import weakref
 import logging
+import warnings
 from ..compat import WeakOrderedSet
 from .core import _BaseKeyword
-from ..exc import CauldronAPINotImplemented, NoWriteNecessary
+from ..exc import CauldronAPINotImplemented, NoWriteNecessary, CauldronXMLWarning, WrongDispatcher
 from ..utils.helpers import api_not_required, api_not_implemented, api_required, api_override
+from ..bundled import ktlxml
+from ..api import STRICT_KTL_XML
 
 __all__ = ['Keyword', 'Service']
+
+def check_dispatcher_XML(service, name):
+    """Check that the XML for the dispatcher is correct.
+    
+    Checks that if this service has a dispatcher value, that it
+    matches the keyword's dispatcher value.
+    """
+    if service.dispatcher != None:
+        keyword_node = service.xml[name]
+        dispatcher_node = ktlxml.get.dispatcher(keyword_node)
+        dispatcher = ktlxml.get.value(dispatcher_node, 'name')
+        if dispatcher != service.dispatcher:
+            if STRICT_KTL_XML:
+                raise WrongDispatcher("service dispatcher is '%s', dispatcher for %s is '%s'" % (service.dispatcher, name, dispatcher))
+            else:
+                warnings.warn(CauldronXMLWarning("Service dispatcher '{0}' does not match keyword {1} dispatcher '{2}'".format(service.name, name, dispatcher)))
+    
+
+def get_initial_XML(xml, name):
+    """Get the keyword's initial value from the XML configuraton.
+    
+    :param xml: The XML tree containing keywords.
+    :param name: Name of the keyword.
+    """
+    keyword_xml = xml[name]
+    
+    initial = None
+    
+    for element in keyword_xml.childNodes:
+        if element.nodeName != 'serverside' and \
+           element.nodeName != 'server-side':
+            continue
+            
+        server_xml = element
+        
+        for element in server_xml.childNodes:
+            if element.nodeName != 'initialize':
+                continue
+                
+            # TODO: this loop could check to see if
+            # there is more than one initial value,
+            # rather than immediately halting the
+            # iteration.
+            
+            try:
+                initial = ktlxml.getValue (element, 'value')
+            except ValueError: # pragma: no cover
+                continue
+                
+            # Found a value, stop the iteration.
+            break
+            
+            
+        if initial != None:
+            # Found a value, stop the iteration.
+            break
+            
+    return initial
 
 class Keyword(_BaseKeyword):
     """A dispatcher-based keyword, which should own its own values."""
@@ -25,7 +86,7 @@ class Keyword(_BaseKeyword):
     def __init__(self, name, service, initial=None, period=None):
         name = str(name).upper()
         super(Keyword, self).__init__(name=name, service=service)
-        if name in service:
+        if service.get(name, None) is not None:
             raise ValueError("keyword named '%s' already exists." % name)
         self._acting = False
         self._callbacks = WeakOrderedSet()
@@ -34,7 +95,17 @@ class Keyword(_BaseKeyword):
         self.readonly = False
         self._period = None
         
-        #TODO:
+        try:
+            if service.xml is not None:
+                check_dispatcher_XML(service, name)
+                if initial is None:
+                    initial = get_initial_XML(service.xml, name)
+        except Exception as e:
+            if STRICT_KTL_XML:
+                raise
+            else:
+                warnings.warn("XML setup for keyword {0} failed. {1}".format(name, e), CauldronXMLWarning)
+        
         # Handle XML-specified initial values here.
         self.initial = str(initial)
         
@@ -43,7 +114,7 @@ class Keyword(_BaseKeyword):
         
         service[self.name] = self
     
-    def __contains__ (self, value):
+    def __contains__(self, value):
         
         if self.value == None:
             return False
@@ -201,6 +272,9 @@ class Keyword(_BaseKeyword):
 @six.add_metaclass(abc.ABCMeta)
 class Service(object):
     """A dispatcher is a KTL service server-side. It owns the values."""
+    
+    name = None
+    
     def __init__(self, name, config, setup=None, dispatcher=None):
         super(Service, self).__init__()
         
@@ -212,16 +286,20 @@ class Service(object):
         self._keywords = {}
         self.status_keyword = None
         
-        #TODO: Replace the keyword verification done here.
-        # self.xml = ktlxml.Service(name, directory=os.path.abspath('./xml/'))
-        #
-        # self.__contains__ = self.xml.__contains__
-        
-        # Implementors will be expected to assign Keyword instances
-        # for each KTL keyword in this KTL service.
-        
-        # for keyword in self.xml.list ():
-        #     self.__keywords[keyword] = None
+        try:
+            self.xml = ktlxml.Service(self.name)
+        except Exception as e:
+            if STRICT_KTL_XML:
+                raise
+            warning = CauldronXMLWarning("KTLXML was not loaded correctly. Keywords will not be validated against XML.")
+            warnings.warn(warning)
+            self.log.warning("{0!s}: exception was {1!r}".format(warning, e))
+            self.xml = None
+        else:
+            # Implementors will be expected to assign Keyword instances
+            # for each KTL keyword in this KTL service.
+            for keyword in self.xml.list():
+                self._keywords[keyword] = None
         
         if setup is not None:
             setup(self)
@@ -276,16 +354,20 @@ class Service(object):
         
     @abc.abstractmethod
     def _begin(self):
-        """Implementation-dependent startup tasks."""
-        pass
+        """Implementation-dependent startup tasks should be handled here. This method is called
+        when :meth:`begin` is done setting initial keyword values."""
+        pass # pragma: no cover
         
     def __getitem__(self, name):
         """Get a keyword item."""
         name = str(name).upper()
         try:
-            return self._keywords[name]
+            keyword = self._keywords[name]
         except KeyError:
             return self.__missing__(name)
+        if keyword is None:
+            return self.__missing__(name)
+        return keyword
         
     def __missing__(self, key):
         """What to do with missing keys."""
@@ -298,9 +380,11 @@ class Service(object):
         
         name = str(name).upper()
         
-        #TODO: Make this work with keyword validation.
-        # if name not in self._keywords:
-        #     raise KeyError("service '%s' does not have a keyword '%s'" % (self.name, name))
+        if name not in self._keywords:
+            if not STRICT_KTL_XML:
+                warnings.warn(CauldronXMLWarning("service '{0}' does not have a keyword '{1}' in XML".format(self.name, name)))
+            else:
+                raise KeyError("service '%s' does not have a keyword '%s'" % (self.name, name))
             
         if name in self._keywords and self._keywords[name] is not None:
             raise RuntimeError("cannot set keyword '%s' twice" % (name))
@@ -309,11 +393,17 @@ class Service(object):
         
     def __contains__(self, name):
         """Check for name in self"""
+        if self.xml is not None:
+            return (str(name).upper() in self.xml and STRICT_KTL_XML) or (str(name).upper() in self._keywords and not STRICT_KTL_XML)
         return str(name).upper() in self._keywords
         
     def __iter__(self):
         """Iterator over self."""
         return six.itervalues(self._keywords)
+    
+    def get(self, name, default=None):
+        """Get a keyword."""
+        return self._keywords.get(str(name).upper(), default)
     
     def broadcast(self):
         """Called to broadcast all values to ensure that the keyword server matches the keyword."""

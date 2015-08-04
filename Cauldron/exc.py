@@ -12,18 +12,34 @@ except ImportError:
         """Raised to cancel a keyword write in progress."""
         pass
 
-class CauldronWarning(RuntimeWarning):
-    pass
-    
+try:
+    from DFW.Keyword import WrongDispatcher
+except ImportError:
+    class WrongDispatcher(ValueError):
+        """Error raised for incorrect dispatchers in services."""
+        pass
+
 class CauldronException(Exception):
+    """A base class to collect Cauldron Exceptions & Warnings."""
     pass
-    
+
+class CauldronWarning(CauldronException, RuntimeWarning):
+    """A base class for all Cauldron warnings."""
+    pass
+
 class CauldronAPINotImplemented(CauldronException, NotImplementedError):
-    pass
-    
-class CauldronAPINotImplementedWarning(CauldronWarning):
+    """Exception raised when an API feature is not implemented."""
     pass
     
 class ServiceNotStarted(CauldronException, KeyError):
     """Exception raised when starting a client which requires a dispatcher, and the dispatcher has not started."""
     pass
+
+class CauldronAPINotImplementedWarning(CauldronWarning, CauldronAPINotImplemented):
+    """Warning raised to indicate that an API feature is not implemented, and so was silently ignored."""
+    pass
+    
+class CauldronXMLWarning(CauldronWarning):
+    """Warning raised due to the non-strict use of XML in non-standard KTL backends."""
+    pass
+    
