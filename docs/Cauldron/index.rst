@@ -3,16 +3,16 @@
 Cauldron - Abstraction layer for KTL
 ------------------------------------
 
-Cauldron is a library to remove the dependency on the "Keck Telescope Libary", KTL.
+Cauldron is a library to remove the dependency on the :ref:`ktl`, :ref:`KTL <ktl>`.
 
-KTL is a system used by UC Observatories for both Lick and Keck Observatories. It is primarily
+:ref:`KTL <ktl>` is a system used by UC Observatories for both Lick and Keck Observatories. It is primarily
 a message passing system which behaves akin to a Keyword-Value store with distributed backends.
 
-KTL uses come in two flavors: "Clients", which read and write to a KTL service, and "Dispatchers",
+:ref:`KTL <ktl>` uses come in two flavors: "Clients", which read and write to a :ref:`KTL <ktl>` service, and "Dispatchers",
 which maintain the truth value of keywords for a given service.
 
 This library provides a python drop-in replacement for both clients and dispatchers which use the
-KTL libraries and protocols. It is designed to seamlessly replace the need for KTL tools when
+:ref:`KTL <ktl>` libraries and protocols. It is designed to seamlessly replace the need for :ref:`KTL <ktl>` tools when
 running on a local, non-production machine.
 
 .. toctree::
@@ -21,6 +21,7 @@ running on a local, non-production machine.
     ktl
     api
     base
+    xml
     declarative
     backends/index
     internals
@@ -52,7 +53,7 @@ To use Cauldron, you must first select a backend via :func:`use`::
     Cauldron.use("local")
     
 
-Then, where you would have imported a KTL library, you can call::
+Then, where you would have imported a :ref:`KTL <ktl>` library, you can call::
     
     from Cauldron import ktl
     
@@ -62,7 +63,7 @@ or for the python dispatcher framework::
     from Cauldron import DFW
     
 
-To use the standard KTL implementation, use the "ktl" backend::
+To use the standard :ref:`KTL <ktl>` implementation, use the "ktl" backend::
     
     import Cauldron
     Cauldron.use("ktl")

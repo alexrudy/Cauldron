@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 from . import registry
 
-__all__ = ['install', 'use', 'teardown']
+__all__ = ['install', 'use', 'teardown', 'use_strict_xml', 'STRICT_KTL_XML']
 
 class _Setting(object):
     """A settings object, which can be passed around by value."""
@@ -48,8 +48,10 @@ KTL_DEFAULT_NAMES = set(['ktl', 'DFW'])
 STRICT_KTL_XML = _Setting("STRICT_KTL_XML", False)
 
 def use_strict_xml():
-    """Use strict XML settings."""
-    STRICT_KTL_XML.value = True
+    """Use strict XML settings. Strict XML enforces all of the KTL XML rules to the letter, and requires that all keywords be pre-defined in XML files which are loaded when connecting a service from either the client or dispatcher side.
+    
+    If strict XML is not used, Cauldron will provide warnings when XML rules are violated, but will continue to operate."""
+    STRICT_KTL_XML.on()
 
 def use(name):
     """Activae a KTL backend in Cauldron.
@@ -73,7 +75,7 @@ def use(name):
             name, list(registry.keys())))
     
     # Allow imports of backend modules now.
-    CAULDRON_SETUP.value = True
+    CAULDRON_SETUP.on()
     
     # Set up the LROOT KTL installation differently
     if name in KTL_DEFAULT_NAMES: # pragma: no cover
@@ -156,8 +158,8 @@ def teardown():
     except: # pragma: no cover
         raise
     finally:
-        STRICT_KTL_XML.value = False
-        CAULDRON_SETUP.value = False
+        STRICT_KTL_XML.off()
+        CAULDRON_SETUP.off()
     
     
 def install():

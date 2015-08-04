@@ -13,7 +13,7 @@ This library provides a python drop-in replacement for both clients and dispatch
 KTL libraries and protocols. It is designed to seamlessly replace the need for KTL tools when
 running on a local, non-production machine.
 
-Cauldron is available on GitHub: <https://github.com/alexrudy/Cauldron>.
+Cauldron is available on GitHub: https://github.com/alexrudy/Cauldron.
 
 .. toctree::
   :maxdepth: 1

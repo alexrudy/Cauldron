@@ -25,7 +25,7 @@ Messages are passed in ASCII encoded strings on the backend, with type checking 
 
 Keywords and services are discovered via XML configuration files on the KTL backend, and support for KTL XML files is possible, but not implemented, in :mod:`Cauldron`.
 
-The KTL API is implemented by two entities, Clients and Dispatchers. Clients are user-facing entities which read and write keyword values. Dispatchers are the facility-facing tools which respond to read and write requests.
+The KTL API is implemented by two entities, Clients and Dispatchers. Clients are user-facing entities which read and write keyword values. Dispatchers are the facility-facing tools which respond to read and write requests. The KTL API works across many languages, but :mod:`Cauldron` is really only designed for use with python.
 
 Clients
 =======
@@ -52,6 +52,7 @@ Dispatchers
 
 KTL Dispatchers provide the source of values, and respond to requests to read and write from a particular keyword. Dispatchers must repsond to all requests, but don't have to do anything on a given request, including saving a given keyword value. Using a dispatcher is a little more complicated. To start a dispatcher, you must define a function which will be called with a single argument, the :class:`Service <Cauldron.base.dispatcher.DispatcherService>` instance, and will create all of the required :class:`Keyword <Cauldron.base.dispatcher.DispatcherKeyword>` instances::
     
+    >>> from Cauldron.api import use, teardown; teardown(); use("mock")
     >>> from Cauldron.DFW import Service, Keyword
     >>> def setup(service):
     ...     Keyword.Keyword("MYKEYWORD", service)
@@ -59,3 +60,8 @@ KTL Dispatchers provide the source of values, and respond to requests to read an
     >>> kwd = service["MYKEYWORD"]
     >>> kwd.modify("hello")
     
+
+XML
+===
+
+KTL uses a custom XML format to specify keywords. The XML format fully specifies keywords in use in a system. :mod:`Cauldron` provides support for KTL XML at varying levels of severity. See :ref:`xml` for more details.
