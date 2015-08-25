@@ -51,7 +51,7 @@ class DescriptorBase(object):
                 member = getattr(cls, var)
                 if isinstance(member, KeywordDescriptor):
                     yield member
-            except:
+            except Exception:
                 # We don't know what happened here, but there are lots of ways
                 # to override class-level attribute access and screw this up.
                 pass
