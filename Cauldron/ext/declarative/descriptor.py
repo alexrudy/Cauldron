@@ -15,6 +15,10 @@ class ServiceNotBound(CauldronException):
     """Error raised when a service is not bound to a descriptor."""
     pass
 
+class ServiceAlreadyBound(CauldronException):
+    """Error raised when a service is already bound to a descriptor."""
+    pass
+
 class IntegrityError(CauldronException):
     """Raised to indicate an instance has a differing initial value from the one in the keyword store."""
     pass
@@ -145,7 +149,8 @@ class KeywordDescriptor(object):
         
         self._attr = "_{0}_{1}".format(self.__class__.__name__, self.name)
         self._initial = initial
-        self._real_initial = initial
+        self._attr_initial = initial
+        self._bound = False
         self._events.append(self.callback)
         
     def __repr__(self):
@@ -165,7 +170,7 @@ class KeywordDescriptor(object):
         try:
             return self.type(self.keyword.update())
         except ServiceNotBound:
-            return self.type(getattr(obj, self._attr, self._initial))
+            return self.type(getattr(obj, self._attr, self._attr_initial))
         
     def __set__(self, obj, value):
         """Set the value."""
@@ -175,6 +180,45 @@ class KeywordDescriptor(object):
             return self.keyword.modify(str(self.type(value)))
         except ServiceNotBound:
             return setattr(obj, self._attr, self.type(value))
+        
+    def _bind_initial_value(self, obj):
+        """Bind the initial value for this service."""
+        # We do this here to retain a reference to the same keyword object
+        # thoughout the course of this function.
+        keyword = self.keyword
+        
+        # Compute the initial value.
+        try:
+            initial = str(self.type(getattr(obj, self._attr, self._initial)))
+        except TypeError:
+            # We catch this error in case it was caused because no initial value was set.
+            # If an initial value was set, then we want to raise this back to the user.
+            if not (self._initial is None and not hasattr(obj, self._attr)):
+                raise
+        else:
+            if getattr(obj, self._attr, self._initial) is None:
+                # Do nothing if it was really None everywhere.
+                pass
+            elif keyword['value'] is None:
+                # Only modify the keyword value if it wasn't already set to anything.
+                keyword.modify(initial)
+            elif keyword['value'] == initial:
+                # But ignore the case where the current keyword value already matches the initial value
+                pass
+            else:
+                raise IntegrityError("Keyword {0!r} has a value {1!r}, and descriptor has initial value {2!r} which do not match.".format(keyword, keyword['value'], initial))
+            
+            # Once we've bound an initial value, we set it to None
+            # so that the descriptor-level initial value can't be invoked multiple times.
+            self._attr_initial = None
+            # The original value is still available via ._initial, if it is required.
+        
+        # Clean up the instance initial values.
+        try:
+            delattr(obj, self._attr)
+        except AttributeError:
+            pass
+        
         
     def bind(self, obj, service=None):
         """Bind a service to this descriptor, and the descriptor to an instance.
@@ -204,48 +248,19 @@ class KeywordDescriptor(object):
             :attr:`service` attribute.
         
         """
-        if service is not None:
+        
+        if service is not None and not self._bound:
             self.service = service
+        elif service is not None and service.name != self.service.name and self._bound:
+            raise ServiceAlreadyBound("Service {0!r} is already bound to {1}".format(self.service, self))
         
-        # We do this here to retain a reference to the same keyword object
-        # thoughout the course of this function.
-        keyword = self.keyword
-        
-        # Compute the initial value.
-        try:
-            initial = str(self.type(getattr(obj, self._attr, self._initial)))
-        except TypeError:
-            # We catch this error in case it was caused because no initial value was set.
-            # If an initial value was set, then we want to raise this back to the user.
-            if not (self._initial is None and not hasattr(obj, self._attr)):
-                raise
-        else:
-            if getattr(obj, self._attr, self._initial) is None:
-                # Do nothing if it was really None everywhere.
-                pass
-            elif keyword['value'] is None:
-                # Only modify the keyword value if it wasn't already set to anything.
-                keyword.modify(initial)
-            elif keyword['value'] == initial:
-                # But ignore the case where the current keyword value already matches the initial value
-                pass
-            else:
-                raise IntegrityError("Keyword {0!r} has a value {1!r}, and descriptor has initial value {2!r} which do not match.".format(keyword, keyword['value'], initial))
-            
-            # Once we've bound an initial value, we set it to None
-            # so that the descriptor-level initial value can't be invoked multiple times.
-            self._initial = None
-            # The original value is still available via ._real_initial, if it is required.
-        
-        # Clean up the instance initial values.
-        try:
-            delattr(obj, self._attr)
-        except AttributeError:
-            pass
-        
+        if not self._bound:
+            self._bind_initial_value(obj)
         
         for event in self._events:
             _KeywordEvent(self.keyword, obj, event)
+            
+        self._bound = True
         
     @property
     def service(self):
@@ -255,7 +270,16 @@ class KeywordDescriptor(object):
     @service.setter
     def service(self, value):
         """Set the service via a weakreference proxy."""
-        self._service = weakref.proxy(value)
+        def _proxy_callback(proxy, weakself=weakref.ref(self)):
+            self = weakself()
+            if self is not None:
+                self._bound = False
+        self._service = weakref.proxy(value, _proxy_callback)
+        
+    @service.deleter
+    def service(self):
+        """Delete service."""
+        self._service = None
         
     @property
     def keyword(self):

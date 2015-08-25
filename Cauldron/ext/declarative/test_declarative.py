@@ -2,7 +2,7 @@
 
 import pytest
 
-from .descriptor import KeywordDescriptor, DescriptorBase, ServiceNotBound, IntegrityError
+from .descriptor import KeywordDescriptor, DescriptorBase, ServiceNotBound, IntegrityError, ServiceAlreadyBound
 from .events import _KeywordEvent
 
 @pytest.fixture
@@ -86,6 +86,7 @@ def test_bind(dispatcher, cls):
 def test_class_bind(dispatcher, cls):
     """Test class-level bind."""
     cls.bind(dispatcher)
+    instance_a = cls()
     instance = cls()
     instance.mykeyword = "Hello"
     
@@ -200,3 +201,40 @@ def test_event_class_reprs(dispatcher, cls):
     expected = "<_KeywordListener name=preread at "
     assert repr(kl)[:len(expected)] == expected
     
+def test_multiple_binds_other_serivce(dispatcher, config, cls):
+    """Test for binds against multiple services"""
+    from Cauldron import DFW
+    svc = DFW.Service("OTHERSERVCE", config)
+    try:
+        instance = cls()
+        instance.bind(dispatcher)
+        with pytest.raises(ServiceAlreadyBound):
+            instance.bind(svc)
+    finally:
+        svc.shutdown()
+    
+def test_multiple_binds_initial_values(dispatcher):
+    """Test for multiple binds with initial values."""
+    class MKO(DescriptorBase):
+        """MultipleBind Keyword Test class!"""
+        mykeyword = KeywordDescriptor("MYKEYWORD", initial="SomeValue")
+    
+    MKO.bind(dispatcher)
+    i1 = MKO()
+    i1.mykeyword = "OtherValue"
+    # Should be fine, won't initialize, already bound.
+    i2 = MKO()
+    
+    # This is definitley a hack to unbind, but we can't cause
+    # the fixture 'dispatcher' to go out of scope.
+    assert MKO.mykeyword._bound
+    del MKO.mykeyword.service
+    MKO.mykeyword._bound = False
+    assert not MKO.mykeyword._bound
+    
+    # Now if we bind again, we should get
+    # an IntegrityError when we try to instantiate
+    # an instance, as the value was already set.
+    MKO.bind(dispatcher)
+    with pytest.raises(IntegrityError):
+        i3 = MKO()
