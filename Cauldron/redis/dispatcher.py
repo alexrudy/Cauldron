@@ -49,6 +49,7 @@ class Service(DispatcherService):
     def __missing__(self, key):
         """Allows the redis dispatcher to populate any keyword, whether it should exist or not."""
         return Keyword(key, self)
+        
 
 @registry.dispatcher.keyword_for("redis")
 class Keyword(DispatcherKeyword):

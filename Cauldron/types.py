@@ -105,7 +105,7 @@ class Boolean(Basic):
     def _type(self, value):
         """Return the python type for a value."""
         if value not in '01':
-            raise ValueError("Booleans must have ascii values of '0' or '1'.")
+            raise ValueError("Booleans must have ascii values of '0' or '1'. Bad value {0!r}".format(value))
         return value == '1'
     
     def translate(self, value):
