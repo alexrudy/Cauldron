@@ -2,7 +2,7 @@
 
 import pytest
 
-from .descriptor import KeywordDescriptor, DescriptorBase, ServiceNotBound, IntegrityError
+from .descriptor import KeywordDescriptor, DescriptorBase, ServiceNotBound, IntegrityError, ServiceAlreadyBound
 from .events import _KeywordEvent
 
 @pytest.fixture
@@ -200,6 +200,18 @@ def test_event_class_reprs(dispatcher, cls):
     kl = _KeywordListener(kwd, instance, de)
     expected = "<_KeywordListener name=preread at "
     assert repr(kl)[:len(expected)] == expected
+    
+def test_multiple_binds_other_serivce(dispatcher, config, cls):
+    """Test for binds against multiple services"""
+    from Cauldron import DFW
+    svc = DFW.Service("OTHERSERVCE", config)
+    try:
+        instance = cls()
+        instance.bind(dispatcher)
+        with pytest.raises(ServiceAlreadyBound):
+            instance.bind(svc)
+    finally:
+        svc.shutdown()
     
 def test_multiple_binds_initial_values(dispatcher):
     """Test for multiple binds with initial values."""
