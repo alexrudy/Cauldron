@@ -150,7 +150,12 @@ class KeywordDescriptor(object):
         
     def __repr__(self):
         """Represent"""
-        return "<{0} name={1}{2}>".format(self.__class__.__name__, self.name, " bound to {0}".format(self.service) if self.service is not None else "")
+        try:
+            repr_bind = " bound to {0}".format(self.service) if self.service is not None else ""
+        except weakref.ReferenceError:
+            repr_bind = ""
+        
+        return "<{0} name={1}{2}>".format(self.__class__.__name__, self.name, repr_bind)
         
     @descriptor__get__
     def __get__(self, obj, objtype=None):

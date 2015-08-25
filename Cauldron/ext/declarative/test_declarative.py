@@ -103,6 +103,13 @@ def test_class_bind_no_arguments(cls):
     with pytest.raises(ServiceNotBound):
         cls.bind()
     
+def test_descriptor_repr(dispatcher, cls):
+    """Test the descriptor repr"""
+    assert repr(cls.mykeyword) == "<KeywordDescriptor name=MYKEYWORD>"
+    cls.bind(dispatcher)
+    instance = cls()
+    assert repr(cls.mykeyword) == "<KeywordDescriptor name=MYKEYWORD bound to {0!r}>".format(dispatcher)
+    
 def test_initial(dispatcher, cls):
     """Test the integrity checking for keywords."""
     instance = cls()
