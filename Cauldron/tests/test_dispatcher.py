@@ -19,9 +19,22 @@ def test_callbacks(dispatcher):
     
     with pytest.raises(CallbackRecieved):
         dispatcher['MODE'].modify('1')
-        
+    
+    assert not dispatcher['MODE']._acting
     dispatcher['MODE'].callback(cb, remove=True)
     dispatcher['MODE'].modify('1')
+    
+def test_recursive_callbacks(dispatcher):
+    """Test a recursive callback function."""
+    def cb(keyword):
+        cb.count += 1
+        keyword.modify("OtherValue")
+    
+    cb.count = 0
+    dispatcher["KEYWORD"].callback(cb)
+    dispatcher["KEYWORD"].modify("SomeValue")
+    assert cb.count == 2
+    assert dispatcher["KEYWORD"].value == "OtherValue"
         
 def test_check(dispatcher, client):
     """Test that check accepts only values of the correct type, etc."""

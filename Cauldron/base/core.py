@@ -25,6 +25,7 @@ class _BaseKeyword(object):
         self._last_value = None
         self._last_read = None
         self._reading = False
+        self._acting = False
         if type is not None:
             self._type = type
         

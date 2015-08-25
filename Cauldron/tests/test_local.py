@@ -69,6 +69,27 @@ def test_monitor(local_service, local_client):
     local_client["KEYWORD"].monitor(start=False)
     assert len(local_service['KEYWORD']._consumers) == 0
     
+def test_recursive_callback(local_service, local_client):
+    """Test a recursive callback invoke"""
+    def cb(keyword):
+        cb.count += 1
+        print(keyword,type(keyword))
+        keyword.write("OtherValue")
+    
+    def cb2(keyword):
+        print(keyword, type(keyword))
+    
+    cb.count = 0
+    local_client["KEYWORD"].callback(cb)
+    local_client["KEYWORD"].monitor(prime=False)
+    local_service["KEYWORD"].callback(cb2)
+    assert len(local_client['KEYWORD']._callbacks) == 1
+    assert len(local_service["KEYWORD"]._consumers) == 1
+    local_service["KEYWORD"].modify("SomeValue")
+    assert cb.count == 2
+    assert local_client["KEYWORD"]['ascii'] == "OtherValue"
+    assert local_service["KEYWORD"].value == "OtherValue"
+
 def test_subscribe(local_service, local_client):
     """Test monitoring"""
     

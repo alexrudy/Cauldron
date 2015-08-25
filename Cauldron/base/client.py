@@ -155,10 +155,12 @@ In circumstances when a KTL keyword cannot (or will not) reliably broadcast upda
     def propagate(self):
         """Invoke any/all callbacks registered via :meth:`callback`. This is an internal function, invoked after a Keyword instance successfully completes a :meth:`read` call, or a KTL broadcast event occurs.
         """
-        self._acting = True
-        for cb in self._callbacks:
-            cb(self)
-        self._acting = False
+        try:
+            self._acting = True
+            for cb in self._callbacks:
+                cb(self)
+        finally:
+            self._acting = False
         
     @api_required
     def read(self, binary=False, both=False, wait=True, timeout=None):
@@ -192,8 +194,9 @@ In circumstances when a KTL keyword cannot (or will not) reliably broadcast upda
     def _update(self, value):
         """An internal callback to handle value updates."""
         self._last_read = datetime.datetime.now()
-        self._last_value = value
-        self.propagate()
+        if self._last_value != value:
+            self._last_value = value
+            self.propagate()
         
 
 

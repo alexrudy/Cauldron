@@ -165,11 +165,11 @@ class Keyword(_BaseKeyword):
         
         self.check(value)
         
-        if value != None:
-            self._broadcast(value)
-        
         self._history.append(value)
         self.value = value
+        
+        if value != None:
+            self._broadcast(value)
         
         self._propogate()
         
@@ -232,10 +232,12 @@ class Keyword(_BaseKeyword):
     
     def _propogate(self):
         """Propagate the change to any waiting callbacks."""
-        self._acting = True
-        for callback in self._callbacks:
-            callback(self)
-        self._acting = False
+        try:
+            self._acting = True
+            for callback in self._callbacks:
+                callback(self)
+        finally:
+            self._acting = False
         
     @api_override
     def postwrite(self, value):

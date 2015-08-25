@@ -208,10 +208,6 @@ class KeywordDescriptor(object):
             else:
                 raise IntegrityError("Keyword {0!r} has a value {1!r}, and descriptor has initial value {2!r} which do not match.".format(keyword, keyword['value'], initial))
             
-            # Once we've bound an initial value, we set it to None
-            # so that the descriptor-level initial value can't be invoked multiple times.
-            self._attr_initial = None
-            # The original value is still available via ._initial, if it is required.
         
         # Clean up the instance initial values.
         try:
