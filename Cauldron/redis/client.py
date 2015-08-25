@@ -37,10 +37,10 @@ class Keyword(ClientKeyword):
         if prime:
             self.read(wait=wait)
         if start:
-            self.service.pubsub.subscribe(**{self._redis_sub_name:self._redis_callback})
+            self.service.pubsub.subscribe(**{redis_key_name(self):self._redis_callback})
             self.service._start()
         else:
-            self.service.pubsub.unsubscribe(self._redis_sub_name)
+            self.service.pubsub.unsubscribe(redis_key_name(self))
             
     def _ktl_monitored(self):
         """Determine if this keyword is monitored."""

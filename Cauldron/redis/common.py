@@ -14,7 +14,7 @@ REDIS_SERVICES_REGISTRY = "{0}.SERVICES_REGISTRY".format(__name__)
 def check_redis():
     """Runtime check for REDIS availability."""
     if not REDIS_AVAILALBE:
-        raise RuntimeError("You must have pyredis installed to use the REDIS backend")
+        raise RuntimeError("You must have redis.py installed to use the REDIS backend")
     return redis
 
 def redis_key_name(service, keyword=None):
