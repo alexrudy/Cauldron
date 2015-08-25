@@ -34,7 +34,7 @@ class DescriptorBase(object):
     """
     
     def __init__(self, *args, **kwargs):
-        """This inializer tries to bind the instance, if it can."""
+        """This initalizer tries to bind the instance, if it can."""
         super(DescriptorBase, self).__init__(*args, **kwargs)
         try:
             self.bind()
