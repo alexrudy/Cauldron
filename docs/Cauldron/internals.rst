@@ -1,11 +1,16 @@
 .. _internals:
 
 Cauldron Internals
-******************
+==================
+
+API Reference
+-------------
 
 .. automodapi:: Cauldron.types
+    :headings: *^
 
 .. automodapi:: Cauldron.exc
+    :headings: *^
 
 KTL API Features
 ----------------
@@ -18,3 +23,13 @@ API Setup Functions
 -------------------
 
 .. automodapi:: Cauldron.registry
+    :headings: *^
+
+Utilities
+---------
+
+.. automodapi:: Cauldron.utils.callbacks
+    :headings: *^
+    
+.. automodapi:: Cauldron.utils.helpers
+    :headings: *^
