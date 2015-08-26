@@ -17,9 +17,6 @@ class _DescriptorEvent(object):
         
     def listen(self, func):
         """Listen to a function."""
-        if not hasattr(func, '_listens'):
-            func._listens = WeakSet()
-        func._listens.add(self)
         self.callbacks.add(func)
         
     def __repr__(self):
@@ -59,7 +56,9 @@ class _KeywordEvent(object):
             functools.update_wrapper(self, func)
         if not hasattr(self, 'listeners'):
             self.listeners = []
-        self.listeners.append(_KeywordListener(keyword, instance, event))
+        listener = _KeywordListener(keyword, instance, event)
+        if listener not in self.listeners:
+            self.listeners.append(listener)
         self.name = event.name
         self.keyword = weakref.ref(keyword)
         
@@ -95,6 +94,10 @@ class _KeywordListener(object):
     
     def __repr__(self):
         return "<{0} name={1} at {2}>".format(self.__class__.__name__, self.event.name, hex(id(self)))
+    
+    def __eq__(self, other):
+        """Compare to other listeners"""
+        return (self.event == other.event and self.keyword == other.keyword and self.instance == other.instance)
     
     def __call__(self, *args, **kwargs):
         """Ensure that the dispatcher fires before the keyword's own implementation."""

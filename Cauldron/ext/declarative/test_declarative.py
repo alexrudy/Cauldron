@@ -44,6 +44,7 @@ def test_descriptor_basics(dispatcher, cls):
     
     print("Starting bind.")
     instance.bind(dispatcher)
+    instance.bind()
     print("Bind done.")
     
     instance.mykeyword = "Hello"
