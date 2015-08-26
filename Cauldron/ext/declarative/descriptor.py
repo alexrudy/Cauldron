@@ -9,7 +9,7 @@ from .events import _DescriptorEvent, _KeywordEvent
 from .utils import descriptor__get__, hybridmethod
 from ...exc import CauldronException
 
-__all__ = ['KeywordDescriptor', 'DescriptorBase', 'ServiceNotBound']
+__all__ = ['KeywordDescriptor', 'DescriptorBase', 'ServiceNotBound', 'ServiceAlreadyBound', 'IntegrityError']
 
 class ServiceNotBound(CauldronException):
     """Error raised when a service is not bound to a descriptor."""
@@ -225,7 +225,7 @@ class KeywordDescriptor(object):
         Binding an instance of :class:`DescriptorBase` to this descriptor will cause
         the descriptor to resolve the initial value of the keyword. This initial value
         will be taken from the instance itself, if the descriptor was modified before
-        it was bound to this instnace, or the initial value as set by this descriptor
+        it was bound to this instance, or the initial value as set by this descriptor
         will be used. When the initial value conflicts with a value already written
         to the underlying keyword, :exc:`IntegrityError` will be raised.
         

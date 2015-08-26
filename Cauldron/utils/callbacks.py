@@ -124,6 +124,7 @@ class WeakMethod(object):
 
 def remove_pending(func):
     """Decorator to remove pending items."""
+    
     @functools.wraps(func)
     def removes(self, *args, **kwargs):
         self._remove_pending()
