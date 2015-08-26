@@ -34,8 +34,15 @@ class Service(DispatcherService):
     def _begin(self):
         """Start the pub/sub thread."""
         self.redis.sadd(REDIS_SERVICES_REGISTRY, self.name)
+        self._run_thread()
+    
+    def _run_thread(self):
+        """Run the pubsub monitoring thread."""
         if self._thread is None:
             self.log.debug("Starting monitor thread for '{0}'".format(self.name))
+            self._thread = self.pubsub.run_in_thread(sleep_time=0.001)
+        elif not self._thread.is_alive():
+            self.log.debug("Re-starting monitor thread for '{0}'".format(self.name))
             self._thread = self.pubsub.run_in_thread(sleep_time=0.001)
     
     def shutdown(self):
@@ -43,8 +50,7 @@ class Service(DispatcherService):
         if self._thread is not None:
             self.log.debug("Stopping monitor thread for '{0}'".format(self.name))
             self._thread.stop()
-        if self.redis is not None:
-            self.redis.srem(REDIS_SERVICES_REGISTRY, self.name)
+        self.redis.srem(REDIS_SERVICES_REGISTRY, self.name)
     
     def __missing__(self, key):
         """Allows the redis dispatcher to populate any keyword, whether it should exist or not."""
@@ -59,6 +65,7 @@ class Keyword(DispatcherKeyword):
         """Set the initial value for this keyword."""
         super(Keyword, self).__init__(name, service, initial, period)
         self.service.pubsub.subscribe(**{redis_key_name(self):self._redis_callback})
+        self.service._run_thread()
         if not self.service.redis.exists(redis_key_name(self)):
             self.service.redis.set(redis_key_name(self), '')
     
@@ -68,7 +75,7 @@ class Keyword(DispatcherKeyword):
     
     def _redis_callback(self, msg):
         """Take a message."""
-        if msg['channel'] == self._redis_sub_name:
+        if msg['channel'] == redis_key_name(self):
             try:
                 self.modify(msg["data"])
             except ValueError as e:
