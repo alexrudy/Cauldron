@@ -31,6 +31,8 @@ def test_Service_with_strict_xml(backend, servicename, config):
     from Cauldron.api import use_strict_xml
     use_strict_xml()
     from Cauldron import DFW
+    
+    os.environ.pop('RELDIR', None)
     with pytest.raises(KeyError):
         svc = DFW.Service(servicename, config)
     os.environ['RELDIR'] = "directory/does/not/exist"
