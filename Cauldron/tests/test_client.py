@@ -75,6 +75,7 @@ def test_binary(service, client):
     """Get the binary version of a keyword value."""
     keyword = client["KEYWORD"]
     keyword.write("SomeValue")
+    keyword.read()
     assert keyword['binary'] == "SomeValue"
     
 def test_current_value(service, client):

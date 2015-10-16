@@ -5,6 +5,7 @@ REDIS client tools
 from __future__ import absolute_import
 
 import weakref
+import time
 from ..base import ClientService, ClientKeyword
 from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented
 from .common import REDIS_SERVICES_REGISTRY, redis_key_name, check_redis, get_connection_pool
@@ -28,7 +29,7 @@ class Keyword(ClientKeyword):
         """A redis callback function."""
         if message is None:
             return
-        if message['channel'] == self._redis_sub_name and message['data'] == "set":
+        if message['channel'] == redis_key_name(self) and message['data'] == "set":
             self.read()
             return
         return message
@@ -44,7 +45,7 @@ class Keyword(ClientKeyword):
             
     def _ktl_monitored(self):
         """Determine if this keyword is monitored."""
-        return self._redis_sub_name in self.service.pubsub.channels
+        return redis_key_name(self) in self.service.pubsub.channels
         
     def read(self, binary=False, both=False, wait=True, timeout=None):
         """Read a value, synchronously, always."""
@@ -55,6 +56,9 @@ class Keyword(ClientKeyword):
         if not wait or timeout is not None:
             warnings.warn("Cauldron.redis doesn't support asynchronous reads.", CauldronAPINotImplementedWarning)
         
+        #TODO: This should somehow not be a busy wait!
+        while not self.service.redis.get(redis_key_name(self) + ":status") == "ready":
+            time.sleep(0.01)
         self._update(self.service.redis.get(redis_key_name(self)))
         return self._current_value(binary=binary, both=both)
         
@@ -72,6 +76,7 @@ class Keyword(ClientKeyword):
         except (TypeError, ValueError):
             pass
         
+        self.service.redis.set(redis_key_name(self) + ":status", "modify")
         #TODO: Typechecking? Error munging?
         self.service.redis.publish(redis_key_name(self), value)
         

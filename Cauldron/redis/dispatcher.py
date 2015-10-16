@@ -68,10 +68,12 @@ class Keyword(DispatcherKeyword):
         self.service._run_thread()
         if not self.service.redis.exists(redis_key_name(self)):
             self.service.redis.set(redis_key_name(self), '')
+            self.service.redis.set(redis_key_name(self)+':status', 'init')
     
     def _broadcast(self, value):
         """Broadcast that a value has changed in this keyword."""
         self.service.redis.set(redis_key_name(self), value)
+        self.service.redis.set(redis_key_name(self)+':status', 'ready')
     
     def _redis_callback(self, msg):
         """Take a message."""
@@ -81,5 +83,13 @@ class Keyword(DispatcherKeyword):
             except ValueError as e:
                 #TODO: respond with the error to the stream.
                 pass
+                
+    def set(self, value, force=False):
+        """During set, lock status."""
+        self.service.redis.set(redis_key_name(self)+':status', 'modify')
+        try:
+            super(Keyword, self).set(value, force)
+        finally:
+            self.service.redis.set(redis_key_name(self)+':status', 'ready')
     
 
