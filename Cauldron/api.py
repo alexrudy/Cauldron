@@ -7,10 +7,7 @@ from __future__ import absolute_import
 
 import types
 import sys
-import logging
 import warnings
-
-logging.basicConfig(level=logging.DEBUG)
 
 from . import registry
 
