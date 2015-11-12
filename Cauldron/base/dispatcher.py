@@ -280,10 +280,10 @@ class Service(object):
     def __init__(self, name, config, setup=None, dispatcher=None):
         super(Service, self).__init__()
         
-        self.log = logging.getLogger("DFW.Service")
         
         self.dispatcher = dispatcher
         self.name = name.lower()
+        self.log = logging.getLogger("DFW.Service.{0}".format(self.name))
         
         self._keywords = {}
         self.status_keyword = None
