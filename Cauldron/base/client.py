@@ -284,10 +284,10 @@ class Service(object):
         return list(sorted(self._keywords.keys()))
         
     
-    def read(self, keyword):
+    def read(self, keyword, **kwargs):
         """Read a keyword, passes through to the keyword implementation's :meth:`Keyword.read`."""
-        return self[keyword].read()
+        return self[keyword].read(**kwargs)
     
-    def write(self, keyword, value):
+    def write(self, keyword, value, **kwargs):
         """Write a keyword value, passes through to the keyword implementation's :meth:`Keyword.write`."""
-        return self[keyword].write(value)
+        return self[keyword].write(value, **kwargs)
