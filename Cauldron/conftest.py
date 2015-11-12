@@ -37,17 +37,18 @@ except NameError:   # Needed to support Astropy <= 1.0.0
 
 available_backends = ["local"]
 
+from .redis.common import configure_pool, REDIS_SERVICES_REGISTRY, REDIS_DOMAIN
 def clear_registry():
     """Clear the redis registry."""
     import redis
     r = redis.StrictRedis(host='localhost', port=6379, db=0)
     r.delete(REDIS_SERVICES_REGISTRY)
+    r.flushdb()
 
 try:
     import redis
     r = redis.StrictRedis(host='localhost', port=6379, db=0)
     r.ping()
-    from .redis.common import configure_pool, REDIS_SERVICES_REGISTRY
     configure_pool(host='localhost', port=6379, db=0)
     clear_registry()
 except Exception as e:
