@@ -14,6 +14,7 @@ import abc
 import time
 import weakref
 import datetime
+import logging
 from .core import _BaseKeyword
 from ..utils.callbacks import Callbacks
 from ..utils.helpers import api_not_required, api_not_implemented, api_required, api_override
@@ -222,6 +223,7 @@ class Service(object):
         self.name = name.lower()
         if populate:
             self._populate()
+        self.log = logging.getLogger("ktl.Service.{0}".format(self.name))
     
     def __repr__(self):
         """Represent this object"""
