@@ -58,9 +58,8 @@ class Keyword(ClientKeyword):
         if not self['writes']:
             raise ValueError("Keyword '{0}' does not support writes, it is read-only.".format(self.name))
         
-        if not wait or timeout is not None:
+        if (not wait) or (timeout is not None):
             warnings.warn("Cauldron.local doesn't support asynchronous writes.", CauldronAPINotImplementedWarning)
-            
         # User-facing convenience to make writes smoother.
         try:
             value = self.cast(value)

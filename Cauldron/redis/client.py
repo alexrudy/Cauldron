@@ -8,13 +8,13 @@ import weakref
 import time
 from ..base import ClientService, ClientKeyword
 from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented
-from .common import REDIS_SERVICES_REGISTRY, redis_key_name, check_redis, get_connection_pool
+from .common import REDIS_SERVICES_REGISTRY, redis_key_name, check_redis, get_connection_pool, redis_status_key, REDISKeywordBase, REDISPubsubBase
 from .. import registry
 
 __all__ = ['Service', 'Keyword']
 
 @registry.client.keyword_for("redis")
-class Keyword(ClientKeyword):
+class Keyword(ClientKeyword, REDISKeywordBase):
     """A keyword for REDIS dispatcher implementations."""
     
     def _ktl_reads(self):
@@ -39,7 +39,7 @@ class Keyword(ClientKeyword):
             self.read(wait=wait)
         if start:
             self.service.pubsub.subscribe(**{redis_key_name(self):self._redis_callback})
-            self.service._start()
+            self.service._run_thread()
         else:
             self.service.pubsub.unsubscribe(redis_key_name(self))
             
@@ -47,29 +47,30 @@ class Keyword(ClientKeyword):
         """Determine if this keyword is monitored."""
         return redis_key_name(self) in self.service.pubsub.channels
         
+    def _update_from_redis(self):
+        """Update this keyword from REDIS."""
+        self._update(self.service.redis.get(redis_key_name(self)))
+        
+        
     def read(self, binary=False, both=False, wait=True, timeout=None):
-        """Read a value, synchronously, always."""
+        """Read a value, possibly asynchronously."""
         
         if not self['reads']:
             raise NotImplementedError("Keyword '{0}' does not support reads.".format(self.name))
         
-        if not wait or timeout is not None:
-            warnings.warn("Cauldron.redis doesn't support asynchronous reads.", CauldronAPINotImplementedWarning)
-        
-        #TODO: This should somehow not be a busy wait!
-        while not self.service.redis.get(redis_key_name(self) + ":status") == "ready":
-            time.sleep(0.01)
-        self._update(self.service.redis.get(redis_key_name(self)))
-        return self._current_value(binary=binary, both=both)
+        if wait or timeout is not None:
+            self._wait_for_status('ready', timeout)
+            self._update_from_redis()
+            return self._current_value(binary=binary, both=both)
+        else:
+            self._trigger_on_status('ready', self._update_from_redis)
+            return
         
     def write(self, value, wait=True, binary=False, timeout=None):
         """Write a value"""
         if not self['writes']:
             raise NotImplementedError("Keyword '{0}' does not support writes.".format(self.name))
         
-        if not wait or timeout is not None:
-            warnings.warn("Cauldron.redis doesn't support asynchronous writes.", CauldronAPINotImplementedWarning)
-            
         # User-facing convenience to make writes smoother.
         try:
             value = self.cast(value)
@@ -77,14 +78,15 @@ class Keyword(ClientKeyword):
             pass
         
         self.service.redis.set(redis_key_name(self) + ":status", "modify")
-        #TODO: Typechecking? Error munging?
         self.service.redis.publish(redis_key_name(self), value)
+        if wait or timeout is not None:
+            self._wait_for_status('ready', timeout)
         
     def wait(self, timeout=None, operator=None, value=None, sequence=None, reset=False, case=False):
         raise CauldronAPINotImplemented("Asynchronous operations are not supported for Cauldron.redis")
 
 @registry.client.service_for("redis")
-class Service(ClientService):
+class Service(REDISPubsubBase, ClientService):
     """A Redis service client."""
     
     def __init__(self, name, populate=False, connection_pool=None):

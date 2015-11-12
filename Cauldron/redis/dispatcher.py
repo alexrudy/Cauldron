@@ -5,18 +5,19 @@ REDIS dispatcher.
 """
 from __future__ import absolute_import
 
+import weakref
+
 from ..base import DispatcherService, DispatcherKeyword
 from ..compat import WeakOrderedSet
-from .common import REDIS_SERVICES_REGISTRY, redis_key_name, get_connection_pool, check_redis
+from .common import REDIS_SERVICES_REGISTRY, redis_key_name, get_connection_pool, check_redis, REDISPubsubBase
 from .. import registry
 
 __all__ = ['Service', 'Keyword']
 
 @registry.dispatcher.service_for("redis")
-class Service(DispatcherService):
+class Service(REDISPubsubBase, DispatcherService):
     """REDIS dispatcher service."""
     
-    _thread = None
     name = None
     
     def __init__(self, name, config, setup=None, dispatcher=None):
@@ -24,7 +25,6 @@ class Service(DispatcherService):
         self.connection_pool = get_connection_pool(None)
         self.redis = redis.StrictRedis(connection_pool=self.connection_pool)
         self.pubsub = redis.StrictRedis(connection_pool=self.connection_pool).pubsub()
-        self._thread = None
         
         if self.redis.sismember(REDIS_SERVICES_REGISTRY, name.lower()):
             raise ValueError("Service {0} cannot have multiple instances. Found {1!r}".format(name.lower(), self.redis.smembers(REDIS_SERVICES_REGISTRY)))
@@ -36,25 +36,20 @@ class Service(DispatcherService):
         self.redis.sadd(REDIS_SERVICES_REGISTRY, self.name)
         self._run_thread()
     
-    def _run_thread(self):
-        """Run the pubsub monitoring thread."""
-        if self._thread is None:
-            self.log.debug("Starting monitor thread for '{0}'".format(self.name))
-            self._thread = self.pubsub.run_in_thread(sleep_time=0.001)
-        elif not self._thread.is_alive():
-            self.log.debug("Re-starting monitor thread for '{0}'".format(self.name))
-            self._thread = self.pubsub.run_in_thread(sleep_time=0.001)
-    
     def shutdown(self):
         """Shutdown"""
-        if self._thread is not None:
-            self.log.debug("Stopping monitor thread for '{0}'".format(self.name))
-            self._thread.stop()
+        self._stop_thread()
         self.redis.srem(REDIS_SERVICES_REGISTRY, self.name)
     
     def __missing__(self, key):
         """Allows the redis dispatcher to populate any keyword, whether it should exist or not."""
         return Keyword(key, self)
+        
+    def __del__(self):
+        """Destructor!"""
+        super(Service, self).__del__()
+        if hasattr(self, "redis"):
+            self.redis.srem(REDIS_SERVICES_REGISTRY, self.name)
         
 
 @registry.dispatcher.keyword_for("redis")
