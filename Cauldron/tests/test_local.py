@@ -108,6 +108,7 @@ def test_subscribe(local_service, local_client):
     local_service["KEYWORD"].modify("SomeValue")
     assert monitor.monitored
     
+@pytest.mark.xfail
 def test_write_async(local_service, local_client, recwarn):
     """Test local asynchronous write."""
     from Cauldron.exc import CauldronAPINotImplementedWarning
