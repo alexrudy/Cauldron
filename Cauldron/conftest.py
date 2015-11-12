@@ -94,11 +94,11 @@ def fail_if_not_teardown():
     else:
         pytest.fail("Shouldn't be able to import DFW now!")
     
-    import threading
+    import threading, time
     if threading.active_count() > 1:
-        for thread in threading.enumerate():
-            print(thread)
-        pytest.fail("Threads left alive!")
+        time.sleep(0.1) #Allow zombies to die!
+    if threading.active_count() > 1:
+        pytest.fail("Threads left alive!\n{!s}".format("\n".join([repr(thread) for thread in threading.enumerate()])))
     
 @pytest.fixture(scope='function')
 def teardown_cauldron(request):
@@ -155,3 +155,4 @@ def strictxml(xmlvar):
     from Cauldron.api import STRICT_KTL_XML
     STRICT_KTL_XML.on()
     return xmlvar
+    
