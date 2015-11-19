@@ -5,15 +5,17 @@ from __future__ import absolute_import
 import threading
 import logging
 import weakref
+from pkg_resources import parse_version
 
 from ..api import _Setting
 
+REDIS_AVAILALBE = _Setting("REDIS_AVAILALBE", False)
 try:
     import redis
+    if parse_version(redis.__version__) >= parse_version("2.10.5"):
+        REDIS_AVAILALBE.on()
 except ImportError:
-    REDIS_AVAILALBE = _Setting("REDIS_AVAILALBE", False)
-else:
-    REDIS_AVAILALBE = _Setting("REDIS_AVAILALBE", True)
+    REDIS_AVAILALBE.off()
 
 REDIS_DOMAIN = "{0}".format(__name__)
 REDIS_SERVICES_REGISTRY = "{0}.SERVICES_REGISTRY".format(REDIS_DOMAIN)
@@ -130,6 +132,18 @@ def get_connection_pool(connection_pool):
         return connection_pool
     else:
         return get_global_connection_pool()
+    
+
+def check_redis_connection(connection_pool=None):
+    """Check a redis connection."""
+    if not REDIS_AVAILALBE:
+        return REDIS_AVAILALBE
+    try:
+        client = redis.StrictRedis(connection_pool=get_connection_pool(connection_pool))
+        client.ping()
+    except Exception as e:
+        REDIS_AVAILALBE.off()
+    return REDIS_AVAILALBE
     
 
 _global_connection_pool = None

@@ -98,4 +98,5 @@ def test_monitor(redis_service, redis_client):
     finally:
         print("Stopping Monitor")
         redis_client["KEYWORD"].monitor(start=False)
-        time.sleep(waittime)
+        time.sleep(3*waittime)
+        assert not redis_client._thread.is_alive()
