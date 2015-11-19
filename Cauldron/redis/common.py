@@ -45,10 +45,14 @@ class REDISPubsubBase(object):
     
     _thread = None
     THREAD_SLEEP_TIME = 0.001
+    THREAD_DAEMON = False
     
     def _start_thread(self):
         """Create and start a new thread."""
-        self._thread = weakref.proxy(self.pubsub.run_in_thread(sleep_time=self.THREAD_SLEEP_TIME))
+        import redis.client
+        self._thread = redis.client.PubSubWorkerThread(self.pubsub, sleep_time=self.THREAD_SLEEP_TIME)
+        self._thread.daemon = self.THREAD_DAEMON
+        self._thread.start()
     
     def _run_thread(self):
         """Run the pubsub monitoring thread."""

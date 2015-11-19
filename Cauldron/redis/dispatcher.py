@@ -19,11 +19,13 @@ class Service(REDISPubsubBase, DispatcherService):
     """REDIS dispatcher service."""
     
     name = None
+    THREAD_DAEMON = True
     
     def __init__(self, name, config, setup=None, dispatcher=None):
         redis = check_redis()
         self.connection_pool = get_connection_pool(None)
         self.redis = redis.StrictRedis(connection_pool=self.connection_pool)
+        self.redis.config_set("notify-keyspace-events", "KA")
         self.pubsub = redis.StrictRedis(connection_pool=self.connection_pool).pubsub()
         
         if self.redis.sismember(REDIS_SERVICES_REGISTRY, name.lower()):
