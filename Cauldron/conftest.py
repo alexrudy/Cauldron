@@ -98,8 +98,13 @@ def fail_if_not_teardown():
     import threading, time
     if threading.active_count() > 1:
         time.sleep(0.1) #Allow zombies to die!
-    if threading.active_count() > 1:
-        pytest.fail("Threads left alive!\n{!s}".format("\n".join([repr(thread) for thread in threading.enumerate()])))
+    count = 0
+    for thread in threading.enumerate():
+        if not thread.daemon:
+            count += 1
+    if count > 1:
+        pytest.fail("{0:d} non-deamon thread{1:s} left alive!\n{2!s}".format(count-1, "s" if (count-1)>1 else "",
+            "\n".join([repr(thread) for thread in threading.enumerate()])))
     
 @pytest.fixture(scope='function')
 def teardown_cauldron(request):
