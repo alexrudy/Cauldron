@@ -9,6 +9,13 @@ from pkg_resources import parse_version
 
 from ..api import _Setting
 
+__all__ = ['REDIS_AVAILALBE', 'REDIS_DOMAIN', 'REDIS_SERVICES_REGISTRY',
+    'check_redis', 'check_redis_connection',
+    'redis_key_name', 'redis_status_key', 
+    'REDISPubsubBase', 'REDISKeywordBase', 
+    'get_connection_pool', 'set_global_connection_pool', 'get_global_connection_pool',
+    'configure_pool']
+
 REDIS_AVAILALBE = _Setting("REDIS_AVAILALBE", False)
 try:
     import redis
@@ -16,6 +23,8 @@ try:
         REDIS_AVAILALBE.on()
 except ImportError:
     REDIS_AVAILALBE.off()
+finally:
+    del parse_version
 
 REDIS_DOMAIN = "{0}".format(__name__)
 REDIS_SERVICES_REGISTRY = "{0}.SERVICES_REGISTRY".format(REDIS_DOMAIN)
