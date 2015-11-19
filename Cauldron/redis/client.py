@@ -29,19 +29,20 @@ class Keyword(ClientKeyword, REDISKeywordBase):
         """A redis callback function."""
         if message is None:
             return
-        if message['channel'] == redis_key_name(self) and message['data'] == "set":
+        if message['channel'].endswith(redis_key_name(self)) and message['data'] == "set":
             self.read()
             return
+        
         return message
         
     def monitor(self, start=True, prime=True, wait=True):
-        if prime:
-            self.read(wait=wait)
         if start:
-            self.service.pubsub.subscribe(**{redis_key_name(self):self._redis_callback})
+            if prime:
+                self.read(wait=wait)
+            self.service.pubsub.psubscribe(**{"__keyspace@*__:"+redis_key_name(self):self._redis_callback})
             self.service._run_thread()
         else:
-            self.service.pubsub.unsubscribe(redis_key_name(self))
+            self.service.pubsub.punsubscribe("__keyspace@*__:"+redis_key_name(self))
             
     def _ktl_monitored(self):
         """Determine if this keyword is monitored."""

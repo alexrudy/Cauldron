@@ -61,23 +61,29 @@ def test_wait(redis_client):
 def test_monitor(redis_service, redis_client):
     """Test monitoring"""
     
+    start = time.time()
     waittime = 0.1
     
     def monitor(keyword):
         """Monitor"""
         monitor.monitored = True
-        print("Monitored!")
+        print("Monitored={0!s} @{1:.2f}".format(monitor.monitored, time.time() - start))
     
     monitor.monitored = False
     
     try:
+        log = redis_client.log
         redis_client["KEYWORD"].callback(monitor)
         redis_client["KEYWORD"].monitor(prime=False)
         time.sleep(waittime) #Wait for threaded operations to catch up!
         assert not monitor.monitored
+        log.info("Modify @{0:.2f}".format(time.time() - start))
         redis_service["KEYWORD"].modify("SomeValue")
         time.sleep(waittime) #Wait for threaded operations to catch up!
+        log.info("Checking @{0:.2f}".format(time.time() - start))
         assert monitor.monitored
+        log.info("Checked")
+        
         redis_client["KEYWORD"].callback(monitor, remove=True)
         monitor.monitored = False
         redis_service["KEYWORD"].modify("OtherValue")
@@ -90,4 +96,6 @@ def test_monitor(redis_service, redis_client):
         time.sleep(waittime) #Wait for threaded operations to catch up!
         assert monitor.monitored
     finally:
+        print("Stopping Monitor")
         redis_client["KEYWORD"].monitor(start=False)
+        time.sleep(waittime)
