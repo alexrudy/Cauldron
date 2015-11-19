@@ -15,6 +15,7 @@ from ..compat import WeakOrderedSet
 from .core import _BaseKeyword
 from ..exc import CauldronAPINotImplemented, NoWriteNecessary, CauldronXMLWarning, WrongDispatcher
 from ..utils.helpers import api_not_required, api_not_implemented, api_required, api_override
+from ..utils.callbacks import Callbacks
 from ..bundled import ktlxml
 from ..api import STRICT_KTL_XML
 
@@ -89,7 +90,7 @@ class Keyword(_BaseKeyword):
         if service.get(name, None) is not None:
             raise ValueError("keyword named '%s' already exists." % name)
         self._acting = False
-        self._callbacks = WeakOrderedSet()
+        self._callbacks = Callbacks()
         self._history = list()
         self.writeonly = False
         self.readonly = False
@@ -234,8 +235,7 @@ class Keyword(_BaseKeyword):
         """Propagate the change to any waiting callbacks."""
         try:
             self._acting = True
-            for callback in self._callbacks:
-                callback(self)
+            self._callbacks(self)
         finally:
             self._acting = False
         

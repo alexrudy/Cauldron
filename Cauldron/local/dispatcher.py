@@ -58,6 +58,5 @@ class Keyword(DispatcherKeyword):
     
     def _broadcast(self, value):
         """Notify consumers that this value has changed."""
-        for consumer in self._consumers:
-            consumer(value)
-    
+        self._consumers(value)
+        

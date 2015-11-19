@@ -232,4 +232,8 @@ class Callbacks(object):
         wm = WeakMethod(item)
         return wm in self.data
         
+    def __call__(self, *args, **kwargs):
+        """Fire all callbacks. Return values are collected in a list."""
+        return [callback(*args, **kwargs) for callback in self]
+            
         
