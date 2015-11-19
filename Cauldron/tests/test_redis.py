@@ -12,7 +12,6 @@ def useredis(request):
     """Use the local backend."""
     from Cauldron.api import use
     use('redis')
-    request.addfinalizer(fail_if_not_teardown)
 
 @pytest.fixture
 def redis_service(request, useredis, servicename, config):
@@ -21,6 +20,7 @@ def redis_service(request, useredis, servicename, config):
     svc = Service(servicename, config=config)
     mykw = svc['KEYWORD']
     request.addfinalizer(lambda : svc.shutdown())
+    request.addfinalizer(fail_if_not_teardown)
     return svc
     
 @pytest.fixture
@@ -61,6 +61,8 @@ def test_wait(redis_client):
 def test_monitor(redis_service, redis_client):
     """Test monitoring"""
     
+    waittime = 0.1
+    
     def monitor(keyword):
         """Monitor"""
         monitor.monitored = True
@@ -68,23 +70,24 @@ def test_monitor(redis_service, redis_client):
     
     monitor.monitored = False
     
-    redis_client["KEYWORD"].callback(monitor)
-    redis_client["KEYWORD"].monitor(prime=False)
-    time.sleep(0.01) #Wait for threaded operations to catch up!
-    assert not monitor.monitored
-    redis_service["KEYWORD"].modify("SomeValue")
-    time.sleep(0.01) #Wait for threaded operations to catch up!
-    assert monitor.monitored
-    local_client["KEYWORD"].callback(monitor, remove=True)
-    monitor.monitored = False
-    redis_service["KEYWORD"].modify("OtherValue")
-    time.sleep(0.01) #Wait for threaded operations to catch up!
-    assert not monitor.monitored
+    try:
+        redis_client["KEYWORD"].callback(monitor)
+        redis_client["KEYWORD"].monitor(prime=False)
+        time.sleep(waittime) #Wait for threaded operations to catch up!
+        assert not monitor.monitored
+        redis_service["KEYWORD"].modify("SomeValue")
+        time.sleep(waittime) #Wait for threaded operations to catch up!
+        assert monitor.monitored
+        redis_client["KEYWORD"].callback(monitor, remove=True)
+        monitor.monitored = False
+        redis_service["KEYWORD"].modify("OtherValue")
+        time.sleep(waittime) #Wait for threaded operations to catch up!
+        assert not monitor.monitored
     
-    local_client["KEYWORD"].callback(monitor, preferred=True)
-    local_client["KEYWORD"].monitor(prime=True)
-    redis_service["KEYWORD"].modify("SomeValue")
-    time.sleep(0.01) #Wait for threaded operations to catch up!
-    assert monitor.monitored
-    
-    local_client["KEYWORD"].monitor(start=False)
+        redis_client["KEYWORD"].callback(monitor, preferred=True)
+        redis_client["KEYWORD"].monitor(prime=True)
+        redis_service["KEYWORD"].modify("SomeValue")
+        time.sleep(waittime) #Wait for threaded operations to catch up!
+        assert monitor.monitored
+    finally:
+        redis_client["KEYWORD"].monitor(start=False)

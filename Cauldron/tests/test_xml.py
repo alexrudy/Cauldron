@@ -20,11 +20,14 @@ def test_Service_with_xml(xmlvar, backend, servicename, config):
     """Test a service with XML."""
     from Cauldron import DFW
     svc = DFW.Service(servicename, config)
-    assert svc.xml is not None
-    assert "LOOP" in svc
-    assert "KEYWORD" not in svc
-    kwd = svc["KEYWORD"]
-    assert "KEYWORD" in svc
+    try:
+        assert svc.xml is not None
+        assert "LOOP" in svc
+        assert "KEYWORD" not in svc
+        kwd = svc["KEYWORD"]
+        assert "KEYWORD" in svc
+    finally:
+        svc.shutdown()
     
 def test_Service_with_strict_xml(backend, servicename, config):
     """Test the backend with strict xml enabled, so it should raise an exception."""
@@ -38,7 +41,8 @@ def test_Service_with_strict_xml(backend, servicename, config):
     os.environ['RELDIR'] = "directory/does/not/exist"
     with pytest.raises(IOError):
         svc = DFW.Service(servicename, config)
-        
+    
+
 def test_Keyword_with_xml(xmlvar, dispatcher):
     """Test the backend with XML enabled."""
     keyword = dispatcher['LOOP']
@@ -57,12 +61,18 @@ def test_Service_with_dispatcher(xmlvar, backend, servicename, config):
     """XML service with dispatcher explicitly set."""
     from Cauldron import DFW
     svc = DFW.Service(servicename, config, dispatcher='+service+_dispatch_2')
-    keyword = svc['LOOP']
+    try:
+        keyword = svc['LOOP']
+    finally:
+        svc.shutdown()
     
 def test_Service_with_wrong_dispatcher(strictxml, backend, servicename, config):
     """XML service with dispatcher explicitly set."""
     from Cauldron import DFW
     from Cauldron.exc import WrongDispatcher
     svc = DFW.Service(servicename, config, dispatcher='+service+_dispatch_2')
-    with pytest.raises(WrongDispatcher):
-        keyword = svc['LOOP']
+    try:
+        with pytest.raises(WrongDispatcher):
+            keyword = svc['LOOP']
+    finally:
+        svc.shutdown()
