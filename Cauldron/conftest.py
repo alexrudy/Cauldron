@@ -60,6 +60,15 @@ else:
     PYTEST_HEADER_MODULES['redis'] = 'redis'
     available_backends.append("redis")
 
+try:
+    import zmq
+except ImportError:
+    pass
+else:
+    PYTEST_HEADER_MODULES['zmq'] = 'zmq'
+    available_backends.append("zmq")
+    
+
 import pkg_resources
 import os
 

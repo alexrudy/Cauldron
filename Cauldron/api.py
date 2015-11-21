@@ -65,10 +65,10 @@ def use(name):
     """
     # We do some hacks here to install the module 'Cauldron.ktl' and 'Cauldron.DFW' only once this API function has been called.
     if CAULDRON_SETUP:
-        raise RuntimeError("You may only call Cauldron.use() once! Refusing to activate again.")
+        raise RuntimeError("You may only call Cauldron.use() once! It is an error to activate again.")
     
     if name not in registry.keys():
-        raise ValueError("The Cauldron backend {0} is not known. Try one of {1!r}".format(
+        raise ValueError("The Cauldron backend '{0}' is not registered. Available backends are {1!r}".format(
             name, list(registry.keys())))
     
     # Allow imports of backend modules now.

@@ -13,6 +13,7 @@ import logging
 import warnings
 from ..compat import WeakOrderedSet
 from .core import _BaseKeyword
+from ..config import read_configuration
 from ..exc import CauldronAPINotImplemented, NoWriteNecessary, CauldronXMLWarning, WrongDispatcher
 from ..utils.helpers import api_not_required, api_not_implemented, api_required, api_override
 from ..utils.callbacks import Callbacks
@@ -280,7 +281,7 @@ class Service(object):
     def __init__(self, name, config, setup=None, dispatcher=None):
         super(Service, self).__init__()
         
-        
+        self._config = read_configuration(config)
         self.dispatcher = dispatcher
         self.name = name.lower()
         self.log = logging.getLogger("DFW.Service.{0}".format(self.name))
@@ -293,15 +294,17 @@ class Service(object):
         except Exception as e:
             if STRICT_KTL_XML:
                 raise
-            warning = CauldronXMLWarning("KTLXML was not loaded correctly. Keywords will not be validated against XML.")
+            warning = CauldronXMLWarning("KTLXML was not loaded correctly. Keywords will not be validated against XML. Exception was {0!s}.".format(e))
             warnings.warn(warning)
-            self.log.warning("{0!s} exception was {1!r}".format(warning, e))
+            self.log.warning(warning)
             self.xml = None
         else:
             # Implementors will be expected to assign Keyword instances
             # for each KTL keyword in this KTL service.
             for keyword in self.xml.list():
                 self._keywords[keyword] = None
+        
+        self._prepare()
         
         if setup is not None:
             setup(self)
@@ -330,6 +333,11 @@ class Service(object):
     @api_override
     def setupOrphans(self):
         """Set up orphaned keywords, that is keywords which aren't attached to a specific keyword class."""
+        pass
+    
+    @api_override
+    def _prepare(self):
+        """This method is called once the configuration has been read, but before setup. It provides an implementation-dependent way to take action after the system has been configured, but before any keywords are available."""
         pass
     
     def begin(self):

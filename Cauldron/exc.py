@@ -43,3 +43,12 @@ class CauldronXMLWarning(CauldronWarning):
     """Warning raised due to the non-strict use of XML in non-standard KTL backends."""
     pass
     
+
+class DispatcherError(CauldronException):
+    """Raised when something went wrong with the dispatcher."""
+    pass
+    
+class ConfigurationMissing(CauldronWarning):
+    """An exception raised when a configuration item is missing."""
+    pass
+    
