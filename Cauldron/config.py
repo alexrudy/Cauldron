@@ -46,9 +46,9 @@ def read_configuration(configuration_location = None, config = None):
         with open(configuration_location, 'r') as fp:
             config.readfp(fp)
     except configparser.ParsingError as e:
-        warnings.warn("Can't parse configuration file '{0:s}'", ConfigurationMissing)
+        warnings.warn("Can't parse configuration file '{0:s}'".format(configuration_location), ConfigurationMissing)
     except IOError:
-        warnings.warn("Can't locate configuration file '{0:s}'.", ConfigurationMissing)
+        warnings.warn("Can't locate configuration file '{0:s}'.".format(configuration_location), ConfigurationMissing)
     return config
     
 _cauldron_configuration = default_configuration()
