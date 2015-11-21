@@ -4,7 +4,8 @@ Dispatcher implementation for ZMQ
 
 """
 
-from .common import zmq_dispatcher_address, zmq_broadcaster_address, check_zmq, teardown
+from .common import zmq_dispatcher_address, zmq_broadcaster_address, check_zmq, teardown, ZMQCauldronMessage, ZMQCauldronParserError, ZMQCauldronErrorResponse, ZMQCauldronParserError
+from .router import register, _shutdown_router
 from ..base import DispatcherService, DispatcherKeyword
 from .. import registry
 
@@ -23,6 +24,37 @@ class _ZMQResponderThread(threading.Thread):
         self.service = weakref.proxy(service)
         self.log = logging.getLogger("DFW.Service.Thread")
         self.daemon = True
+        
+    def handle(self, message):
+        """Handle a message."""
+        method_name = "handle_{0:s}".format(message.command)
+        if not hasattr(self, method_name):
+            message.raise_error_response("Bad command '{0:s}'!".format(message['command']))
+        try:
+            response = getattr(self, method_name)(message)
+        except ZMQCauldronErrorResponse as e:
+            raise
+        except Exception as e:
+            self.log.error(repr(e))
+            message.raise_error_response(repr(e))
+        return  message.response(response)
+        
+    def handle_modify(self, message):
+        """Handle a modify command."""
+        return message.keyword.modify(message.payload)
+    
+    def handle_update(self, message):
+        """Handle an update command."""
+        return message.keyword.update()
+        
+    def handle_identify(self, message):
+        """Handle an identify command."""
+        return "yes" if message.payload in message.service else "no"
+        
+    def handle_enumerate(self, message):
+        """Handle enumerate command."""
+        return ":".join(message.service.keywords())
+        
     
     def run(self):
         """Run the thread."""
@@ -37,34 +69,13 @@ class _ZMQResponderThread(threading.Thread):
                 self.log.info("Service can't bind to address '{0}' because {1}".format(address, e))
                 
             while not self._shutdown.isSet():
-                message = socket.recv()
-                cmd, service, kwd, value = message.split(":", 3)
-                if kwd == "":
-                    keyword = None
-                else:
-                    try:
-                        keyword = self.service[kwd]
-                    except KeyError:
-                        message = "Bad request, invalid keyword '{0:s}'".format(kwd)
-                        self.log.error(message)
-                        socket.send("{0}Error:{1}:{2}".format(cmd, service, kwd, message))
                 try:
-                    if cmd == 'modify':
-                        resp = keyword.modify(value)
-                    elif cmd == 'update':
-                        resp = keyword.update()
-                    elif cmd == "identify":
-                        # If we are here, and the command is identify, 
-                        # we can return 'yes', because we already checked for
-                        # the existence of the keyword above.
-                        resp = "yes" if value in self.service else "no"
-                    elif cmd == "enumerate":
-                        resp = ":".join(self.service.keywords())
-                except Exception as e:
-                    socket.send("{0}Error:{1}:{2}:{3}".format(cmd, service, kwd, repr(e)))
-                    self.log.error(repr(e))
+                    message = ZMQCauldronMessage.parse(socket.recv(), self.service)
+                    response = self.handle(message)
+                except (ZMQCauldronErrorResponse, ZMQCauldronParserError) as e:
+                    socket.send(e.response)
                 else:
-                    socket.send("{0}:{1}:{2}:{3}".format(cmd, service, kwd, resp))
+                    socket.send(str(response))
         except weakref.ReferenceError as e:
             self.log.info("Service reference error, shutting down, {0}".format(repr(e)))
         except zmq.ContextTerminated as e:
@@ -91,6 +102,9 @@ class Service(DispatcherService):
         
     def _prepare(self):
         """Begin this service."""
+        if self._config.getboolean("zmq-router", "enable"):
+            register(self)
+        
         try:
             address = zmq_broadcaster_address(self._config, bind=True)
             self._broadcast_socket.bind(address)
@@ -108,7 +122,13 @@ class Service(DispatcherService):
         """Shutdown this object."""
         if hasattr(self, '_thread') and self._thread.is_alive():
             self._thread.stop()
-        self._broadcast_socket.close()
+        if hasattr(self, '_broadcast_socket'):
+            self._broadcast_socket.setsockopt(zmq.LINGER, 0)
+            self._broadcast_socket.close()
+            del self._broadcast_socket
+        if hasattr(self, '_router'):
+            _shutdown_router(self)
+        
         self.ctx.destroy()
         
     def __missing__(self, key):

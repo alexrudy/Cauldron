@@ -8,7 +8,8 @@ from __future__ import absolute_import
 import weakref
 from ..base import ClientService, ClientKeyword
 from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented, DispatcherError
-from .common import zmq_dispatcher_address, zmq_broadcaster_address, check_zmq, sync_command, teardown
+from .common import zmq_dispatcher_address, zmq_broadcaster_address, check_zmq, teardown, ZMQCauldronMessage
+from .router import lookup
 from .. import registry
 from ..config import get_module_configuration
 
@@ -62,31 +63,46 @@ class Service(ClientService):
         self.ctx = zmq.Context.instance()
         self._socket = self.ctx.socket(zmq.REQ)
         self._config = get_module_configuration()
-        self._socket.connect(zmq_dispatcher_address(self._config))
         self._thread = _ZMQMonitorThread(self)
         super(Service, self).__init__(name, populate)
+        
+    def _prepare(self):
+        """Prepare step."""
+        lookup(self)
+        self._socket.connect(zmq_dispatcher_address(self._config))
         self._thread.start()
+        
         
     def shutdown(self):
         """When this client is shutdown, close the subscription thread."""
-        self._thread.shutdown.set()
-        self._thread.join()
-        self._socket.close()
+        if hasattr(self, '_thread'):
+            self._thread.shutdown.set()
+        zmq = check_zmq()
+        try:
+            self._socket.close()
+        except zmq.ZMQError as e:
+            pass
         
     def has_keyword(self, name):
         """Check if a dispatcher has a keyword."""
-        msg = sync_command(self._socket, "identify", self.name, "", name)
-        return msg['response'] == "yes"
+        message = self._synchronous_command("identify", name, None)
+        return message.payload == "yes"
         
     def keywords(self):
         """List all available keywords."""
-        msg = sync_command(self._socket, "enumerate", self.name, "", "")
-        return msg['response'].split(":")
+        message = self._synchronous_command("enumerate", "", None)
+        return message.payload.split(":")
         
     def __missing__(self, key):
         """Populate and return a missing key."""
         keyword = self._keywords[key] = Keyword(self, key)
         return keyword
+        
+    def _synchronous_command(self, command, payload, keyword=None):
+        """Execute a synchronous command."""
+        self._socket.send(str(ZMQCauldronMessage(command, self, keyword, payload, "REQ")))
+        #TODO: Use polling here to support timeouts.
+        return ZMQCauldronMessage.parse(self._socket.recv(), self)
     
 @registry.client.keyword_for("zmq")
 class Keyword(ClientKeyword):
@@ -103,6 +119,10 @@ class Keyword(ClientKeyword):
     def _ktl_monitored(self):
         """Is this keyword monitored."""
         return self.name in self.service._thread.monitored
+        
+    def _synchronous_command(self, command, payload):
+        """Exectue a synchronous command."""
+        return self.service._synchronous_command(command, payload, self)
         
     def wait(self, timeout=None, operator=None, value=None, sequence=None, reset=False, case=False):
         raise CauldronAPINotImplemented("Asynchronous operations are not supported for Cauldron.zmq")
@@ -124,8 +144,8 @@ class Keyword(ClientKeyword):
         if not wait or timeout is not None:
             warnings.warn("Cauldron.zmq doesn't support asynchronous reads.", CauldronAPINotImplementedWarning)
         
-        message = sync_command(self.service._socket, "update", self.service.name, self.name, "")
-        self._update(message['response'])
+        message = self._synchronous_command("update", "")
+        self._update(message.payload)
         return self._current_value(binary=binary, both=both)
         
     def write(self, value, wait=True, binary=False, timeout=None):
@@ -141,5 +161,6 @@ class Keyword(ClientKeyword):
             value = self.cast(value)
         except (TypeError, ValueError):
             pass
-        message = sync_command(self.service._socket, "modify", self.service.name, self.name, value)
+        message = self._synchronous_command("modify", value)
+        
         
