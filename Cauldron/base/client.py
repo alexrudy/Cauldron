@@ -221,9 +221,10 @@ class Service(object):
         super(Service, self).__init__()
         self._keywords = {}
         self.name = name.lower()
+        self.log = logging.getLogger("ktl.Service.{0}".format(self.name))
+        self._prepare()
         if populate:
             self._populate()
-        self.log = logging.getLogger("ktl.Service.{0}".format(self.name))
     
     def __del__(self):
         """Delete this service."""
@@ -231,6 +232,10 @@ class Service(object):
         
     def shutdown(self):
         """An explicity shutdown method."""
+        pass
+        
+    def _prepare(self):
+        """Prepare for service."""
         pass
     
     def __repr__(self):
