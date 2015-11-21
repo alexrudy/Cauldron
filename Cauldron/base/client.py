@@ -225,6 +225,14 @@ class Service(object):
             self._populate()
         self.log = logging.getLogger("ktl.Service.{0}".format(self.name))
     
+    def __del__(self):
+        """Delete this service."""
+        self.shutdown()
+        
+    def shutdown(self):
+        """An explicity shutdown method."""
+        pass
+    
     def __repr__(self):
         """Represent this object"""
         return "<Service name='{0}' at {1}>".format(self.name, hex(id(self)))
