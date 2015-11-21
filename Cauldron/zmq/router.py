@@ -75,6 +75,15 @@ class ZMQRouter(object):
         proc.daemon = True
         proc.start()
         return proc
+        
+    @classmethod
+    def thread(cls, config):
+        """Serve in a thread."""
+        import threading
+        thread = threading.Thread(target=cls.serve, args=(config,), name="ZMQRouter")
+        thread.daemon = True
+        thread.start()
+        return thread
     
 
 def _setup_logging(verbose):
@@ -131,8 +140,12 @@ def register(service):
         else:
             # We probably need to start our own router.
             # Note that this router will only live as long as our primary service lives.
-            router = ZMQRouter.daemon(service._configuration_location)
-            service.log.info("Can't locate router at {0}, starting daemonic router.".format(address))
+            if service._config.get("zmq-router", "process") == "thread":
+                router = ZMQRouter.thread(service._configuration_location)
+            else:
+                router = ZMQRouter.daemon(service._configuration_location)
+            service.log.info("Can't locate router at {0}, starting {1} router.".format(address,
+                "thread" if service._config.get("zmq-router", "process") == "thread" else "subprocess"))
             
             # Disconnect the old socket.
             poller.unregister(socket)
