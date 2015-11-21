@@ -30,7 +30,12 @@ class _ZMQResponderThread(threading.Thread):
         ctx = self.service.ctx
         socket = ctx.socket(zmq.REP)
         try:
-            socket.bind(zmq_dispatcher_address(self.service._config, bind=True))
+            try:
+                address = zmq_dispatcher_address(self.service._config, bind=True)
+                socket.bind(address)
+            except zmq.ZMQError as e:
+                self.log.info("Service can't bind to address '{0}' because {1}".format(address, e))
+                
             while not self._shutdown.isSet():
                 message = socket.recv()
                 cmd, service, kwd, value = message.split(":", 3)
@@ -86,7 +91,13 @@ class Service(DispatcherService):
         
     def _prepare(self):
         """Begin this service."""
-        self._broadcast_socket.bind(zmq_broadcaster_address(self._config, bind=True))
+        try:
+            address = zmq_broadcaster_address(self._config, bind=True)
+            self._broadcast_socket.bind(address)
+        except zmq.ZMQError as e:
+            self.log.error("Service can't bind to address '{0}' because {1}".format(address, e))
+            raise
+        
     
     def _begin(self):
         """Allow command responses to start."""
