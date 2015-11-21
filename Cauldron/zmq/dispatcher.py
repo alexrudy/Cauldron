@@ -4,7 +4,7 @@ Dispatcher implementation for ZMQ
 
 """
 
-from . import ZMQ_DISPATCHER_BIND, ZMQ_DISPATCHER_BROADCAST
+from .common import zmq_dispatcher_address, zmq_broadcaster_address, check_zmq, teardown
 from ..base import DispatcherService, DispatcherKeyword
 from .. import registry
 
@@ -13,6 +13,8 @@ import logging
 import weakref
 import zmq
 
+registry.dispatcher.teardown_for('zmq')(teardown)
+
 class _ZMQResponderThread(threading.Thread):
     """A python thread for ZMQ responses."""
     def __init__(self, service):
@@ -20,32 +22,49 @@ class _ZMQResponderThread(threading.Thread):
         self._shutdown = threading.Event()
         self.service = weakref.proxy(service)
         self.log = logging.getLogger("DFW.Service.Thread")
+        self.daemon = True
     
     def run(self):
         """Run the thread."""
-        ctx = zmq.Context.instance()
+        zmq = check_zmq()
+        ctx = self.service.ctx
         socket = ctx.socket(zmq.REP)
-        socket.bind(ZMQ_DISPATCHER_BIND)
         try:
+            socket.bind(zmq_dispatcher_address(self.service._config, bind=True))
             while not self._shutdown.isSet():
                 message = socket.recv()
                 cmd, service, kwd, value = message.split(":", 3)
-                try:
-                    keyword = self.service[kwd]
-                except KeyError:
-                    self.log.error("Bad request, invalid keyword {0:s}".format(kwd))
+                if kwd == "":
+                    keyword = None
+                else:
+                    try:
+                        keyword = self.service[kwd]
+                    except KeyError:
+                        message = "Bad request, invalid keyword '{0:s}'".format(kwd)
+                        self.log.error(message)
+                        socket.send("{0}Error:{1}:{2}".format(cmd, service, kwd, message))
                 try:
                     if cmd == 'modify':
                         resp = keyword.modify(value)
                     elif cmd == 'update':
                         resp = keyword.update()
+                    elif cmd == "identify":
+                        # If we are here, and the command is identify, 
+                        # we can return 'yes', because we already checked for
+                        # the existence of the keyword above.
+                        resp = "yes" if value in self.service else "no"
+                    elif cmd == "enumerate":
+                        resp = ":".join(self.service.keywords())
                 except Exception as e:
-                    socket.send("{0}Error:{1}:{2}".format(cmd, service, repr(e)))
+                    socket.send("{0}Error:{1}:{2}:{3}".format(cmd, service, kwd, repr(e)))
                     self.log.error(repr(e))
                 else:
-                    socket.send("{0}:{1}:{2}".format(cmd, service, resp))
+                    socket.send("{0}:{1}:{2}:{3}".format(cmd, service, kwd, resp))
         except weakref.ReferenceError as e:
-            self.log.error("Service reference error, {0}".format(repr(e)))
+            self.log.info("Service reference error, shutting down, {0}".format(repr(e)))
+        except zmq.ContextTerminated as e:
+            self.log.info("Service shutdown and context terminated, closing command thread.")
+        socket.close()
         return
         
     
@@ -58,21 +77,28 @@ class _ZMQResponderThread(threading.Thread):
 @registry.dispatcher.service_for("zmq")
 class Service(DispatcherService):
     """A ZMQ-based service."""
-    def __init__(self, name, config, setup, dispatcher):
-        super(Service, self).__init__(name, config, setup, dispatcher)
-        self.ctx = zmq.Context.instance()
+    def __init__(self, name, config, setup=None, dispatcher=None):
+        zmq = check_zmq()
+        self.ctx = zmq.Context()
         self._broadcast_socket = self.ctx.socket(zmq.PUB)
-        self._broadcast_socket.bind(ZMQ_DISPATCHER_BROADCAST)
         self._thread = _ZMQResponderThread(self)
+        super(Service, self).__init__(name, config, setup, dispatcher)
         
-    def _begin(self):
+    def _prepare(self):
         """Begin this service."""
-        self._thread.start()
+        self._broadcast_socket.bind(zmq_broadcaster_address(self._config, bind=True))
+    
+    def _begin(self):
+        """Allow command responses to start."""
+        if not self._thread.is_alive():
+            self._thread.start()
         
     def shutdown(self):
         """Shutdown this object."""
-        if hasattr(self, '_thread') and self._thread.isAlive():
+        if hasattr(self, '_thread') and self._thread.is_alive():
             self._thread.stop()
+        self._broadcast_socket.close()
+        self.ctx.destroy()
         
     def __missing__(self, key):
         """Allows the redis dispatcher to populate any keyword, whether it should exist or not."""

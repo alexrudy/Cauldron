@@ -8,57 +8,85 @@ from __future__ import absolute_import
 import weakref
 from ..base import ClientService, ClientKeyword
 from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented, DispatcherError
-from . import zmq_dispatcher_address, zmq_broadcaster_address
+from .common import zmq_dispatcher_address, zmq_broadcaster_address, check_zmq, sync_command, teardown
 from .. import registry
-import zmq
+from ..config import get_module_configuration
+
+import six
 import threading
 import logging
+import warnings
+
+registry.client.teardown_for('zmq')(teardown)
 
 class _ZMQMonitorThread(threading.Thread):
-    """docstring for _ZMQMonitorThread"""
+    """A monitoring thread for ZMQ-powered Services which listens for broadcasts."""
     def __init__(self, service):
         super(_ZMQMonitorThread, self).__init__()
         self.service = weakref.proxy(service)
         self.shutdown = threading.Event()
-        self.log = logging.getLogger("KTL.Service.Thread")
+        self.log = logging.getLogger("KTL.Service.Broadcasts")
         self.monitored = set()
+        self.daemon = True
         
     def run(self):
         """Run the monitoring thread."""
-        ctx = zmq.Context.instance()
+        zmq = check_zmq()
+        ctx = self.service.ctx
         socket = ctx.socket(zmq.SUB)
-        socket.connect(zmq_broadcaster_address())
+        try:
+            socket.connect(zmq_broadcaster_address(self.service._config))
         
-        # Accept everything belonging to this service.
-        socket.setsockopt_string(zmq.SUBSCRIBE, "broadcast:{0}".format(self.service.name))
-        
-        while not self.shutdown.isSet():
-            if socket.poll(timeout=1.0):
-                message = socket.recv()
-                cmd, service, kwd, value = message.split(":", 3)
-                if kwd in self.monitored:
-                    try:
-                        keyword = self.service[kwd]
-                    except KeyError:
-                        self.log.error("Bad request, invalid keyword {0:s}".format(kwd))
-                    keyword._update(value)
+            # Accept everything belonging to this service.
+            socket.setsockopt_string(zmq.SUBSCRIBE, six.text_type("broadcast:{0}".format(self.service.name)))
+            while not self.shutdown.isSet():
+                if socket.poll(timeout=1.0):
+                    message = socket.recv()
+                    cmd, service, kwd, value = message.split(":", 3)
+                    if kwd in self.monitored:
+                        try:
+                            keyword = self.service[kwd]
+                        except KeyError:
+                            self.log.error("Bad request, invalid keyword {0:s}".format(kwd))
+                        keyword._update(value)
+        except (zmq.ContextTerminated, zmq.ZMQError) as e:
+            self.log.info("Service shutdown and context terminated, closing broadcast thread.")
+        socket.close()
 
 @registry.client.service_for("zmq")
 class Service(ClientService):
     """Client service object for use with ZMQ."""
     
     def __init__(self, name, populate=False):
-        super(Service, self).__init__(name, populate)
+        zmq = check_zmq()
         self.ctx = zmq.Context.instance()
-        self._socket = zmq.socket(zmq.REQ)
-        self._socket.connect(zmq_dispatcher_address())
+        self._socket = self.ctx.socket(zmq.REQ)
+        self._config = get_module_configuration()
+        self._socket.connect(zmq_dispatcher_address(self._config))
         self._thread = _ZMQMonitorThread(self)
+        super(Service, self).__init__(name, populate)
         self._thread.start()
         
     def shutdown(self):
         """When this client is shutdown, close the subscription thread."""
         self._thread.shutdown.set()
         self._thread.join()
+        self._socket.close()
+        
+    def has_keyword(self, name):
+        """Check if a dispatcher has a keyword."""
+        msg = sync_command(self._socket, "identify", self.name, "", name)
+        return msg['response'] == "yes"
+        
+    def keywords(self):
+        """List all available keywords."""
+        msg = sync_command(self._socket, "enumerate", self.name, "", "")
+        return msg['response'].split(":")
+        
+    def __missing__(self, key):
+        """Populate and return a missing key."""
+        keyword = self._keywords[key] = Keyword(self, key)
+        return keyword
     
 @registry.client.keyword_for("zmq")
 class Keyword(ClientKeyword):
@@ -71,6 +99,13 @@ class Keyword(ClientKeyword):
     def _ktl_writes(self):
         """Is this keyword writable?"""
         return True
+        
+    def _ktl_monitored(self):
+        """Is this keyword monitored."""
+        return self.name in self.service._thread.monitored
+        
+    def wait(self, timeout=None, operator=None, value=None, sequence=None, reset=False, case=False):
+        raise CauldronAPINotImplemented("Asynchronous operations are not supported for Cauldron.zmq")
     
     def monitor(self, start=True, prime=True, wait=True):
         if prime:
@@ -87,14 +122,10 @@ class Keyword(ClientKeyword):
             raise NotImplementedError("Keyword '{0}' does not support reads.".format(self.name))
         
         if not wait or timeout is not None:
-            warnings.warn("Cauldron.redis doesn't support asynchronous reads.", CauldronAPINotImplementedWarning)
+            warnings.warn("Cauldron.zmq doesn't support asynchronous reads.", CauldronAPINotImplementedWarning)
         
-        self.service.socket.send("update:{0}:{1}:".format(self.service.name, self.name))
-        message = self.service.socket.recv()
-        cmd, service, response = message.split(":",3)
-        if "Error" in cmd:
-            raise DispatcherError(response)
-        self._update(response)
+        message = sync_command(self.service._socket, "update", self.service.name, self.name, "")
+        self._update(message['response'])
         return self._current_value(binary=binary, both=both)
         
     def write(self, value, wait=True, binary=False, timeout=None):
@@ -103,17 +134,12 @@ class Keyword(ClientKeyword):
             raise NotImplementedError("Keyword '{0}' does not support writes.".format(self.name))
         
         if not wait or timeout is not None:
-            warnings.warn("Cauldron.redis doesn't support asynchronous writes.", CauldronAPINotImplementedWarning)
+            warnings.warn("Cauldron.zmq doesn't support asynchronous writes.", CauldronAPINotImplementedWarning)
             
         # User-facing convenience to make writes smoother.
         try:
             value = self.cast(value)
         except (TypeError, ValueError):
             pass
-        
-        self.service.socket.send("modify:{0}:{1}:{2}".format(self.service.name, self.name, value))
-        message = self.service.socket.recv()
-        cmd, service, response = message.split(":",3)
-        if "Error" in cmd:
-            raise DispatcherError(response)
+        message = sync_command(self.service._socket, "modify", self.service.name, self.name, value)
         
