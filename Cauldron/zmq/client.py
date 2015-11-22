@@ -18,6 +18,8 @@ import threading
 import logging
 import warnings
 
+__all__ = ["Service", "Keyword"]
+
 registry.client.teardown_for('zmq')(teardown)
 
 class _ZMQMonitorThread(threading.Thread):

@@ -14,6 +14,8 @@ except ImportError:
     ZMQ_AVAILALBE.off()
 else:
     ZMQ_AVAILALBE.on()
+    
+__all__ = ['ZMQ_AVAILALBE', 'check_zmq', 'ZMQCauldronMessage', 'ZMQCauldronErrorResponse', 'ZMQCauldronParserError']
 
 def check_zmq():
     """Check if ZMQ is available."""

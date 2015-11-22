@@ -7,7 +7,9 @@ from ..config import read_configuration
 from .common import check_zmq, zmq_router_address, zmq_dispatcher_host
 
 from six.moves import range
-import logging        
+import logging
+
+__all__ = ['ZMQRouter', 'register', 'lookup', 'main']
 
 class ZMQRouter(object):
     """A router maintains a registry of services, and tells clients how to connect to a service."""

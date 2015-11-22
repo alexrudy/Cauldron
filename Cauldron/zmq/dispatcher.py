@@ -14,6 +14,9 @@ import logging
 import weakref
 import zmq
 
+__all__ = ["Service", "Keyword"]
+
+
 registry.dispatcher.teardown_for('zmq')(teardown)
 
 class _ZMQResponderThread(threading.Thread):
