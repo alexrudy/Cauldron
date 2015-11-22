@@ -13,11 +13,11 @@ __all__ = ['ZMQRouter', 'register', 'lookup', 'main']
 
 class ZMQRouter(object):
     """A router maintains a registry of services, and tells clients how to connect to a service."""
-    def __init__(self, config=None):
+    def __init__(self, config=None, context=None):
         super(ZMQRouter, self).__init__()
         self.config = read_configuration(config)
         zmq = check_zmq()
-        self.ctx = zmq.Context()
+        self.ctx = context or zmq.Context()
         self._listen = self.ctx.socket(zmq.REP)
         self._directory = {}
         self._port = iter(range(self.config.getint("zmq-router", "first-port"), self.config.getint("zmq-router", "last-port"), 2))
@@ -34,6 +34,9 @@ class ZMQRouter(object):
         self.connect()
         while True:
             message = self._listen.recv_multipart()
+            if not len(message) > 2:
+                self._listen.send_multipart(["COMMAND ERROR: UNKNOWN MESSAGE"] + message)
+                continue
             command = message[0]
             service = message[1]
             if command == "register":
@@ -62,6 +65,9 @@ class ZMQRouter(object):
                 self._listen.send_multipart([command, service, "acknowledged"])
                 self.log.info("Router shutdown requested by service '{0}'".format(service))
                 break
+            else:
+                self._listen.send_multipart([command, service, "error: command unknown"])
+                
         
     @classmethod
     def serve(cls, config=None):
@@ -70,7 +76,7 @@ class ZMQRouter(object):
         obj.run()
         
     @classmethod
-    def daemon(cls, config):
+    def daemon(cls, config=None):
         """Serve in a process."""
         import multiprocessing as mp
         proc = mp.Process(target=cls.serve, args=(config,), name="ZMQRouter")
@@ -79,7 +85,7 @@ class ZMQRouter(object):
         return proc
         
     @classmethod
-    def thread(cls, config):
+    def thread(cls, config=None):
         """Serve in a thread."""
         import threading
         thread = threading.Thread(target=cls.serve, args=(config,), name="ZMQRouter")
@@ -92,7 +98,7 @@ def _setup_logging(verbose):
     """Try to use lumberjack to enable logging when in a subprocess."""
     try:
         import lumberjack
-        lumberjack.setup_logging("DFW.Router", mode='stream', level=20 - 10 * verbose)
+        lumberjack.setup_logging("DFW.Router", mode='stream', level=30 - 10 * verbose)
         lumberjack.setup_warnings_logger("DFW.Router")
     except:
         pass
@@ -112,6 +118,7 @@ def main():
     except KeyboardInterrupt:
         pass
     print("\nShutting down.")
+    return 0
 
 def register(service):
     """Register a service with the router."""
