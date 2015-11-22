@@ -76,6 +76,7 @@ else:
 
 import pkg_resources
 import os
+from .utils._weakrefset import WeakSet
 
 @pytest.fixture
 def servicename():
@@ -92,6 +93,7 @@ def check_teardown(request):
     """Check that a module has been torn down."""
     request.addfinalizer(fail_if_not_teardown)
 
+SEEN_THREADS = WeakSet()
 def fail_if_not_teardown():
     """Fail if teardown has not happedned properly."""
     from Cauldron.api import teardown, CAULDRON_SETUP
@@ -116,8 +118,9 @@ def fail_if_not_teardown():
         time.sleep(0.1) #Allow zombies to die!
     count = 0
     for thread in threading.enumerate():
-        if not thread.daemon:
+        if not thread.daemon and thread not in SEEN_THREADS:
             count += 1
+            SEEN_THREADS.add(thread)
     if count > 1:
         pytest.fail("{0:d} non-deamon thread{1:s} left alive!\n{2!s}".format(count-1, "s" if (count-1)>1 else "",
             "\n".join([repr(thread) for thread in threading.enumerate()])))
