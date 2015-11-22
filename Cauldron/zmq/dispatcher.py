@@ -13,6 +13,7 @@ import threading
 import logging
 import weakref
 import zmq
+import six
 
 __all__ = ["Service", "Keyword"]
 
@@ -22,11 +23,9 @@ registry.dispatcher.teardown_for('zmq')(teardown)
 class _ZMQResponderThread(threading.Thread):
     """A python thread for ZMQ responses."""
     def __init__(self, service):
-        super(_ZMQResponderThread, self).__init__()
-        self._shutdown = threading.Event()
         self.service = weakref.proxy(service)
-        self.log = logging.getLogger("DFW.Service.Thread")
-        self.daemon = True
+        self.log = self.service.log.getChild("Responder")
+        super(_ZMQResponderThread, self).__init__(name="ZMQResponderThread-{0:s}".format(self.service.name))
         
     def handle(self, message):
         """Handle a message."""
@@ -40,7 +39,8 @@ class _ZMQResponderThread(threading.Thread):
         except Exception as e:
             self.log.error(repr(e))
             message.raise_error_response(repr(e))
-        return  message.response(response)
+        return message.response(response)
+        
         
     def handle_modify(self, message):
         """Handle a modify command."""
@@ -62,34 +62,59 @@ class _ZMQResponderThread(threading.Thread):
     def run(self):
         """Run the thread."""
         zmq = check_zmq()
-        ctx = self.service.ctx
-        socket = ctx.socket(zmq.REP)
+        run = True
         try:
+            ctx = self.service.ctx # Grab the context from the parent thread.
+            socket = ctx.socket(zmq.REP)
+            
+            # Set up our switching poller to allow shutdown to come through.
+            poller = zmq.Poller()
+            poller.register(socket, zmq.POLLIN)
+            
             try:
                 address = zmq_dispatcher_address(self.service._config, bind=True)
                 socket.bind(address)
             except zmq.ZMQError as e:
-                self.log.info("Service can't bind to address '{0}' because {1}".format(address, e))
+                self.log.error("Service can't bind to address '{0}' because {1}".format(address, e))
+                raise
                 
-            while not self._shutdown.isSet():
-                try:
-                    message = ZMQCauldronMessage.parse(socket.recv(), self.service)
-                    response = self.handle(message)
-                except (ZMQCauldronErrorResponse, ZMQCauldronParserError) as e:
-                    socket.send(e.response)
-                else:
-                    socket.send(str(response))
+            self.log.log(5, "Starting service loop.")
+            while run:
+                ready = dict(poller.poll(timeout=10.0))
+                if ready.get(socket) == zmq.POLLIN:
+                    self.respond(socket)
+                
         except weakref.ReferenceError as e:
             self.log.info("Service reference error, shutting down, {0}".format(repr(e)))
         except zmq.ContextTerminated as e:
             self.log.info("Service shutdown and context terminated, closing command thread.")
+            # We need to return here, because the socket was closed when the context terminated.
+            return
+        except zmq.ZMQError as e:
+            self.log.info("ZMQ Error '{0}' terminated thread.".format(e))
+            
+            return
+            
+        signal.setsockopt(zmq.LINGER, 0)
+        signal.close()
+        socket.setsockopt(zmq.LINGER, 0)
         socket.close()
         return
         
     
+    def respond(self, socket):
+        """Respond to the command socket."""
+        try:
+            message = ZMQCauldronMessage.parse(socket.recv(), self.service)
+            response = self.handle(message)
+        except (ZMQCauldronErrorResponse, ZMQCauldronParserError) as e:
+            socket.send(six.binary_type(e.response))
+        else:
+            socket.send(six.binary_type(response))
+    
     def stop(self):
         """Stop the responder thread."""
-        self._shutdown.set()
+        pass
     
 
 
@@ -99,14 +124,17 @@ class Service(DispatcherService):
     def __init__(self, name, config, setup=None, dispatcher=None):
         zmq = check_zmq()
         self.ctx = zmq.Context()
-        self._broadcast_socket = self.ctx.socket(zmq.PUB)
-        self._thread = _ZMQResponderThread(self)
         super(Service, self).__init__(name, config, setup, dispatcher)
         
     def _prepare(self):
         """Begin this service."""
+        zmq = check_zmq()
+        
         if self._config.getboolean("zmq-router", "enable"):
             register(self)
+        
+        self._thread = _ZMQResponderThread(self)
+        self._broadcast_socket = self.ctx.socket(zmq.PUB)
         
         try:
             address = zmq_broadcaster_address(self._config, bind=True)
@@ -126,9 +154,13 @@ class Service(DispatcherService):
         if hasattr(self, '_thread') and self._thread.is_alive():
             self._thread.stop()
         if hasattr(self, '_broadcast_socket'):
-            self._broadcast_socket.setsockopt(zmq.LINGER, 0)
-            self._broadcast_socket.close()
-            del self._broadcast_socket
+            try:
+                self._broadcast_socket.setsockopt(zmq.LINGER, 0)
+                self._broadcast_socket.close()
+            except zmq.ZMQError as e:
+                pass
+            finally:
+                del self._broadcast_socket
         if hasattr(self, '_router'):
             _shutdown_router(self)
         
