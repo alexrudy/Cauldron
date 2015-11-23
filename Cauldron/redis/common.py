@@ -61,7 +61,7 @@ class REDISPubsubBase(object):
     def _start_thread(self):
         """Create and start a new thread."""
         import redis.client
-        self._thread = redis.client.PubSubWorkerThread(self.pubsub, sleep_time=self.THREAD_SLEEP_TIME)
+        self._thread = redis.client.PubSubWorkerThread(weakref.proxy(self.pubsub), sleep_time=self.THREAD_SLEEP_TIME)
         self._thread.daemon = self.THREAD_DAEMON
         self._thread.start()
     
@@ -88,10 +88,12 @@ class REDISPubsubBase(object):
             # Thread was already garbage collected, do nothing.
             pass
     
-    def __del__(self):
+    def shutdown(self):
         """Destructor which ensures that the child threads are stopped."""
+        super(REDISPubsubBase, self).shutdown()
         if hasattr(self, "_thread"):
             self._stop_thread()
+        
     
 class REDISKeywordBase(object):
     """A base class for managing REDIS Keywords"""

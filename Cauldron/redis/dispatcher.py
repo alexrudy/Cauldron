@@ -19,7 +19,7 @@ class Service(REDISPubsubBase, DispatcherService):
     """REDIS dispatcher service."""
     
     name = None
-    THREAD_DAEMON = True
+    # THREAD_DAEMON = True
     
     def __init__(self, name, config, setup=None, dispatcher=None):
         redis = check_redis()
