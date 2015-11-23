@@ -9,7 +9,6 @@ import inspect
 def service(request, dispatcher):
     """A service dispatch tool."""
     mykw = dispatcher['KEYWORD']
-    dispatcher._begin()
     request.addfinalizer(lambda : dispatcher.shutdown())
     return dispatcher
 
