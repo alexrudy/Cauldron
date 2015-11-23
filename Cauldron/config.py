@@ -18,6 +18,8 @@ from six.moves import configparser
 
 from .exc import ConfigurationMissing
 
+__all__ = ['default_configuration', 'read_configuration', 'set_module_configuration', 'get_module_configuration']
+
 def default_configuration():
     """Get the default configuration object."""
     config = configparser.ConfigParser()
