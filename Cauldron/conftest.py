@@ -57,16 +57,21 @@ except Exception as e:
     # If, for any reason, REDIS is not available, just don't test against it.
     pass
 else:
+    from . import registry
     PYTEST_HEADER_MODULES['redis'] = 'redis'
-    available_backends.append("redis")
+    if "redis" in registry.keys():
+        available_backends.append("redis")
+    
 
 try:
     import zmq
 except ImportError:
     pass
 else:
+    from . import registry
     PYTEST_HEADER_MODULES['zmq'] = 'zmq'
-    available_backends.append("zmq")
+    if "zmq" in registry.keys():
+        available_backends.append("zmq")
     
 
 import pkg_resources
