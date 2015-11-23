@@ -225,9 +225,15 @@ def _handle_response(service, message):
 
 def _shutdown_router(service):
     """Shutdown a router attached to a service."""
+    if not service._router.is_alive():
+        return #nothing to do here!
     zmq = check_zmq()
-    socket = service.ctx.socket(zmq.REQ)
-    timeout = service._config.getint("zmq-router", "timeout")
+    try:
+        # Make a socket.
+        socket = service.ctx.socket(zmq.REQ)
+        timeout = service._config.getint("zmq-router", "timeout")
+    except zmq.ZMQError as e:
+        return # If we can't get ZMQ to work, there is nothing to do here.
     try:
         # Connect to the router.
         socket.connect(zmq_router_address(service._config, bind=False))

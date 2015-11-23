@@ -8,11 +8,11 @@ from .common import zmq_dispatcher_address, zmq_broadcaster_address, check_zmq, 
 from .router import register, _shutdown_router
 from ..base import DispatcherService, DispatcherKeyword
 from .. import registry
+from ..exc import DispatcherError
 
 import threading
 import logging
 import weakref
-import zmq
 import six
 
 __all__ = ["Service", "Keyword"]
@@ -25,6 +25,7 @@ class _ZMQResponderThread(threading.Thread):
     def __init__(self, service):
         self.service = weakref.proxy(service)
         self.log = self.service.log.getChild("Responder")
+        self.running = threading.Event()
         super(_ZMQResponderThread, self).__init__(name="ZMQResponderThread-{0:s}".format(self.service.name))
         
     def handle(self, message):
@@ -62,7 +63,6 @@ class _ZMQResponderThread(threading.Thread):
     def run(self):
         """Run the thread."""
         zmq = check_zmq()
-        run = True
         try:
             ctx = self.service.ctx # Grab the context from the parent thread.
             socket = ctx.socket(zmq.REP)
@@ -78,8 +78,9 @@ class _ZMQResponderThread(threading.Thread):
                 self.log.error("Service can't bind to address '{0}' because {1}".format(address, e))
                 raise
                 
+            self.running.set()
             self.log.log(5, "Starting service loop.")
-            while run:
+            while self.running:
                 ready = dict(poller.poll(timeout=10.0))
                 if ready.get(socket) == zmq.POLLIN:
                     self.respond(socket)
@@ -92,8 +93,9 @@ class _ZMQResponderThread(threading.Thread):
             return
         except zmq.ZMQError as e:
             self.log.info("ZMQ Error '{0}' terminated thread.".format(e))
-            
             return
+        finally:
+            self.running.clear()
             
         signal.setsockopt(zmq.LINGER, 0)
         signal.close()
@@ -148,9 +150,12 @@ class Service(DispatcherService):
         """Allow command responses to start."""
         if not self._thread.is_alive():
             self._thread.start()
+        if not self._thread.running.wait(1.0):
+            raise DispatcherError("The dispatcher responder thread did not start.")
         
     def shutdown(self):
         """Shutdown this object."""
+        zmq = check_zmq()
         if hasattr(self, '_thread') and self._thread.is_alive():
             self._thread.stop()
         if hasattr(self, '_broadcast_socket'):

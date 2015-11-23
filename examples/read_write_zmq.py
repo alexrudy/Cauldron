@@ -33,4 +33,6 @@ disp.shutdown()
 log.info("Shutdown complete.")
 import zmq
 ctx = zmq.Context.instance().destroy()
+disp.shutdown()
+
 log.info("Context terminated.")
