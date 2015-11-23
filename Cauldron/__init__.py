@@ -19,6 +19,5 @@ if not _ASTROPY_SETUP_:
     from . import local
     from . import redis
     from . import mock
-    from . import zmq
     from . import types
 
