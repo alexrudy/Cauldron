@@ -24,7 +24,7 @@ class _ZMQResponderThread(threading.Thread):
     """A python thread for ZMQ responses."""
     def __init__(self, service):
         self.service = weakref.proxy(service)
-        self.log = self.service.log.getChild("Responder")
+        self.log = logging.getLogger(self.service.log.name + ".Responder")
         self.running = threading.Event()
         super(_ZMQResponderThread, self).__init__(name="ZMQResponderThread-{0:s}".format(self.service.name))
         
