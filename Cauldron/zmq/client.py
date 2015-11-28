@@ -63,15 +63,34 @@ class Service(ClientService):
     def __init__(self, name, populate=False):
         zmq = check_zmq()
         self.ctx = zmq.Context.instance()
-        self._socket = self.ctx.socket(zmq.REQ)
+        self._sockets = threading.local()
         self._config = get_module_configuration()
         self._thread = _ZMQMonitorThread(self)
         super(Service, self).__init__(name, populate)
         
+    @property
+    def socket(self):
+        """A thread-local ZMQ socket for sending commands to the responder thread."""
+        # Short out if we already have a socket.
+        if hasattr(self._sockets, 'socket'):
+            return self._sockets.socket
+        
+        zmq = check_zmq()
+        socket = self.ctx.socket(zmq.REQ)
+        try:
+            address = zmq_dispatcher_address(self._config)
+            socket.connect(address)
+        except zmq.ZMQError as e:
+            self.log.error("Service can't connect to responder address '{0}' because {1}".format(address, e))
+            raise
+        else:
+            self.log.debug("Connected to {0}".format(address))
+            self._sockets.socket = socket
+        return socket
+        
     def _prepare(self):
         """Prepare step."""
         lookup(self)
-        self._socket.connect(zmq_dispatcher_address(self._config))
         self._thread.start()
         
         
@@ -79,11 +98,6 @@ class Service(ClientService):
         """When this client is shutdown, close the subscription thread."""
         if hasattr(self, '_thread'):
             self._thread.shutdown.set()
-        zmq = check_zmq()
-        try:
-            self._socket.close()
-        except zmq.ZMQError as e:
-            pass
         
     def has_keyword(self, name):
         """Check if a dispatcher has a keyword."""
@@ -102,9 +116,9 @@ class Service(ClientService):
         
     def _synchronous_command(self, command, payload, keyword=None):
         """Execute a synchronous command."""
-        self._socket.send(str(ZMQCauldronMessage(command, self, keyword, payload, "REQ")))
+        self.socket.send(str(ZMQCauldronMessage(command, self, keyword, payload, "REQ")))
         #TODO: Use polling here to support timeouts.
-        return ZMQCauldronMessage.parse(self._socket.recv(), self)
+        return ZMQCauldronMessage.parse(self.socket.recv(), self)
     
 @registry.client.keyword_for("zmq")
 class Keyword(ClientKeyword):

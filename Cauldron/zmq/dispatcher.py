@@ -156,7 +156,7 @@ class Service(DispatcherService):
         
     @property
     def socket(self):
-        """A thread-local ZMQ socket."""
+        """A thread-local ZMQ socket for sending commands to the responder thread."""
         # Short out if we already have a socket.
         if hasattr(self._sockets, 'socket'):
             return self._sockets.socket
