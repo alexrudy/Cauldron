@@ -77,7 +77,7 @@ class DescriptorBase(object):
         try:
             for desc in self.keyword_descriptors():
                 desc.bind(self, service)
-        except ServiceNotBound:
+        except ServiceNotBound as e:
             raise ServiceNotBound("In order to bind this object's keyword descriptors, "
             "you must set the appropriate service via the bind(service=...) method.")
             
