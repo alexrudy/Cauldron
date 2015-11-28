@@ -80,7 +80,6 @@ class PubSubWorkerThread(threading.Thread):
                 pubsub.get_message(ignore_subscribe_messages=True,
                                    timeout=sleep_time)
             time.sleep(sleep_time)
-        pubsub.close()
         self._running = False
 
     def stop(self):
