@@ -123,7 +123,7 @@ class Keyword(ClientKeyword):
         return self.name in self.service._thread.monitored
         
     def _synchronous_command(self, command, payload):
-        """Exectue a synchronous command."""
+        """Execute a synchronous command."""
         return self.service._synchronous_command(command, payload, self)
         
     def wait(self, timeout=None, operator=None, value=None, sequence=None, reset=False, case=False):

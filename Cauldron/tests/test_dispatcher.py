@@ -127,11 +127,15 @@ def test_setup_function(backend, servicename, config):
     from Cauldron import DFW
     def setup(service):
         """Set up a service"""
-        DFW.Keyword.Keyword("KEYWORD", service)
+        kwd = DFW.Keyword.Keyword("KEYWORD", service)
+        print("Service setup")
         
     service = DFW.Service(servicename, config, setup=setup)
+    print("Service __init__")
     assert "KEYWORD" in service
+    print("Service check")
     del service
+    print("Service done.")
     
 def test_service_setitem(dispatcher):
     """Test a dispatcher service's setitem."""

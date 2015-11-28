@@ -16,7 +16,13 @@ from Cauldron.api import use
 use("zmq")
 
 from Cauldron import DFW
-disp = DFW.Service("testsvc", config=None)
+
+def setup(service):
+    """Setup the service."""
+    kwd = DFW.Keyword.Keyword("TEST", service)
+    print("Service setup")
+
+disp = DFW.Service("testsvc", setup = setup, config=None)
 dtest = disp["TEST"]
 log.info(dtest)
 

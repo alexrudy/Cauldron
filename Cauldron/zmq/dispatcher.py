@@ -14,6 +14,7 @@ import threading
 import logging
 import weakref
 import six
+import time
 
 __all__ = ["Service", "Keyword"]
 
@@ -59,6 +60,10 @@ class _ZMQResponderThread(threading.Thread):
         """Handle enumerate command."""
         return ":".join(message.service.keywords())
         
+    def handle_broadcast(self, message):
+        """Handle the broadcast command."""
+        self._broadcast_socket.send("broadcast:{0}:{1}:{2}".format(self.service.name, message.keyword.name, message.payload))
+        return "success"
     
     def run(self):
         """Run the thread."""
@@ -78,8 +83,16 @@ class _ZMQResponderThread(threading.Thread):
                 self.log.error("Service can't bind to address '{0}' because {1}".format(address, e))
                 raise
                 
+            self._broadcast_socket = ctx.socket(zmq.PUB)
+            try:
+                address = zmq_broadcaster_address(self.service._config, bind=True)
+                self._broadcast_socket.bind(address)
+            except zmq.ZMQError as e:
+                self.log.error("Service can't bind to broadcaster address '{0}' because {1}".format(address, e))
+                raise
+                
             self.running.set()
-            self.log.log(5, "Starting service loop.")
+            self.log.log(10, "Starting service loop.")
             while self.running:
                 ready = dict(poller.poll(timeout=10.0))
                 if ready.get(socket) == zmq.POLLIN:
@@ -96,11 +109,18 @@ class _ZMQResponderThread(threading.Thread):
             return
         finally:
             self.running.clear()
-            
-        signal.setsockopt(zmq.LINGER, 0)
-        signal.close()
+        
         socket.setsockopt(zmq.LINGER, 0)
         socket.close()
+        
+        try:
+            self._broadcast_socket.setsockopt(zmq.LINGER, 0)
+            self._broadcast_socket.close()
+        except zmq.ZMQError as e:
+            pass
+        finally:
+            del self._broadcast_socket
+        
         return
         
     
@@ -108,6 +128,7 @@ class _ZMQResponderThread(threading.Thread):
         """Respond to the command socket."""
         try:
             message = ZMQCauldronMessage.parse(socket.recv(), self.service)
+            self.log.debug("Handling '{0}'".format(str(message)))
             response = self.handle(message)
         except (ZMQCauldronErrorResponse, ZMQCauldronParserError) as e:
             socket.send(six.binary_type(e.response))
@@ -136,44 +157,54 @@ class Service(DispatcherService):
             register(self)
         
         self._thread = _ZMQResponderThread(self)
-        self._broadcast_socket = self.ctx.socket(zmq.PUB)
-        
-        try:
-            address = zmq_broadcaster_address(self._config, bind=True)
-            self._broadcast_socket.bind(address)
-        except zmq.ZMQError as e:
-            self.log.error("Service can't bind to address '{0}' because {1}".format(address, e))
-            raise
-        
-    
-    def _begin(self):
-        """Allow command responses to start."""
         if not self._thread.is_alive():
             self._thread.start()
         if not self._thread.running.wait(1.0):
             raise DispatcherError("The dispatcher responder thread did not start.")
+        
+        self._socket = self.ctx.socket(zmq.REQ)
+        try:
+            address = zmq_dispatcher_address(self._config)
+            self._socket.connect(address)
+        except zmq.ZMQError as e:
+            self.log.error("Service can't connect to responder address '{0}' because {1}".format(address, e))
+            raise
+        else:
+            self.log.debug("Connected to {0}".format(address))
+        
+        self._broadcast_queue = []
+    
+    def _begin(self):
+        """Allow command responses to start."""
+        if hasattr(self, "_broadcast_queue"):
+            while len(self._broadcast_queue):
+                self._synchronous_command(*self._broadcast_queue.pop())
+            del self._broadcast_queue
         
     def shutdown(self):
         """Shutdown this object."""
         zmq = check_zmq()
         if hasattr(self, '_thread') and self._thread.is_alive():
             self._thread.stop()
-        if hasattr(self, '_broadcast_socket'):
-            try:
-                self._broadcast_socket.setsockopt(zmq.LINGER, 0)
-                self._broadcast_socket.close()
-            except zmq.ZMQError as e:
-                pass
-            finally:
-                del self._broadcast_socket
         if hasattr(self, '_router'):
             _shutdown_router(self)
-        
+        if hasattr(self, '_socket'):
+            try:
+                self._socket.setsockopt(zmq.LINGER, 0)
+                self._socket.close()
+            except zmq.ZMQError as e:
+                pass
         self.ctx.destroy()
         
     def __missing__(self, key):
         """Allows the redis dispatcher to populate any keyword, whether it should exist or not."""
         return Keyword(key, self)
+        
+    def _synchronous_command(self, command, payload, keyword=None):
+        """Execute a synchronous command."""
+        self._socket.send(str(ZMQCauldronMessage(command, self, keyword, payload, "REQ")))
+        #TODO: Use polling here to support timeouts.
+        return ZMQCauldronMessage.parse(self._socket.recv(), self)
         
 
 @registry.dispatcher.keyword_for("zmq")
@@ -182,6 +213,10 @@ class Keyword(DispatcherKeyword):
     
     def _broadcast(self, value):
         """Broadcast this keyword value."""
-        self.service._broadcast_socket.send("broadcast:{0}:{1}:{2}".format(self.service.name, self.name, value))
-        
+        if hasattr(self, "_broadcast_queue"):
+            self._broadcast_queue.append(("broadcast", value, self))
+        elif threading.current_thread() == self.service._thread:
+            self.service._thread._broadcast_socket.send("broadcast:{0}:{1}:{2}".format(self.service.name, self.name, value))
+        else:
+            self.service._synchronous_command("broadcast", value, self)
         
