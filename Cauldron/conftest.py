@@ -37,7 +37,7 @@ except NameError:   # Needed to support Astropy <= 1.0.0
 
 available_backends = ["local"]
 
-from .redis.common import configure_pool, REDIS_SERVICES_REGISTRY, REDIS_DOMAIN, check_redis_connection, REDIS_AVAILALBE
+from .redis.common import configure_pool, REDIS_SERVICES_REGISTRY, REDIS_DOMAIN, check_redis_connection, REDIS_AVAILALBE, get_global_connection_pool
 
 if REDIS_AVAILALBE:
     def clear_registry():

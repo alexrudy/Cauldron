@@ -5,6 +5,9 @@ from __future__ import absolute_import
 import threading
 import logging
 import weakref
+import contextlib
+import time
+
 from pkg_resources import parse_version
 
 from ..api import _Setting
@@ -51,6 +54,42 @@ def redis_status_key(service, keyword=None):
     """Return the REDIS status key name for a given keyword."""
     return "{0}:status".format(redis_key_name(service, keyword))
     
+class PubSubWorkerThread(threading.Thread):
+    def __init__(self, pubsub, sleep_time):
+        super(PubSubWorkerThread, self).__init__()
+        self._pubsub = pubsub
+        self.sleep_time = sleep_time
+        self._running = False
+        self._adjust_lock = threading.RLock()
+    
+    @contextlib.contextmanager
+    def pubsub(self):
+        """Yield the pubsub object."""
+        with self._adjust_lock:
+            yield self._pubsub
+        
+    
+    def run(self):
+        if self._running:
+            return
+        self._running = True
+        pubsub = self._pubsub
+        sleep_time = self.sleep_time
+        while pubsub.subscribed:
+            with self._adjust_lock:
+                pubsub.get_message(ignore_subscribe_messages=True,
+                                   timeout=sleep_time)
+            time.sleep(sleep_time)
+        pubsub.close()
+        self._running = False
+
+    def stop(self):
+        # stopping simply unsubscribes from all channels and patterns.
+        # the unsubscribe responses that are generated will short circuit
+        # the loop in run(), calling pubsub.close() to clean up the connection
+        self._pubsub.unsubscribe()
+        self._pubsub.punsubscribe()
+    
 class REDISPubsubBase(object):
     """A base class for handling the REDIS pubsub interface in background threads."""
     
@@ -58,10 +97,19 @@ class REDISPubsubBase(object):
     THREAD_SLEEP_TIME = 0.001
     THREAD_DAEMON = False
     
+    @contextlib.contextmanager
+    def pubsub(self):
+        """Get the pubsub object from the thread."""
+        if self._thread is None or not self._thread.is_alive():
+            yield self._pubsub
+        else:
+            with self._thread.pubsub() as pubsub:
+                yield pubsub
+    
     def _start_thread(self):
         """Create and start a new thread."""
         import redis.client
-        self._thread = redis.client.PubSubWorkerThread(weakref.proxy(self.pubsub), sleep_time=self.THREAD_SLEEP_TIME)
+        self._thread = PubSubWorkerThread(weakref.proxy(self._pubsub), sleep_time=self.THREAD_SLEEP_TIME)
         self._thread.daemon = self.THREAD_DAEMON
         self._thread.start()
     
@@ -93,7 +141,6 @@ class REDISPubsubBase(object):
         super(REDISPubsubBase, self).shutdown()
         if hasattr(self, "_thread"):
             self._stop_thread()
-        
     
 class REDISKeywordBase(object):
     """A base class for managing REDIS Keywords"""
@@ -101,6 +148,7 @@ class REDISKeywordBase(object):
     def _wait_for_status(self, status, timeout=None, callback=None):
         """Wait for a status value to appear."""
         event = threading.Event()
+        
         def _message_responder(message):
             if message is None:
                 return # pragma: no cover
@@ -110,13 +158,15 @@ class REDISKeywordBase(object):
                     if callback is not None:
                         callback()
                 
-        self.service.pubsub.psubscribe(**{"__keyspace@*__:"+redis_status_key(self):_message_responder})
+        with self.service.pubsub() as pubsub:
+            pubsub.psubscribe(**{"__keyspace@*__:"+redis_status_key(self):_message_responder})
         self.service._run_thread()
         if self.service.redis.get(redis_status_key(self)) == status:
             event.set()
         else:
             event.wait(timeout)
-        self.service.pubsub.punsubscribe("__keyspace@*__:"+redis_status_key(self))
+        with self.service.pubsub() as pubsub:
+            pubsub.punsubscribe("__keyspace@*__:"+redis_status_key(self))
         return event.isSet()
         
     def _trigger_on_status(self, status, callback=None):
@@ -127,11 +177,14 @@ class REDISKeywordBase(object):
                 return # pragma: no cover
             if message['channel'].endswith(redis_status_key(self)) and message['data'] == "set":
                 if self.service.redis.get(redis_status_key(self)) == status:
-                    self.service.pubsub.unsubscribe("__keyspace@*__:"+redis_status_key(self))
+                    
+                    with self.service.pubsub() as pubsub:
+                        pubsub.unsubscribe("__keyspace@*__:"+redis_status_key(self))
                     triggered.set()
                     if callback is not None:
                         callback()
-        self.service.pubsub.subscribe(**{"__keyspace@*__:"+redis_status_key(self):_message_responder})
+        with self.service.pubsub() as pubsub:
+            pubsub.subscribe(**{"__keyspace@*__:"+redis_status_key(self):_message_responder})
         self.service._run_thread()
         # Immediately call the message responder with a fake message to ensure that the initial state is checked.
         _message_responder({'channel':redis_status_key(self), 'data':'set'})
@@ -184,3 +237,17 @@ def configure_pool(**kwargs):
     
     """
     _connection_pool_settings.update(kwargs)
+    
+def teardown():
+    """Teardown the REDIS connections."""
+    global _global_connection_pool
+    pool = get_global_connection_pool()
+    try:
+        pool.disconnect()
+    except:
+        _global_connection_pool = None
+    try:
+        pool.reset()
+    except:
+        _global_connection_pool = None
+    

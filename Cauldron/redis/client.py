@@ -8,10 +8,12 @@ import weakref
 import time
 from ..base import ClientService, ClientKeyword
 from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented
-from .common import REDIS_SERVICES_REGISTRY, redis_key_name, check_redis, get_connection_pool, redis_status_key, REDISKeywordBase, REDISPubsubBase
+from .common import REDIS_SERVICES_REGISTRY, redis_key_name, check_redis, get_connection_pool, redis_status_key, REDISKeywordBase, REDISPubsubBase, teardown
 from .. import registry
 
 __all__ = ['Service', 'Keyword']
+
+registry.client.teardown_for("redis")(teardown)
 
 @registry.client.keyword_for("redis")
 class Keyword(ClientKeyword, REDISKeywordBase):
@@ -39,14 +41,18 @@ class Keyword(ClientKeyword, REDISKeywordBase):
         if start:
             if prime:
                 self.read(wait=wait)
-            self.service.pubsub.psubscribe(**{"__keyspace@*__:"+redis_key_name(self):self._redis_callback})
+            with self.service.pubsub() as pubsub:
+                pubsub.psubscribe(**{"__keyspace@*__:"+redis_key_name(self):self._redis_callback})
             self.service._run_thread()
         else:
-            self.service.pubsub.punsubscribe("__keyspace@*__:"+redis_key_name(self))
+            with self.service.pubsub() as pubsub:
+                pubsub.punsubscribe("__keyspace@*__:"+redis_key_name(self))
             
     def _ktl_monitored(self):
         """Determine if this keyword is monitored."""
-        return redis_key_name(self) in self.service.pubsub.channels
+        with self.service.pubsub() as pubsub:
+            mon = redis_key_name(self) in pubsub.channels
+        return mon
         
     def _update_from_redis(self):
         """Update this keyword from REDIS."""
@@ -94,7 +100,7 @@ class Service(REDISPubsubBase, ClientService):
         redis = check_redis()
         connection_pool = get_connection_pool(connection_pool)
         self.redis = redis.StrictRedis(connection_pool=connection_pool)
-        self.pubsub = redis.StrictRedis(connection_pool=connection_pool).pubsub()
+        self._pubsub = redis.StrictRedis(connection_pool=connection_pool).pubsub()
         super(Service, self).__init__(name, populate)
     
     def has_keyword(self, name):

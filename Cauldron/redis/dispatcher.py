@@ -9,10 +9,12 @@ import weakref
 
 from ..base import DispatcherService, DispatcherKeyword
 from ..compat import WeakOrderedSet
-from .common import REDIS_SERVICES_REGISTRY, redis_key_name, get_connection_pool, check_redis, REDISPubsubBase
+from .common import REDIS_SERVICES_REGISTRY, redis_key_name, get_connection_pool, check_redis, REDISPubsubBase, teardown
 from .. import registry
 
 __all__ = ['Service', 'Keyword']
+
+registry.dispatcher.teardown_for("redis")(teardown)
 
 @registry.dispatcher.service_for("redis")
 class Service(REDISPubsubBase, DispatcherService):
@@ -26,7 +28,7 @@ class Service(REDISPubsubBase, DispatcherService):
         self.connection_pool = get_connection_pool(None)
         self.redis = redis.StrictRedis(connection_pool=self.connection_pool)
         self.redis.config_set("notify-keyspace-events", "KA")
-        self.pubsub = redis.StrictRedis(connection_pool=self.connection_pool).pubsub()
+        self._pubsub = redis.StrictRedis(connection_pool=self.connection_pool).pubsub()
         
         if self.redis.sismember(REDIS_SERVICES_REGISTRY, name.lower()):
             raise ValueError("Service {0} cannot have multiple instances. Found {1!r}".format(name.lower(), self.redis.smembers(REDIS_SERVICES_REGISTRY)))
@@ -61,7 +63,8 @@ class Keyword(DispatcherKeyword):
     def __init__(self, name, service, initial=None, period=None):
         """Set the initial value for this keyword."""
         super(Keyword, self).__init__(name, service, initial, period)
-        self.service.pubsub.subscribe(**{redis_key_name(self):self._redis_callback})
+        with self.service.pubsub() as pubsub:
+            pubsub.subscribe(**{redis_key_name(self):self._redis_callback})
         self.service._run_thread()
         if not self.service.redis.exists(redis_key_name(self)):
             self.service.redis.set(redis_key_name(self), '')
