@@ -74,9 +74,10 @@ class PubSubWorkerThread(threading.Thread):
             return
         self._running = True
         pubsub = self._pubsub
+        lock = self._adjust_lock
         sleep_time = self.sleep_time
         while pubsub.subscribed:
-            with self._adjust_lock:
+            with lock:
                 pubsub.get_message(ignore_subscribe_messages=True,
                                    timeout=sleep_time)
             time.sleep(sleep_time)
