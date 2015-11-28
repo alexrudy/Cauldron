@@ -97,7 +97,20 @@ class _KeywordListener(object):
     
     def __eq__(self, other):
         """Compare to other listeners"""
-        return (self.event == other.event and self.keyword == other.keyword and self.instance == other.instance)
+        if not isinstance(other, _KeywordListener):
+            return NotImplemented
+        try:
+            return (self.event == other.event and self.keyword == other.keyword and self.instance == other.instance)
+        except weakref.ReferenceError:
+            # Listeners are by definition not equal 
+            return False
+    
+    def __ne__(self, other):
+        """Not equal to another listener."""
+        eq = self.__eq__(other)
+        if eq is NotImplemented:
+            return NotImplemented
+        return eq
     
     def __call__(self, *args, **kwargs):
         """Ensure that the dispatcher fires before the keyword's own implementation."""
