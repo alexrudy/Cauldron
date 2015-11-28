@@ -126,14 +126,18 @@ class _ZMQResponderThread(threading.Thread):
     
     def respond(self, socket):
         """Respond to the command socket."""
+        message = ZMQCauldronMessage.parse(socket.recv(), self.service)
+        socket.send(six.binary_type(self.respond_message(message)))
+            
+    def respond_message(self, message):
+        """Respond to a message."""
         try:
-            message = ZMQCauldronMessage.parse(socket.recv(), self.service)
             self.log.debug("Handling '{0}'".format(str(message)))
             response = self.handle(message)
         except (ZMQCauldronErrorResponse, ZMQCauldronParserError) as e:
-            socket.send(six.binary_type(e.response))
+            return e.response
         else:
-            socket.send(six.binary_type(response))
+            return response
     
     def stop(self):
         """Stop the responder thread."""
@@ -147,7 +151,28 @@ class Service(DispatcherService):
     def __init__(self, name, config, setup=None, dispatcher=None):
         zmq = check_zmq()
         self.ctx = zmq.Context()
+        self._sockets = threading.local()
         super(Service, self).__init__(name, config, setup, dispatcher)
+        
+    @property
+    def socket(self):
+        """A thread-local ZMQ socket."""
+        # Short out if we already have a socket.
+        if hasattr(self._sockets, 'socket'):
+            return self._sockets.socket
+        
+        zmq = check_zmq()
+        socket = self.ctx.socket(zmq.REQ)
+        try:
+            address = zmq_dispatcher_address(self._config)
+            socket.connect(address)
+        except zmq.ZMQError as e:
+            self.log.error("Service can't connect to responder address '{0}' because {1}".format(address, e))
+            raise
+        else:
+            self.log.debug("Connected to {0}".format(address))
+            self._sockets.socket = socket
+        return socket
         
     def _prepare(self):
         """Begin this service."""
@@ -161,16 +186,6 @@ class Service(DispatcherService):
             self._thread.start()
         if not self._thread.running.wait(1.0):
             raise DispatcherError("The dispatcher responder thread did not start.")
-        
-        self._socket = self.ctx.socket(zmq.REQ)
-        try:
-            address = zmq_dispatcher_address(self._config)
-            self._socket.connect(address)
-        except zmq.ZMQError as e:
-            self.log.error("Service can't connect to responder address '{0}' because {1}".format(address, e))
-            raise
-        else:
-            self.log.debug("Connected to {0}".format(address))
         
         self._broadcast_queue = []
     
@@ -202,9 +217,12 @@ class Service(DispatcherService):
         
     def _synchronous_command(self, command, payload, keyword=None):
         """Execute a synchronous command."""
-        self._socket.send(str(ZMQCauldronMessage(command, self, keyword, payload, "REQ")))
-        #TODO: Use polling here to support timeouts.
-        return ZMQCauldronMessage.parse(self._socket.recv(), self)
+        message = ZMQCauldronMessage(command, self, keyword, payload, "REQ")
+        if threading.current_thread() == self._thread:
+            return self._thread.respond_message(message)
+        else:
+            self.socket.send(six.binary_type(message))
+            return ZMQCauldronMessage.parse(self.socket.recv(), self)
         
 
 @registry.dispatcher.keyword_for("zmq")
@@ -215,8 +233,6 @@ class Keyword(DispatcherKeyword):
         """Broadcast this keyword value."""
         if hasattr(self, "_broadcast_queue"):
             self._broadcast_queue.append(("broadcast", value, self))
-        elif threading.current_thread() == self.service._thread:
-            self.service._thread._broadcast_socket.send("broadcast:{0}:{1}:{2}".format(self.service.name, self.name, value))
         else:
             self.service._synchronous_command("broadcast", value, self)
         
