@@ -31,9 +31,9 @@ VALUE = "SOMEVALUE"
 from Cauldron import ktl
 svc = ktl.Service("testsvc")
 test = svc["TEST"]
-log.info("Writing '{}'".format(VALUE))
+log.info("Writing '{0}'".format(VALUE))
 test.write(VALUE)
-log.info("'{}' =? '{}'".format(VALUE, test.read()))
+log.info("'{0}' =? '{1}'".format(VALUE, test.read()))
 log.info("Done!")
 disp.shutdown()
 log.info("Shutdown complete.")

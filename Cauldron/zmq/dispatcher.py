@@ -184,7 +184,10 @@ class Service(DispatcherService):
         self._thread = _ZMQResponderThread(self)
         if not self._thread.is_alive():
             self._thread.start()
-        if not self._thread.running.wait(1.0):
+            self.log.debug("Started ZMQ Responder Thread.")
+            
+        self._thread.running.wait(1.0)
+        if not self._thread.running.is_set():
             raise DispatcherError("The dispatcher responder thread did not start.")
         
         self._broadcast_queue = []
