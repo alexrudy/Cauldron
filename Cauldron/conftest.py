@@ -63,6 +63,11 @@ else:
         available_backends.append("redis")
     
 
+@pytest.fixture(scope='session')
+def router():
+    """Launch a ZMQ router for the entire time, a default implementation for when ZMQ is not available."""
+    pass
+
 try:
     import zmq
 except ImportError:
@@ -73,6 +78,14 @@ else:
     if "zmq" in registry.keys():
         available_backends.append("zmq")
     
+    from Cauldron.zmq.router import ZMQRouter
+    ZMQRouter.daemon()
+    
+    @pytest.fixture(scope='session')
+    def router():
+        """Launch a ZMQ router for the entire time."""
+        from Cauldron.zmq.router import ZMQRouter
+        ZMQRouter.daemon()
 
 import pkg_resources
 import os

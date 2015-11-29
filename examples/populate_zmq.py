@@ -16,29 +16,16 @@ from Cauldron.api import use
 use("zmq")
 
 from Cauldron import DFW
-
-def setup(service):
-    """Setup the service."""
-    kwd = DFW.Keyword.Keyword("TEST", service)
-    print("Service setup")
-
-disp = DFW.Service("testsvc", setup = setup, config=None)
+disp = DFW.Service("testsvc", config=None)
 dtest = disp["TEST"]
 log.info(dtest)
 
 VALUE = "SOMEVALUE"
 
 from Cauldron import ktl
-svc = ktl.Service("testsvc")
-test = svc["TEST"]
-log.info("Writing '{0}'".format(VALUE))
-test.write(VALUE)
-log.info("'{0}' =? '{1}'".format(VALUE, test.read()))
+svc = ktl.Service("testsvc", populate=True)
+log.info(svc)
+log.info(svc.populated())
 log.info("Done!")
 disp.shutdown()
 log.info("Shutdown complete.")
-import zmq
-ctx = zmq.Context.instance().destroy()
-disp.shutdown()
-
-log.info("Context terminated.")

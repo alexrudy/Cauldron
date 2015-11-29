@@ -282,6 +282,7 @@ class Service(object):
         super(Service, self).__init__()
         
         self._config = read_configuration(config)
+        self._configuration_location = config if isinstance(config, six.string_types) else "???"
         self.dispatcher = dispatcher
         self.name = name.lower()
         self.log = logging.getLogger("DFW.Service.{0}".format(self.name))

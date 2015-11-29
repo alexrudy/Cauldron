@@ -10,6 +10,7 @@ Cauldron has a few backends implemented, and it is easy to implement additional 
     
     local
     redis
+    zmq
 
 Implementing a Backend
 ----------------------
