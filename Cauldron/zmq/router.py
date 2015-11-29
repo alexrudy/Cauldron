@@ -4,12 +4,18 @@ A router to direct ZMQ services across different ports and addresses.
 """
 
 from ..config import read_configuration
+from ..exc import DispatcherError
 from .common import check_zmq, zmq_router_address, zmq_dispatcher_host
 
 from six.moves import range
 import logging
+import time
 
 __all__ = ['ZMQRouter', 'register', 'lookup', 'main']
+
+class ZMQRouterUnavailalbe(DispatcherError):
+    """Error raised when a ZMQ router is unavailable."""
+    pass
 
 class ZMQRouter(object):
     """A router maintains a registry of services, and tells clients how to connect to a service."""
@@ -22,6 +28,10 @@ class ZMQRouter(object):
         self._directory = {}
         self._port = iter(range(self.config.getint("zmq-router", "first-port"), self.config.getint("zmq-router", "last-port"), 2))
         self.log = logging.getLogger("DFW.Router.zmq")
+        self.log.debug("Router serving ports between {0} and {1}".format(self.config.getint("zmq-router", "first-port"), self.config.getint("zmq-router", "last-port")))
+        
+        if self.config.getint("zmq-router", "verbose"):
+            _setup_logging(self.config.getint("zmq-router", "verbose"))
         
     def connect(self):
         """Connect to a listener."""
@@ -33,8 +43,9 @@ class ZMQRouter(object):
         """Run the router."""
         self.connect()
         while True:
+            time.sleep(0.001)
             message = self._listen.recv_multipart()
-            if not len(message) > 2:
+            if not len(message) >= 2:
                 self._listen.send_multipart(["COMMAND ERROR: UNKNOWN MESSAGE"] + message)
                 continue
             command = message[0]
@@ -145,8 +156,11 @@ def register(service):
         elif hasattr(service, '_router'):
             # Hmm, something is really broken here, as we have already made our very own
             # router, but we can't seem to connect to it.
-            raise RuntimeError("This is really strange!")
+            raise ZMQRouterUnavailalbe("Service has a built-in router at '{0}', but can't be reached.".format(address))
         else:
+            if not service._config.getboolean("zmq-router", "allow-spawn"):
+                raise ZMQRouterUnavailalbe("Can't locate router at '{0}', and allow-spawn=False, so not starting a new router.".format(address))
+            
             # We probably need to start our own router.
             # Note that this router will only live as long as our primary service lives.
             if service._config.get("zmq-router", "process") == "thread":
@@ -170,7 +184,7 @@ def register(service):
             
             socks = dict(poller.poll(timeout))
             if socks.get(socket) != zmq.POLLIN:
-                raise RuntimeError("Couldn't manage to start router in subprocess. {0!r}".format(router))
+                raise ZMQRouterUnavailalbe("Couldn't manage to start router in subprocess at '{0}'. {1!r}".format(address, router))
             service._router = router
     
         message = socket.recv_multipart()
@@ -222,22 +236,22 @@ def _handle_response(service, message):
     service._config.set("zmq", "dispatch-port", str(port))
     service._config.set("zmq", "broadcast-port", str(bport))
     return host, port, bport
-
-def _shutdown_router(service):
-    """Shutdown a router attached to a service."""
-    if not service._router.is_alive():
-        return #nothing to do here!
+    
+def shutdown_router(ctx = None, config = None, name = "generic"):
+    """Shutdown a router."""
     zmq = check_zmq()
+    ctx = ctx or zmq.Context.instance()
+    config = read_configuration(config=config)
     try:
         # Make a socket.
-        socket = service.ctx.socket(zmq.REQ)
-        timeout = service._config.getint("zmq-router", "timeout")
+        socket = ctx.socket(zmq.REQ)
+        timeout = config.getint("zmq-router", "timeout")
     except zmq.ZMQError as e:
-        return # If we can't get ZMQ to work, there is nothing to do here.
+        return False # If we can't get ZMQ to work, there is nothing to do here.
     try:
         # Connect to the router.
-        socket.connect(zmq_router_address(service._config, bind=False))
-        socket.send_multipart(["shutdown", service.name])
+        socket.connect(zmq_router_address(config, bind=False))
+        socket.send_multipart(["shutdown", name])
         socket.poll(timeout)
         message = socket.recv_multipart()
     except zmq.ZMQError as e:
@@ -245,7 +259,14 @@ def _shutdown_router(service):
     finally:
         socket.setsockopt(zmq.LINGER, 0)
         socket.close()
-    if message[2] == 'acknowledged':
-        del service._router
     return message[2] == 'acknowledged'
+
+def _shutdown_router(service):
+    """Shutdown a router attached to a service."""
+    if not service._router.is_alive():
+        return #nothing to do here!
+    success = shutdown_router(service.ctx, service._config, service.name)
+    if success:
+        del service._router
+
     
