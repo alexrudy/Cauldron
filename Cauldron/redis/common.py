@@ -10,7 +10,7 @@ import time
 
 from pkg_resources import parse_version
 
-from ..utils.helpers import _Setting
+from ..api import APISetting
 from ..config import cauldron_configuration
 from .. import registry
 
@@ -21,7 +21,7 @@ __all__ = ['REDIS_AVAILALBE', 'REDIS_DOMAIN', 'REDIS_SERVICES_REGISTRY',
     'get_connection_pool', 'set_global_connection_pool', 'get_global_connection_pool',
     'configure_pool']
 
-REDIS_AVAILALBE = _Setting("REDIS_AVAILALBE", False)
+REDIS_AVAILALBE = APISetting("REDIS_AVAILALBE", False)
 try:
     import redis
     if parse_version(redis.__version__) >= parse_version("2.10.5"):
