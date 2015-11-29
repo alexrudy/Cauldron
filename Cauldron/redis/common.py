@@ -141,6 +141,7 @@ class REDISPubsubBase(object):
         super(REDISPubsubBase, self).shutdown()
         if hasattr(self, "_thread"):
             self._stop_thread()
+        self._pubsub.close()
     
 class REDISKeywordBase(object):
     """A base class for managing REDIS Keywords"""
