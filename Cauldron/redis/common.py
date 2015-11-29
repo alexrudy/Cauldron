@@ -87,8 +87,9 @@ class PubSubWorkerThread(threading.Thread):
         # stopping simply unsubscribes from all channels and patterns.
         # the unsubscribe responses that are generated will short circuit
         # the loop in run(), calling pubsub.close() to clean up the connection
-        self._pubsub.unsubscribe()
-        self._pubsub.punsubscribe()
+        with self._adjust_lock:
+            self._pubsub.unsubscribe()
+            self._pubsub.punsubscribe()
     
 class REDISPubsubBase(object):
     """A base class for handling the REDIS pubsub interface in background threads."""
@@ -141,7 +142,8 @@ class REDISPubsubBase(object):
         super(REDISPubsubBase, self).shutdown()
         if hasattr(self, "_thread"):
             self._stop_thread()
-        self._pubsub.close()
+        if hasattr(self, '_pubsub'):
+            self._pubsub.close()
     
 class REDISKeywordBase(object):
     """A base class for managing REDIS Keywords"""
