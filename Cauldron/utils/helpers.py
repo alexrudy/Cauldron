@@ -57,3 +57,26 @@ def api_override(func):
     """)
     
     return func
+    
+class _Setting(object):
+    """A settings object, which can be passed around by value."""
+    def __init__(self, name, value):
+        super(_Setting, self).__init__()
+        self.name = name
+        self.value = value
+    
+    def __repr__(self):
+        """Represent this value"""
+        return "<Setting {0}={1}>".format(self.name, self.value)
+    
+    def __nonzero__(self):
+        """Cast this setting to it's own boolean value."""
+        return bool(self.value)
+        
+    def on(self):
+        """Turn this setting on."""
+        self.value = True
+    
+    def off(self):
+        """Turn this setting off."""
+        self.value = False
