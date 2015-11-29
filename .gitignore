@@ -57,3 +57,4 @@ html/*
 *.prof
 *.ipynb
 .ipynb-checkpoints/*
+.cache/*
