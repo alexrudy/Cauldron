@@ -73,15 +73,20 @@ class PubSubWorkerThread(threading.Thread):
         if self._running:
             return
         self._running = True
-        pubsub = self._pubsub
-        lock = self._adjust_lock
-        sleep_time = self.sleep_time
-        while pubsub.subscribed:
-            with lock:
-                pubsub.get_message(ignore_subscribe_messages=True,
-                                   timeout=sleep_time)
-            time.sleep(sleep_time)
-        self._running = False
+        try:
+            pubsub = self._pubsub
+            lock = self._adjust_lock
+            sleep_time = self.sleep_time
+            while pubsub.subscribed:
+                with lock:
+                    pubsub.get_message(ignore_subscribe_messages=True,
+                                       timeout=sleep_time)
+                time.sleep(sleep_time)
+        except weakref.ReferenceError as e:
+            # This is a good enough reason to shutdown.
+            pass
+        finally:
+            self._running = False
 
     def stop(self):
         # stopping simply unsubscribes from all channels and patterns.
@@ -143,7 +148,10 @@ class REDISPubsubBase(object):
         if hasattr(self, "_thread"):
             self._stop_thread()
         if hasattr(self, '_pubsub'):
-            self._pubsub.close()
+            try:
+                self._pubsub.close()
+            except KeyError as e:
+                pass
     
 class REDISKeywordBase(object):
     """A base class for managing REDIS Keywords"""
