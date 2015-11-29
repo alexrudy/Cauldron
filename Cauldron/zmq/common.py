@@ -4,7 +4,7 @@ Tools common to all ZMQ services.
 """
 import six
 
-from ..api import _Setting
+from ..utils.helpers import _Setting
 from ..exc import DispatcherError
 
 ZMQ_AVAILABLE = _Setting("ZMQ_AVAILABLE", False)
