@@ -10,7 +10,9 @@ import time
 
 from pkg_resources import parse_version
 
-from ..api import _Setting
+from ..utils.helpers import _Setting
+from ..config import cauldron_configuration
+from .. import registry
 
 __all__ = ['REDIS_AVAILALBE', 'REDIS_DOMAIN', 'REDIS_SERVICES_REGISTRY',
     'check_redis', 'check_redis_connection',
@@ -84,6 +86,8 @@ class PubSubWorkerThread(threading.Thread):
                 time.sleep(sleep_time)
         except weakref.ReferenceError as e:
             # This is a good enough reason to shutdown.
+            pass
+        except redis.ConnectionError as e:
             pass
         finally:
             self._running = False
@@ -227,29 +231,27 @@ def get_global_connection_pool():
     """Return the global connection pool, or create it."""
     global _global_connection_pool
     if _global_connection_pool is None:
-        _global_connection_pool = redis.ConnectionPool(**_connection_pool_settings)
+        _global_connection_pool = redis.ConnectionPool.from_url(cauldron_configuration.get("redis", "url"))
     return _global_connection_pool
     
-def set_global_connection_pool(connection_pool):
-    """Set the module-level connection pool for REDIS services"""
-    global _global_connection_pool
-    _global_connection_pool = connection_pool
-
-_connection_pool_settings = {}
-def configure_pool(**kwargs):
-    """Configure the REDIS settings from a ConfigParser object.
+def testing_teardown():
+    """Teardown function for tests."""
+    pool = get_global_connection_pool()
+    r = redis.StrictRedis(connection_pool=pool)
+    r.delete(r.keys("{0}:*".format(REDIS_DOMAIN)))    
     
-    The REDIS configuration settings must identify the host, port and database.
+def testing_enable_redis():
+    """Enable REDIS for testing."""
+    from astropy.tests.pytest_plugins import PYTEST_HEADER_MODULES
+    if check_redis_connection():
+        PYTEST_HEADER_MODULES['redis'] = 'redis'
+        testing_teardown()
+        registry.dispatcher.teardown_for("redis")(testing_teardown)
+        return ["redis"]
+    return []
     
-    :keyword str host: REDIS host
-    :keyword int port: REDIS port
-    :keyword int db: REDIS database number, usually ``0``.
-    
-    This function will also accept any other arguments to :class:`redis.ConnectionPool`
-    
-    """
-    _connection_pool_settings.update(kwargs)
-    
+@registry.dispatcher.teardown_for("redis")
+@registry.client.teardown_for("redis")
 def teardown():
     """Teardown the REDIS connections."""
     global _global_connection_pool

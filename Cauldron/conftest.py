@@ -37,36 +37,8 @@ except NameError:   # Needed to support Astropy <= 1.0.0
 
 available_backends = ["local"]
 
-from .redis.common import configure_pool, REDIS_SERVICES_REGISTRY, REDIS_DOMAIN, check_redis_connection, REDIS_AVAILALBE, get_global_connection_pool
-
-if REDIS_AVAILALBE:
-    def clear_registry():
-        """Clear the redis registry."""
-        import redis
-        r = redis.StrictRedis(host='localhost', port=6379, db=0)
-        r.delete(REDIS_SERVICES_REGISTRY)
-        r.flushdb()
-
-try:
-    import redis
-    configure_pool(host='localhost', port=6379, db=0)
-    if not check_redis_connection():
-        raise RuntimeError("REDIS is not available.")
-    clear_registry()
-except Exception as e:
-    # If, for any reason, REDIS is not available, just don't test against it.
-    pass
-else:
-    from . import registry
-    PYTEST_HEADER_MODULES['redis'] = 'redis'
-    if "redis" in registry.keys():
-        available_backends.append("redis")
-    
-
-@pytest.fixture(scope='session')
-def router():
-    """Launch a ZMQ router for the entire time, a default implementation for when ZMQ is not available."""
-    pass
+from .redis.common import testing_enable_redis
+available_backends.extend(testing_enable_redis())
 
 try:
     import zmq
@@ -80,12 +52,6 @@ else:
     
     from Cauldron.zmq.router import ZMQRouter
     ZMQRouter.daemon()
-    
-    @pytest.fixture(scope='session')
-    def router():
-        """Launch a ZMQ router for the entire time."""
-        from Cauldron.zmq.router import ZMQRouter
-        ZMQRouter.daemon()
 
 import pkg_resources
 import os
@@ -150,8 +116,6 @@ def backend(request):
     from Cauldron.api import use, teardown, CAULDRON_SETUP
     use(request.param)
     request.addfinalizer(fail_if_not_teardown)
-    if request.param == "redis":
-        request.addfinalizer(clear_registry)
     return request.param
 
 @pytest.fixture
