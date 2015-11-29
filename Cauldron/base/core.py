@@ -20,7 +20,7 @@ class _BaseKeyword(object):
     def __init__(self, service, name, type=None):
         super(_BaseKeyword, self).__init__()
         name = str(name).upper()
-        self._service = weakref.ref(service)
+        self.service = weakref.proxy(service)
         self.name = name
         self._last_value = None
         self._last_read = None
@@ -37,14 +37,14 @@ class _BaseKeyword(object):
             repr_str += " value={value}".format(value=self._last_value)
         return repr_str + ">"
     
-    @property
-    def service(self):
-        """The parent service for this keyword.
-        
-        This is retained via weak-reference, so the service may be garbage collected
-        and destroyed, in which case this property will become ``None``.
-        """
-        return self._service()
+    # @property
+    # def service(self):
+    #     """The parent service for this keyword.
+    #
+    #     This is retained via weak-reference, so the service may be garbage collected
+    #     and destroyed, in which case this property will become ``None``.
+    #     """
+    #     return self._service()
         
     @property
     def full_name(self):
