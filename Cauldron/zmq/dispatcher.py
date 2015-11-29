@@ -62,6 +62,8 @@ class _ZMQResponderThread(threading.Thread):
         
     def handle_broadcast(self, message):
         """Handle the broadcast command."""
+        if not hasattr(self, '_broadcast_socket'):
+            message.raise_error_response("Can't broadcast when responder thread hasn't started.")
         self._broadcast_socket.send("broadcast:{0}:{1}:{2}".format(self.service.name, message.keyword.name, message.payload))
         return "success"
     
@@ -182,6 +184,11 @@ class Service(DispatcherService):
             register(self)
         
         self._thread = _ZMQResponderThread(self)
+        self._message_queue = []
+    
+    def _begin(self):
+        """Allow command responses to start."""
+        
         if not self._thread.is_alive():
             self._thread.start()
             self.log.debug("Started ZMQ Responder Thread.")
@@ -190,14 +197,9 @@ class Service(DispatcherService):
         if not self._thread.running.is_set():
             raise DispatcherError("The dispatcher responder thread did not start.")
         
-        self._broadcast_queue = []
-    
-    def _begin(self):
-        """Allow command responses to start."""
-        if hasattr(self, "_broadcast_queue"):
-            while len(self._broadcast_queue):
-                self._synchronous_command(*self._broadcast_queue.pop())
-            del self._broadcast_queue
+        while len(self._message_queue):
+            self.socket.send(six.binary_type(self._message_queue.pop()))
+            response = ZMQCauldronMessage.parse(self.socket.recv(), self)
         
     def shutdown(self):
         """Shutdown this object."""
@@ -206,12 +208,6 @@ class Service(DispatcherService):
             self._thread.stop()
         if hasattr(self, '_router'):
             _shutdown_router(self)
-        if hasattr(self, '_socket'):
-            try:
-                self._socket.setsockopt(zmq.LINGER, 0)
-                self._socket.close()
-            except zmq.ZMQError as e:
-                pass
         self.ctx.destroy()
         
     def __missing__(self, key):
@@ -222,6 +218,10 @@ class Service(DispatcherService):
         """Execute a synchronous command."""
         message = ZMQCauldronMessage(command, self, keyword, payload, "REQ")
         if threading.current_thread() == self._thread:
+            return self._thread.respond_message(message)
+        elif not self._thread.running.is_set():
+            return self._message_queue.append(message)
+        elif not self._thread.is_alive():
             return self._thread.respond_message(message)
         else:
             self.socket.send(six.binary_type(message))
@@ -234,8 +234,5 @@ class Keyword(DispatcherKeyword):
     
     def _broadcast(self, value):
         """Broadcast this keyword value."""
-        if hasattr(self, "_broadcast_queue"):
-            self._broadcast_queue.append(("broadcast", value, self))
-        else:
-            self.service._synchronous_command("broadcast", value, self)
+        self.service._synchronous_command("broadcast", value, self)
         
