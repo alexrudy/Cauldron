@@ -6,6 +6,8 @@ Cauldron Internals
 API Reference
 -------------
 
+Cauldron uses a few root-level modules to reduce code repetition between clients and dispatchers, where the code is reasonably symmetric. For example, KTL Keywords are typed, and the typing interface is implemented for Cauldron in the :mod:`Cauldron.types` module, which provides specialized keyword functionality for various KTL Keyword types. These types are exposed in the main :mod:`Cauldron._ktl.Keyword` and :mod:`Cauldron._DFW.Keyword` modules to the user once a backend has been selected.
+
 .. automodapi:: Cauldron.types
     :headings: *^
 

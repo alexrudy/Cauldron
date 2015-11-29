@@ -49,6 +49,7 @@ def setup_client_keyword_module():
     for kwcls in generate_keyword_subclasses(basecls, _client):
         setattr(Keyword, kwcls.__name__, kwcls)
         Keyword.__all__.append(kwcls.__name__)
+        Keyword.types[kwcls.KTL_TYPE] = kwcls
     
 @registry.dispatcher.setup_for('all')
 def setup_dispatcher_keyword_module():
@@ -56,13 +57,19 @@ def setup_dispatcher_keyword_module():
     guard_use("setting up the DFW.Keyword module")
     basecls = registry.dispatcher.Keyword
     from ._DFW import Keyword
-    for kwcls in generate_keyword_subclasses(basecls, _client):
+    for kwcls in generate_keyword_subclasses(basecls, _dispatcher):
         setattr(Keyword, kwcls.__name__, kwcls)
         Keyword.__all__.append(kwcls.__name__)
+        Keyword.types[kwcls.KTL_TYPE] = kwcls
 
 @six.add_metaclass(abc.ABCMeta)
 class KeywordType(object):
-    """A base class for all subclasses of KTL Keyword."""
+    """A base class for all subclasses of KTL Keyword which implement a type specialization.
+    
+    The name of each type specialization is available as the :attr:`KTL_TYPE` class attribute.
+    """
+    KTL_TYPE = None
+    
     def __init__(self, *args, **kwargs):
         super(KeywordType, self).__init__(*args, **kwargs)
 
@@ -88,6 +95,8 @@ class Keyword(Basic):
 @client_keyword
 class Boolean(Basic):
     """A boolean-valued keyword."""
+    KTL_TYPE = 'boolean'
+    
     mapping = {True: '1',
            '1': '1',
            'true': '1',
@@ -123,15 +132,28 @@ class Boolean(Basic):
         """Check value before writing."""
         return super(Boolean, self).prewrite(self.translate(value))
         
+    def postread(self, value):
+        """Translate the value for python binary return."""
+        return super(Boolean, self).postread(self._type(value))
+        
 @dispatcher_keyword
 class Double(Basic):
     """A numerical value keyword."""
+    KTL_TYPE = 'double'
     _type = float
+    
+    def translate(self, value):
+        """Translate the value into something we can deal with."""
+        return str(float(value))
+        
+    def postread(self, value):
+        """Post read """
+        return super(Double, self).postread(self._type(value))
     
 @dispatcher_keyword
 class Float(Double):
     """A numerical value keyword."""
-    pass
+    KTL_TYPE = 'float'
 
 @client_keyword
 class Numeric(Double):
@@ -142,7 +164,7 @@ class Numeric(Double):
 @client_keyword
 class Integer(Basic):
     """An integer value keyword."""
-    
+    KTL_TYPE = 'integer'
     _type = int
     
     minimum = -pow(2, 31)
@@ -154,39 +176,83 @@ class Integer(Basic):
     
     def check(self, value):
         """Check range against allowed KTL values."""
-        super(Integer, self).check(value)
         if not (self.minimum < self.cast(value) < self.maximum):
             raise ValueError("Keyword {0} must have integer values in range {1} to {2}".format(self.name, self.minimum, self.maximum))
+        super(Integer, self).check(value)
         
     def increment(self, amount=1):
         """Increment the integer value."""
         value = self.cast(self.value) if self.value is not None else 0
         self.set(str(value + int(amount)))
         
+    def translate(self, value):
+        """Check value before writing."""
+        return str(self.cast(value))
+        
+    def postread(self, value):
+        """Translate the value for python binary return."""
+        return super(Integer, self).postread(self.cast(value))
+        
+
+class Enumeration(dict):
+    """The key-value pairs for enumeration"""
+    def __init__(self, *args, **kwargs):
+        super(Enumeration, self).__init__(*args, **kwargs)
+        self.enums = set(self.values())
+        
+    def __setitem__(self, key, value):
+        value = str(value)
+        super(Enumeration, self).__setitem__(str(key).lower(), value)
+        self.enums.add(value)
 
 @dispatcher_keyword
-class Enumerated(Integer, _NotImplemented):
+class Enumerated(Integer):
     """An enumerated keyword, which uses an integer as the underlying datatype."""
-    pass
+    KTL_TYPE = 'enumerated'
     
+    def __init__(self, *args, **kwargs):
+        # We override __init__ so we can set up 
+        # the enumerated values.
+        super(Enumerated, self).__init__(*args, **kwargs)
+        self.values = Enumeration()
+        #TODO: Grab enumerated values from XML here.
+        
+    @property
+    def keys(self):
+        """The keys available."""
+        return self.values.enums
+        
+    def prewrite(self, value):
+        return super(Enumerated, self).prewrite(self.translate(value))
+    
+    def translate(self, value):
+        """Translate to the enumerated value"""
+        if str(value).lower() in self.keys:
+            value = str(value).lower()
+        elif str(value).lower() in self.values:
+            value = self.values[str(value).lower()]
+        else:
+            raise ValueError("Bad value for enumerated: '{0}' not in {1!r}".format(value, self.values))
+        return value
 
 @dispatcher_keyword
 class Mask(Basic, _NotImplemented):
-    pass
+    KTL_TYPE = 'mask'
 
 @dispatcher_keyword
 @client_keyword
 class String(Basic): 
     """An ASCII valued keyword, implemented identically to :class:`Basic`."""
-    pass
+    KTL_TYPE = 'string'
 
 @dispatcher_keyword
-class IntegerArray(Basic, _NotImplemented): pass
+class IntegerArray(Basic, _NotImplemented):
+    KTL_TYPE = 'integer array'
 
 @dispatcher_keyword
-class DoubleArray(Basic, _NotImplemented): pass
+class DoubleArray(Basic, _NotImplemented):
+    KTL_TYPE = 'double array'
 
 @dispatcher_keyword
-class FloatArray(DoubleArray): pass
-
-
+class FloatArray(DoubleArray):
+    KTL_TYPE = 'float array'
