@@ -4,6 +4,7 @@ import time
 import pytest
 import functools
 import inspect
+import threading
 
 @pytest.fixture
 def service(request, dispatcher):
@@ -112,48 +113,53 @@ def test_current_value(service, client):
     assert keyword._current_value(binary=True) == "SomeValue"
     assert keyword._current_value(both=True, binary=True) == ("SomeValue", "SomeValue")
     service.shutdown()
+
+def test_monitor(service, client, waittime):
+    """Test .monitor() for asynchronous broadcast monitoring."""
     
-def test_monitor(service, client):
-    """Test monitoring"""
-    waittime = 0.1
     def monitor(keyword):
         """Monitor"""
-        monitor.monitored = True
-        print("Monitored!")
+        monitor.monitored.set()
     
-    monitor.monitored = False
+    monitor.monitored = threading.Event()
     
     client["KEYWORD"].callback(monitor)
     client["KEYWORD"].monitor(prime=False)
-    assert len(client['KEYWORD']._callbacks) == 1
-    assert not monitor.monitored
+    monitor.monitored.wait(waittime)
+    assert not monitor.monitored.is_set()
+    
     service["KEYWORD"].modify("SomeValue")
-    time.sleep(waittime) #Wait for threaded operations to catch up!
-    assert monitor.monitored
+    monitor.monitored.wait(waittime)
+    assert monitor.monitored.is_set()
     
     client["KEYWORD"].callback(monitor, remove=True)
-    assert len(client['KEYWORD']._callbacks) == 0
+    monitor.monitored.clear()
+    service["KEYWORD"].modify("OtherValue")
+    monitor.monitored.wait(waittime)
+    assert not monitor.monitored.is_set()
+
     client["KEYWORD"].callback(monitor, preferred=True)
     client["KEYWORD"].monitor(prime=True)
-    client["KEYWORD"].monitor(start=False)
+    service["KEYWORD"].modify("SomeValue")
+    monitor.monitored.wait(waittime)
+    assert monitor.monitored.is_set()
+    
 
-def test_subscribe(service, client):
-    """Test monitoring"""
-    waittime = 0.1
+def test_subscribe(service, client, waittime):
+    """Test .subscribe() which should work like .monitor()"""
     
     def monitor(keyword):
         """Monitor"""
-        monitor.monitored = True
+        monitor.monitored.set()
         print("Monitored!")
     
-    monitor.monitored = False
+    monitor.monitored = threading.Event()
     
     client["KEYWORD"].callback(monitor)
     client["KEYWORD"].subscribe(prime=False)
-    assert len(client['KEYWORD']._callbacks) == 1
-    assert not monitor.monitored
+    monitor.monitored.wait(waittime)
+    assert not monitor.monitored.is_set()
     service["KEYWORD"].modify("SomeValue")
-    time.sleep(waittime) #Wait for threaded operations to catch up!
-    
-    assert monitor.monitored
+    monitor.monitored.wait(waittime)
+    assert monitor.monitored.is_set()
     

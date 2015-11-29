@@ -194,3 +194,7 @@ def strictxml(xmlvar):
     STRICT_KTL_XML.on()
     return xmlvar
     
+@pytest.fixture
+def waittime():
+    """Event wait time, in seconds."""
+    return 0.1
