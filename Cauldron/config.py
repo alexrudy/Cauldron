@@ -10,6 +10,7 @@ Basics for handling Cauldron configuration files.
 """
 
 import os
+import sys
 import six
 import warnings
 import pkg_resources
@@ -17,8 +18,10 @@ import pkg_resources
 from six.moves import configparser
 
 from .exc import ConfigurationMissing
+from . import registry
+from .api import BASENAME
 
-__all__ = ['default_configuration', 'read_configuration', 'set_module_configuration', 'get_module_configuration']
+__all__ = ['default_configuration', 'read_configuration', 'cauldron_configuration']
 
 def default_configuration():
     """Get the default configuration object."""
@@ -27,18 +30,13 @@ def default_configuration():
         config.readfp(fp)
     return config
 
-def read_configuration(configuration_location = None, config = None):
-    """Read a configuration from a filepath."""
-    
-    if config is None:
-        if isinstance(configuration_location, configparser.ConfigParser):
-            return configuration_location
-        config = default_configuration()
-    elif not isinstance(config, configparser.ConfigParser):
-        raise TypeError("'config' must be a subclass of {0!r}".format(configparser.ConfigParser))
+def read_configuration(configuration_location = None):
+    """Read a configuration from a filepath or a configuration object."""
     
     if configuration_location is None:
-        return config
+        return cauldron_configuration
+    elif isinstance(configuration_location, configparser.ConfigParser):
+        return configuration_location
     else:
         configuration_location = six.text_type(configuration_location)
     
@@ -47,20 +45,29 @@ def read_configuration(configuration_location = None, config = None):
     
     try:
         with open(configuration_location, 'r') as fp:
-            config.readfp(fp)
+            cauldron_configuration.readfp(fp)
     except configparser.ParsingError as e:
         warnings.warn("Can't parse configuration file '{0:s}'".format(configuration_location), ConfigurationMissing)
     except IOError:
         warnings.warn("Can't locate configuration file '{0:s}'.".format(configuration_location), ConfigurationMissing)
-    return config
+    return cauldron_configuration
     
-_cauldron_configuration = default_configuration()
+@registry.dispatcher.setup_for('all')
+@registry.client.setup_for('all')
+def setup_configuration():
+    """Set up the configuration when the API starts."""
+    Cauldron = sys.modules[BASENAME]
+    Cauldron.configuration = cauldron_configuration
     
-def set_module_configuration(configuration_location = None):
-    """Read a configuration file into the module-level configuration object."""
-    global _cauldron_configuration
-    _cauldron_configuration = read_configuration(configuration_location, _cauldron_configuration)
+@registry.dispatcher.teardown_for('all')
+@registry.client.teardown_for('all')
+def reset_configuration():
+    """Reset the global configuration"""
+    global cauldron_configuration
+    cauldron_configuration = default_configuration()
+    Cauldron = sys.modules[BASENAME]
+    if hasattr(Cauldron, 'configuration'):
+        del Cauldron.configuration
     
-def get_module_configuration():
-    """Get the module level configuration item."""
-    return _cauldron_configuration
+reset_configuration()
+
