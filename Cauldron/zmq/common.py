@@ -7,19 +7,19 @@ import six
 from ..api import _Setting
 from ..exc import DispatcherError
 
-ZMQ_AVAILALBE = _Setting("ZMQ_AVAILALBE", False)
+ZMQ_AVAILABLE = _Setting("ZMQ_AVAILABLE", False)
 try:
     import zmq
 except ImportError:
-    ZMQ_AVAILALBE.off()
+    ZMQ_AVAILABLE.off()
 else:
-    ZMQ_AVAILALBE.on()
+    ZMQ_AVAILABLE.on()
     
-__all__ = ['ZMQ_AVAILALBE', 'check_zmq']
+__all__ = ['ZMQ_AVAILABLE', 'check_zmq']
 
 def check_zmq():
     """Check if ZMQ is available."""
-    if ZMQ_AVAILALBE:
+    if ZMQ_AVAILABLE:
         return zmq
     raise RuntimeError("Must have 'zmq' installed to use the zmq backend.")
 
