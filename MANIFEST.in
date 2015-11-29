@@ -4,6 +4,8 @@ include LICENSE.rst
 include ez_setup.py
 include ah_bootstrap.py
 
+recursive-include Cauldron/data *
+
 exclude *.pyc *.o
 prune build
 prune Cauldron/tests

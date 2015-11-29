@@ -5,15 +5,20 @@ import os
 
 pytestmark = pytest.mark.usefixtures("teardown_cauldron")
 
-def test_xml_index(xmldir, servicename):
+@pytest.fixture
+def xmlpath(xmldir, servicename):
+    """XML Directory path"""
+    return os.path.join(xmldir, servicename)
+
+def test_xml_index(xmlpath, servicename):
     """Test the XML index"""
     from ..bundled import ktlxml
-    index = ktlxml.index(servicename, directory=xmldir)
+    index = ktlxml.index(servicename, directory=xmlpath)
     
-def test_xml_Service(xmldir, servicename):
+def test_xml_Service(xmlpath, servicename):
     """Test the XML service object."""
     from ..bundled import ktlxml
-    xml = ktlxml.Service(servicename, directory=xmldir)
+    xml = ktlxml.Service(servicename, directory=xmlpath)
     assert "LOOP" in xml
     
 def test_Service_with_xml(xmlvar, backend, servicename, config):
