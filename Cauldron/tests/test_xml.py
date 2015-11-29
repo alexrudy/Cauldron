@@ -8,7 +8,7 @@ pytestmark = pytest.mark.usefixtures("teardown_cauldron")
 @pytest.fixture
 def xmlpath(xmldir, servicename):
     """XML Directory path"""
-    return os.path.join(xmldir, servicename)
+    return os.path.join(xmldir, 'data', servicename)
 
 def test_xml_index(xmlpath, servicename):
     """Test the XML index"""

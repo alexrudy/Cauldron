@@ -117,6 +117,7 @@ class REDISPubsubBase(object):
         import redis.client
         self._thread = PubSubWorkerThread(weakref.proxy(self._pubsub), sleep_time=self.THREAD_SLEEP_TIME)
         self._thread.daemon = self.THREAD_DAEMON
+        self._thread.name = "PubSubWorkerThread-{0}".format(self.name)
         self._thread.start()
     
     def _run_thread(self):
