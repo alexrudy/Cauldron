@@ -23,7 +23,7 @@ class CauldronException(Exception):
     """A base class to collect Cauldron Exceptions & Warnings."""
     pass
 
-class CauldronWarning(CauldronException, RuntimeWarning):
+class CauldronWarning(Warning):
     """A base class for all Cauldron warnings."""
     pass
 
@@ -35,7 +35,7 @@ class ServiceNotStarted(CauldronException, KeyError):
     """Exception raised when starting a client which requires a dispatcher, and the dispatcher has not started."""
     pass
 
-class CauldronAPINotImplementedWarning(CauldronWarning, CauldronAPINotImplemented):
+class CauldronAPINotImplementedWarning(CauldronWarning):
     """Warning raised to indicate that an API feature is not implemented, and so was silently ignored."""
     pass
     
