@@ -22,7 +22,13 @@ exclude_lines =
 
    # Don't complain about packages we have installed
    except ImportError
-
+   
+   # Don't complain if we try to catch sporadic ZMQ errors.
+   except zmq.ZMQError
+   
+   # Don't complain if we don't check everything that could be garbage collected.
+   except weakref.ReferenceError
+   
    # Don't complain if tests don't hit assertions
    raise AssertionError
    raise NotImplementedError

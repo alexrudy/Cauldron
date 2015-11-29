@@ -28,6 +28,17 @@ def config_zmq(request):
     set_module_configuration(config)
     request.addfinalizer(lambda : set_module_configuration(default_configuration()))
     return config
+    
+def test_zmq_available():
+    """Test that ZMQ is or isn't available."""
+    from Cauldron.zmq.common import ZMQ_AVAILABLE, check_zmq
+    
+    r = check_zmq()
+    orig = ZMQ_AVAILABLE.value
+    ZMQ_AVAILABLE.off()
+    with pytest.raises(RuntimeError):
+        check_zmq()
+    ZMQ_AVAILABLE.value = orig
 
 def test_router(zmq, config_zmq):
     """Test the router."""
@@ -46,3 +57,15 @@ def test_router(zmq, config_zmq):
     assert shutdown_router(None, config_zmq)
     time.sleep(0.1)
     assert not router.is_alive()
+    
+def test_setup(zmq, config):
+    """Test setup and broadcast functions"""
+    from Cauldron import DFW
+    
+    def setup(service):
+        """Setup function."""
+        DFW.Keyword.Keyword("KEYWORD", service, initial="SOMEVALUE")
+    
+    svc = DFW.Service("test-router", config=config, setup=setup)
+    svc["KEYWORD"]
+    

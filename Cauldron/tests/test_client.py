@@ -113,4 +113,47 @@ def test_current_value(service, client):
     assert keyword._current_value(both=True, binary=True) == ("SomeValue", "SomeValue")
     service.shutdown()
     
+def test_monitor(service, client):
+    """Test monitoring"""
+    waittime = 0.1
+    def monitor(keyword):
+        """Monitor"""
+        monitor.monitored = True
+        print("Monitored!")
+    
+    monitor.monitored = False
+    
+    client["KEYWORD"].callback(monitor)
+    client["KEYWORD"].monitor(prime=False)
+    assert len(client['KEYWORD']._callbacks) == 1
+    assert not monitor.monitored
+    service["KEYWORD"].modify("SomeValue")
+    time.sleep(waittime) #Wait for threaded operations to catch up!
+    assert monitor.monitored
+    
+    client["KEYWORD"].callback(monitor, remove=True)
+    assert len(client['KEYWORD']._callbacks) == 0
+    client["KEYWORD"].callback(monitor, preferred=True)
+    client["KEYWORD"].monitor(prime=True)
+    client["KEYWORD"].monitor(start=False)
+
+def test_subscribe(service, client):
+    """Test monitoring"""
+    waittime = 0.1
+    
+    def monitor(keyword):
+        """Monitor"""
+        monitor.monitored = True
+        print("Monitored!")
+    
+    monitor.monitored = False
+    
+    client["KEYWORD"].callback(monitor)
+    client["KEYWORD"].subscribe(prime=False)
+    assert len(client['KEYWORD']._callbacks) == 1
+    assert not monitor.monitored
+    service["KEYWORD"].modify("SomeValue")
+    time.sleep(waittime) #Wait for threaded operations to catch up!
+    
+    assert monitor.monitored
     
