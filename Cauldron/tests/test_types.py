@@ -84,6 +84,7 @@ def test_keyword_enumerated(keyword_enumerated, modify, update):
     """Modify-update tests for an enumerated keyword."""
     modify_update(keyword_enumerated, modify, update)
 
+@pytest.mark.xfail
 @pytest.mark.parametrize("kwtype", ['mask', 'integer array', 'float array', 'double array'])
 def test_keyword_type_not_implemented(kwtype, dispatcher, recwarn):
     """Test not-implemented keyword types"""
