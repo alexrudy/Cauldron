@@ -93,11 +93,5 @@ class Service(ClientService):
         """Return the list of all available keywords in this service instance."""
         return self._dispatcher.keywords()
         
-    def __missing__(self, key):
-        """Populate and return a missing key."""
-        from .._ktl.Keyword import Keyword
-        keyword = Keyword(self, key)
-        self._keywords[keyword.name] = keyword
-        return keyword
 
     

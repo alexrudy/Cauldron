@@ -112,9 +112,4 @@ class Service(REDISPubsubBase, ClientService):
         prefix = len(redis_key_name(self.name, ""))
         return [ key[prefix:] for key in sorted(self.redis.keys(redis_key_name(self.name, "*"))) ]
         
-    def __missing__(self, key):
-        """Populate and return a missing key."""
-        from .._ktl.Keyword import Keyword
-        keyword = self._keywords[key] = Keyword(self, key)
-        return keyword
     

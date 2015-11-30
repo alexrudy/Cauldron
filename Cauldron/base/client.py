@@ -251,9 +251,12 @@ class Service(object):
         else:
             raise KeyError("{0} has no key '{1}'".format(self, key.upper()))
     
-    def __missing__(self, key): # pragma: no cover
-        """Handle a missing key."""
-        raise KeyError("{0} has no key '{1}'".format(self, key.upper()))
+    def __missing__(self, key):
+        """Populate and return a missing key."""
+        from .._ktl.Keyword import Keyword
+        keyword = Keyword(self, key)
+        self._keywords[keyword.name] = keyword
+        return keyword
     
     def _populate(self):
         """Populate all of the instantiated keywords here."""

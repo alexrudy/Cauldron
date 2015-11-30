@@ -109,12 +109,6 @@ class Service(ClientService):
         message = self._synchronous_command("enumerate", "", None)
         return message.payload.split(":")
         
-    def __missing__(self, key):
-        """Populate and return a missing key."""
-        from .._ktl.Keyword import Keyword
-        keyword = self._keywords[key] = Keyword(self, key)
-        return keyword
-        
     def _synchronous_command(self, command, payload, keyword=None):
         """Execute a synchronous command."""
         self.socket.send(str(ZMQCauldronMessage(command, self, keyword, payload, "REQ")))
