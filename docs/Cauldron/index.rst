@@ -21,6 +21,7 @@ running on a local, non-production machine.
     ktl
     api
     base
+    configuration
     xml
     declarative
     backends/index
