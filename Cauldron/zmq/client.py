@@ -111,6 +111,7 @@ class Service(ClientService):
         
     def __missing__(self, key):
         """Populate and return a missing key."""
+        from .._ktl.Keyword import Keyword
         keyword = self._keywords[key] = Keyword(self, key)
         return keyword
         

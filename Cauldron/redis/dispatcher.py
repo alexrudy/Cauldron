@@ -47,6 +47,7 @@ class Service(REDISPubsubBase, DispatcherService):
     
     def __missing__(self, key):
         """Allows the redis dispatcher to populate any keyword, whether it should exist or not."""
+        from .._DFW.Keyword import Keyword
         return Keyword(key, self)
         
     def __del__(self):

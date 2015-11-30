@@ -106,5 +106,21 @@ def test_increment_integer(dispatcher):
     kwd.increment()
     assert kwd['value'] == str(v + 1)
 
-
+@pytest.mark.parametrize("kwtype", dict((k[0], True) for k in keyword_types).keys())
+def test_keyword_inherits_basic(kwtype, dispatcher):
+    """Test that keyword objects all inherit from basic."""
+    from Cauldron import DFW
+    from Cauldron.types import KeywordType, Basic
+    name = "my{0}".format(kwtype.replace(" ","")).upper()
+    kwd = DFW.Keyword.types[kwtype](name, dispatcher)
+    assert isinstance(kwd, KeywordType)
+    assert isinstance(kwd, Basic)
+    
+def test_keyword_inherits_basic_simple(dispatcher):
+    """Test that even simple keywords inherit from basic types."""
+    from Cauldron.types import KeywordType, Basic
+    kwd = dispatcher['KEYWORD']
+    assert isinstance(kwd, KeywordType)
+    assert isinstance(kwd, Basic)
+    
     
