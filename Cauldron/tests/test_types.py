@@ -123,4 +123,26 @@ def test_keyword_inherits_basic_simple(dispatcher):
     assert isinstance(kwd, KeywordType)
     assert isinstance(kwd, Basic)
     
+@pytest.mark.parametrize("kwtype", dict((k[0], True) for k in keyword_types).keys())
+def test_client_keyword_inherits_basic(kwtype, dispatcher, client):
+    """Test that keyword objects all inherit from basic."""
+    from Cauldron import ktl
+    from Cauldron.types import KeywordType, Basic
+    name = "my{0}".format(kwtype.replace(" ","")).upper()
+    _k = dispatcher[name]
+    if kwtype not in ktl.Keyword.types:
+        pytest.skip("Not a valid ktl client-side type.")
+    kwd = ktl.Keyword.types[kwtype](client, name)
+    assert isinstance(kwd, KeywordType)
+    assert isinstance(kwd, Basic)
+    
+def test_client_keyword_inherits_basic_simple(dispatcher, client):
+    """Test that even simple keywords inherit from basic types."""
+    from Cauldron.types import KeywordType, Basic
+    _k = dispatcher['KEYWORD']
+    kwd = client['KEYWORD']
+    assert isinstance(kwd, KeywordType)
+    assert isinstance(kwd, Basic)
+    
+    
     
