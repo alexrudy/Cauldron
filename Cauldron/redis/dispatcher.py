@@ -45,11 +45,6 @@ class Service(REDISPubsubBase, DispatcherService):
         self._stop_thread()
         self.redis.srem(REDIS_SERVICES_REGISTRY, self.name)
     
-    def __missing__(self, key):
-        """Allows the redis dispatcher to populate any keyword, whether it should exist or not."""
-        from .._DFW.Keyword import Keyword
-        return Keyword(key, self)
-        
     def __del__(self):
         """Destructor!"""
         super(Service, self).__del__()

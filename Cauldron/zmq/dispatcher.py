@@ -210,11 +210,6 @@ class Service(DispatcherService):
             _shutdown_router(self)
         self.ctx.destroy()
         
-    def __missing__(self, key):
-        """Allows the redis dispatcher to populate any keyword, whether it should exist or not."""
-        from .._DFW.Keyword import Keyword
-        return Keyword(key, self)
-        
     def _synchronous_command(self, command, payload, keyword=None):
         """Execute a synchronous command."""
         message = ZMQCauldronMessage(command, self, keyword, payload, "REQ")

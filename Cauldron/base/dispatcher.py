@@ -382,8 +382,9 @@ class Service(object):
         
     def __missing__(self, key):
         """What to do with missing keys."""
-        raise KeyError("Service {0} has no keyword {1}.".format(self.name, key))
-        
+        from .._DFW.Keyword import Keyword
+        return Keyword(key, self)
+    
     def __setitem__(self, name, value):
         """Set a keyword instance in this server."""
         if not isinstance(value, Keyword):
