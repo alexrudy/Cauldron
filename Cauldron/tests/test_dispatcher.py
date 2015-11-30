@@ -7,7 +7,7 @@ import pytest
 pytestmark = pytest.mark.usefixtures("teardown_cauldron")
 
 def test_callbacks(dispatcher):
-    """Test callback propogation."""
+    """Test callback propagation."""
     
     class CallbackRecieved(Exception): pass
     
@@ -156,6 +156,12 @@ def test_broadcast(dispatcher):
     keyword = dispatcher['KEYWORD']
     keyword.set("10")
     dispatcher.broadcast()
+    
+def test_set_statuskeyword(dispatcher):
+    """Check that broadcast works."""
+    assert dispatcher.setStatusKeyword('KEYWORD')
+    assert not dispatcher.setStatusKeyword('KEYWORD')
+    assert dispatcher.setStatusKeyword('OTHERKEYWORD')
     
 def test_keyword_list(dispatcher):
     """Check the keyword list."""

@@ -4,10 +4,10 @@ Tools common to all ZMQ services.
 """
 import six
 
-from ..api import _Setting
+from ..api import APISetting
 from ..exc import DispatcherError
 
-ZMQ_AVAILABLE = _Setting("ZMQ_AVAILABLE", False)
+ZMQ_AVAILABLE = APISetting("ZMQ_AVAILABLE", False)
 try:
     import zmq
 except ImportError:

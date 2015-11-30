@@ -60,10 +60,28 @@ def api_override(func):
     
 class _Setting(object):
     """A settings object, which can be passed around by value."""
-    def __init__(self, name, value):
+    def __init__(self, name, value, lock=None):
         super(_Setting, self).__init__()
         self.name = name
-        self.value = value
+        self.__value = value
+        self._lock = lock
+    
+    @property
+    def value(self):
+        """Setting's boolean value"""
+        return self.__value
+        
+    @value.setter
+    def value(self, new_value):
+        """Set the new value."""
+        if self._lock is not None and self._lock:
+            raise RuntimeError("Setting '{0}' is locked by '{1}', can't change value.".format(self.name, self._lock.name))
+        self.__value = bool(new_value)
+        
+    @property
+    def inverse(self):
+        """A setting which is always the inverse of this setting."""
+        return _SettingInverse(self)
     
     def __repr__(self):
         """Represent this value"""
@@ -80,3 +98,21 @@ class _Setting(object):
     def off(self):
         """Turn this setting off."""
         self.value = False
+        
+class _SettingInverse(_Setting):
+    """The inverse of a setting object."""
+    def __init__(self, setting):
+        self.__setting = setting
+        super(_SettingInverse, self).__init__(name = "~{0}".format(setting.name), value = not setting, lock=setting._lock)
+        
+    @property
+    def value(self):
+        """Get this setting's value."""
+        return not self.__setting.value
+    
+    @value.setter
+    def value(self, new_value):
+        """Set this setting's value."""
+        self.__setting.value = not new_value
+
+        

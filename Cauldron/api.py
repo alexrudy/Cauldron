@@ -12,9 +12,14 @@ import warnings
 from . import registry
 from .utils.helpers import _Setting
 
-__all__ = ['install', 'use', 'teardown', 'use_strict_xml', 'STRICT_KTL_XML']
+__all__ = ['install', 'use', 'teardown', 'use_strict_xml', 'STRICT_KTL_XML', 'APISetting']
 
 CAULDRON_SETUP = _Setting("CAULDRON_SETUP", False)
+
+class APISetting(_Setting):
+    """A setting which locks with the API use() calls."""
+    def __init__(self, name, value):
+        super(APISetting, self).__init__(name=name, value=value, lock=CAULDRON_SETUP)
 
 BASENAME = ".".join(__name__.split(".")[:-1])
 
@@ -133,8 +138,8 @@ def teardown():
     except: # pragma: no cover
         raise
     finally:
-        STRICT_KTL_XML.off()
         CAULDRON_SETUP.off()
+        STRICT_KTL_XML.off()
     
     
 def install():

@@ -11,7 +11,7 @@ from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented, D
 from .common import zmq_dispatcher_address, zmq_broadcaster_address, check_zmq, teardown, ZMQCauldronMessage
 from .router import lookup
 from .. import registry
-from ..config import get_module_configuration
+from ..config import cauldron_configuration
 
 import six
 import threading
@@ -64,7 +64,7 @@ class Service(ClientService):
         zmq = check_zmq()
         self.ctx = zmq.Context.instance()
         self._sockets = threading.local()
-        self._config = get_module_configuration()
+        self._config = cauldron_configuration
         self._thread = _ZMQMonitorThread(self)
         super(Service, self).__init__(name, populate)
         

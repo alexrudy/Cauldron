@@ -7,7 +7,7 @@ import time
 from .router import ZMQRouter, register, lookup, shutdown_router
 from ..conftest import fail_if_not_teardown
 from ..api import use
-from ..config import default_configuration, set_module_configuration
+from ..config import cauldron_configuration
 
 @pytest.fixture
 def zmq(request):
@@ -19,14 +19,11 @@ def zmq(request):
 @pytest.fixture
 def config_zmq(request):
     """Get the configuration item."""
-    # from six.moves import configparser
-    config = default_configuration()
+    config = cauldron_configuration
     config.set("zmq-router","port", "7700")
     config.set("zmq-router","first-port","7710")
     config.set("zmq-router","last-port","7800")
     config.set("zmq-router","allow-spawn","no")
-    set_module_configuration(config)
-    request.addfinalizer(lambda : set_module_configuration(default_configuration()))
     return config
     
 def test_zmq_available():

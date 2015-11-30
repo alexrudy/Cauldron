@@ -241,7 +241,7 @@ def shutdown_router(ctx = None, config = None, name = "generic"):
     """Shutdown a router."""
     zmq = check_zmq()
     ctx = ctx or zmq.Context.instance()
-    config = read_configuration(config=config)
+    config = read_configuration(config)
     try:
         # Make a socket.
         socket = ctx.socket(zmq.REQ)
