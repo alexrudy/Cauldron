@@ -297,7 +297,7 @@ class Service(object):
                 raise
             warning = CauldronXMLWarning("KTLXML was not loaded correctly. Keywords will not be validated against XML. Exception was {0!s}.".format(e))
             warnings.warn(warning)
-            self.log.warning(warning)
+            self.log.warning("%s", warning)
             self.xml = None
         else:
             # Implementors will be expected to assign Keyword instances
