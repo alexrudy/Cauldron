@@ -5,9 +5,12 @@ import pytest
 import time
 
 from .router import ZMQRouter, register, lookup, shutdown_router
-from ..conftest import fail_if_not_teardown
+from ..conftest import fail_if_not_teardown, available_backends
 from ..api import use
 from ..config import cauldron_configuration
+
+pytestmark = pytest.mark.skipif("zmq" not in available_backends, reason="requires zmq")
+
 
 @pytest.fixture
 def zmq(request):
