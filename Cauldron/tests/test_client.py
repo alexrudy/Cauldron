@@ -137,12 +137,19 @@ def test_monitor(service, client, waittime):
     service["KEYWORD"].modify("OtherValue")
     monitor.monitored.wait(waittime)
     assert not monitor.monitored.is_set()
-
+    
+    monitor.monitored.clear()
     client["KEYWORD"].callback(monitor, preferred=True)
     client["KEYWORD"].monitor(prime=True)
     service["KEYWORD"].modify("SomeValue")
     monitor.monitored.wait(waittime)
     assert monitor.monitored.is_set()
+    monitor.monitored.clear()
+    
+    client["KEYWORD"].monitor(start=False)
+    service["KEYWORD"].modify("OtherValue")
+    monitor.monitored.wait(waittime)
+    assert not monitor.monitored.is_set()
     
 
 def test_subscribe(service, client, waittime):
