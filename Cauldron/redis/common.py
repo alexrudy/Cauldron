@@ -18,8 +18,7 @@ __all__ = ['REDIS_AVAILALBE', 'REDIS_DOMAIN', 'REDIS_SERVICES_REGISTRY',
     'check_redis', 'check_redis_connection',
     'redis_key_name', 'redis_status_key', 
     'REDISPubsubBase', 'REDISKeywordBase', 
-    'get_connection_pool', 'set_global_connection_pool', 'get_global_connection_pool',
-    'configure_pool']
+    'get_connection_pool', 'get_global_connection_pool']
 
 REDIS_AVAILALBE = APISetting("REDIS_AVAILALBE", False)
 try:
