@@ -221,7 +221,6 @@ def test_callbacks_iterating():
     for f in cbs:
         for f in cbs:
             del other_function
-            cbs._remove_pending()
         c += 1
         assert len(cbs) == 1
         assert len(cbs.data) == 2
