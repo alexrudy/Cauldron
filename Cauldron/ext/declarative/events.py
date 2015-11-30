@@ -110,7 +110,7 @@ class _KeywordListener(object):
         eq = self.__eq__(other)
         if eq is NotImplemented:
             return NotImplemented
-        return eq
+        return (not eq)
     
     def __call__(self, *args, **kwargs):
         """Ensure that the dispatcher fires before the keyword's own implementation."""

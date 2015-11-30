@@ -202,6 +202,43 @@ def test_event_class_reprs(dispatcher, cls):
     expected = "<_KeywordListener name=preread at "
     assert repr(kl)[:len(expected)] == expected
     
+def test_keyword_listener_equality(dispatcher, cls):
+    """Test __eq__ and __ne__ for _KeywordListener"""
+    from .events import _KeywordEvent, _DescriptorEvent, _KeywordListener
+    
+    kwd = dispatcher["SOMEKEYWORD"]
+    instance = cls()
+    
+    de1 = _DescriptorEvent("preread")
+    de2 = _DescriptorEvent("postread")
+    
+    
+    kl1 = _KeywordListener(kwd, instance, de1)
+    kl2 = _KeywordListener(kwd, instance, de1)
+    kl3 = _KeywordListener(kwd, instance, de2)
+    assert kl1 == kl2
+    assert kl1 != kl3
+    assert kl2 != kl3
+    assert kl1 != 5
+    
+def test_event_singleton_nature(dispatcher, cls):
+    """Test the singleton nature of events."""
+    from .events import _KeywordEvent, _DescriptorEvent, _KeywordListener
+    
+    kwd = dispatcher["SOMEKEYWORD"]
+    instance = cls()
+    
+    de1 = _DescriptorEvent("preread")
+    de2 = _DescriptorEvent("postread")
+    
+    ke1 = _KeywordEvent(kwd, instance, de1)
+    ke2 = _KeywordEvent(kwd, instance, de1)
+    ke3 = _KeywordEvent(kwd, instance, de2)
+    
+    assert ke1 is ke2
+    assert ke1 is not ke3
+    assert ke2 is not ke3
+    
 def test_multiple_binds_other_serivce(backend, dispatcher, config, cls):
     """Test for binds against multiple services"""
     if backend == "zmq":
