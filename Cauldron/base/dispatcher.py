@@ -318,6 +318,12 @@ class Service(object):
         """Represent this object"""
         return "<{0} name='{1}' at {2}>".format(self.__class__.__name__, self.name, hex(id(self)))
     
+    @property
+    def _Keyword_cls(self):
+        """Get the keyword class."""
+        from Cauldron import DFW
+        return DFW.Keyword.Keyword
+    
     def keywords(self):
         """The list of available keywords"""
         return list(sorted(self._keywords.keys()))
@@ -382,8 +388,7 @@ class Service(object):
         
     def __missing__(self, key):
         """What to do with missing keys."""
-        from .._DFW.Keyword import Keyword
-        return Keyword(key, self)
+        return self._Keyword_cls(key, self)
     
     def __setitem__(self, name, value):
         """Set a keyword instance in this server."""
