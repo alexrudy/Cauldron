@@ -85,7 +85,11 @@ class Keyword(DispatcherKeyword):
         self.service.redis.set(redis_key_name(self)+':status', 'modify')
         try:
             super(Keyword, self).set(value, force)
-        finally:
+        except Exception as e:
+            self.service.redis.set(redis_key_name(self)+':error', repr(e))
+            self.service.redis.set(redis_key_name(self)+':status', 'error')
+            raise
+        else:
             self.service.redis.set(redis_key_name(self)+':status', 'ready')
     
 
