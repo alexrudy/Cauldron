@@ -76,18 +76,17 @@ class Keyword(DispatcherKeyword):
         if msg['channel'] == redis_key_name(self):
             try:
                 self.modify(msg["data"])
-            except ValueError as e:
-                #TODO: respond with the error to the stream.
-                pass
-                
+            except Exception as e:
+                self.service.log.error("Error in the REDIS responder thread: {0!s}".format(e))
+                self.service.redis.set(redis_key_name(self)+':error', str(e))
+                self.service.redis.set(redis_key_name(self)+':status', 'error')
+            
     def set(self, value, force=False):
         """During set, lock status."""
         self.service.redis.set(redis_key_name(self)+':status', 'modify')
         try:
             super(Keyword, self).set(value, force)
         except Exception as e:
-            self.service.redis.set(redis_key_name(self)+':error', repr(e))
-            self.service.redis.set(redis_key_name(self)+':status', 'error')
             raise
         else:
             self.service.redis.set(redis_key_name(self)+':status', 'ready')

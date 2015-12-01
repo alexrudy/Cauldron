@@ -12,6 +12,7 @@ from pkg_resources import parse_version
 
 from ..api import APISetting
 from ..config import cauldron_configuration
+from ..exc import DispatcherError
 from .. import registry
 
 __all__ = ['REDIS_AVAILALBE', 'REDIS_DOMAIN', 'REDIS_SERVICES_REGISTRY',
@@ -164,24 +165,48 @@ class REDISKeywordBase(object):
         """Wait for a status value to appear."""
         event = threading.Event()
         
+        def _handle_status(recieved_status):
+            """What to do when the status changes."""
+            if status == recieved_status:
+                event.set()
+                if callback is not None:
+                    callback()
+            if "error" == recieved_status:
+                self._error = self.service.redis.get(redis_key_name(self)+":error")
+                self.service.log.debug("Recieved an 'error' notification for '{0}': {1}".format(self.name, self._error))
+                self.service.redis.set(redis_status_key(self), 'ready')
+                event.set()
+        
         def _message_responder(message):
             if message is None:
                 return # pragma: no cover
             if message['channel'].endswith(redis_status_key(self)) and message['data'] == "set":
-                if status == self.service.redis.get(redis_status_key(self)):
-                    event.set()
-                    if callback is not None:
-                        callback()
+                _handle_status(self.service.redis.get(redis_status_key(self)))
                 
         with self.service.pubsub() as pubsub:
             pubsub.psubscribe(**{"__keyspace@*__:"+redis_status_key(self):_message_responder})
         self.service._run_thread()
-        if self.service.redis.get(redis_status_key(self)) == status:
-            event.set()
-        else:
+        _handle_status(self.service.redis.get(redis_status_key(self)))
+        
+        # Process Timeout
+        if not event.is_set():
+            self.service.log.debug("Keyword '{0}' is waiting {1} on status == '{2}', currently '{3}'".format(
+                self.name, "for {0:d}s".format(timeout) if timeout else 'indefinitely', status,
+                self.service.redis.get(redis_status_key(self))
+            ))
             event.wait(timeout)
+        
+        # Handle the case where the system actually timed out.
+        if not event.is_set():
+            self.service.log.debug("After Keyword '{0}' waiting {1} on status == '{2}', ended, currently, status '{3}'".format(
+                self.name, "for {0:d}s".format(timeout) if timeout else 'indefinitely', status,
+                self.service.redis.get(redis_status_key(self))
+            ))
         with self.service.pubsub() as pubsub:
             pubsub.punsubscribe("__keyspace@*__:"+redis_status_key(self))
+        if getattr(self, '_error', None) is not None:
+            self._error, error = None, self._error
+            raise DispatcherError(error)
         return event.isSet()
         
     def _trigger_on_status(self, status, callback=None):
@@ -191,13 +216,17 @@ class REDISKeywordBase(object):
             if message is None:
                 return # pragma: no cover
             if message['channel'].endswith(redis_status_key(self)) and message['data'] == "set":
-                if self.service.redis.get(redis_status_key(self)) == status:
-                    
+                _status = self.service.redis.get(redis_status_key(self))
+                if _status == status:
                     with self.service.pubsub() as pubsub:
                         pubsub.unsubscribe("__keyspace@*__:"+redis_status_key(self))
                     triggered.set()
                     if callback is not None:
                         callback()
+                if _status == "error":
+                    error = self.service.redis.get(redis_key_name(self)+":error")
+                    self.service.log.error(str(DispatcherError(error)))
+                    self.service.redis.set(redis_status_key(self), status)
         with self.service.pubsub() as pubsub:
             pubsub.subscribe(**{"__keyspace@*__:"+redis_status_key(self):_message_responder})
         self.service._run_thread()
@@ -237,7 +266,8 @@ def testing_teardown_redis():
     """Teardown function for tests."""
     pool = get_global_connection_pool()
     r = redis.StrictRedis(connection_pool=pool)
-    r.delete(r.keys("{0}*".format(REDIS_DOMAIN)))    
+    for key in r.keys("{0}.*".format(REDIS_DOMAIN)):
+        r.delete(key)
     
 def testing_enable_redis():
     """Enable REDIS for testing."""

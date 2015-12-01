@@ -113,7 +113,10 @@ class Service(ClientService):
         """Execute a synchronous command."""
         self.socket.send(str(ZMQCauldronMessage(command, self, keyword, payload, "REQ")))
         #TODO: Use polling here to support timeouts.
-        return ZMQCauldronMessage.parse(self.socket.recv(), self)
+        message = ZMQCauldronMessage.parse(self.socket.recv(), self)
+        if message.direction == "ERR":
+            raise DispatcherError("Dispatcher error on command: {0}".format(message.payload))
+        return message
     
 @registry.client.keyword_for("zmq")
 class Keyword(ClientKeyword):

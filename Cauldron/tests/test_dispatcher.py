@@ -52,7 +52,7 @@ def test_callbacks_from_client(dispatcher, client, waittime):
     cb.triggered.clear()
     
     with pytest.raises(DispatcherError):
-        client['MODE'].write('2', timeout=1)
+        client['MODE'].write('2', timeout=10)
     
     cb.triggered.wait(waittime)
     assert cb.triggered.is_set()
