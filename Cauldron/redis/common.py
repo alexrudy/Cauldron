@@ -233,19 +233,19 @@ def get_global_connection_pool():
         _global_connection_pool = redis.ConnectionPool.from_url(cauldron_configuration.get("redis", "url"))
     return _global_connection_pool
     
-def testing_teardown():
+def testing_teardown_redis():
     """Teardown function for tests."""
     pool = get_global_connection_pool()
     r = redis.StrictRedis(connection_pool=pool)
-    r.delete(r.keys("{0}:*".format(REDIS_DOMAIN)))    
+    r.delete(r.keys("{0}*".format(REDIS_DOMAIN)))    
     
 def testing_enable_redis():
     """Enable REDIS for testing."""
     from astropy.tests.pytest_plugins import PYTEST_HEADER_MODULES
     if check_redis_connection():
         PYTEST_HEADER_MODULES['redis'] = 'redis'
-        testing_teardown()
-        registry.dispatcher.teardown_for("redis")(testing_teardown)
+        testing_teardown_redis()
+        registry.dispatcher.teardown_for("redis")(testing_teardown_redis)
         return ["redis"]
     return []
     
