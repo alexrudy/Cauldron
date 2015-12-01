@@ -57,6 +57,16 @@ import pkg_resources
 import os
 from .utils._weakrefset import WeakSet
 
+def pytest_configure(config):
+    """Activate log capturing if appropriate."""
+    if not config.getvalue('capturelog'):
+        try:
+            import lumberjack
+            lumberjack.setup_logging("", mode='stream', level=1)
+            lumberjack.setup_warnings_logger("")
+        except:
+            pass
+
 @pytest.fixture
 def servicename():
     """Get the service name."""
