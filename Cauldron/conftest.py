@@ -59,7 +59,7 @@ from .utils._weakrefset import WeakSet
 
 def pytest_configure(config):
     """Activate log capturing if appropriate."""
-    if (not config.getvalue('capturelog')) or config.getvalue("capture") == "no":
+    if (not config.getoption('capturelog', default=True)) or (config.getoption("capture", default="no") == "no"):
         try:
             import lumberjack
             lumberjack.setup_logging("", mode='stream', level=1)
