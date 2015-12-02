@@ -84,7 +84,7 @@ class Service(ClientService):
             self.log.error("Service can't connect to responder address '{0}' because {1}".format(address, e))
             raise
         else:
-            self.log.debug("Connected to {0}".format(address))
+            self.log.debug("Connected client to {0}".format(address))
             self._sockets.socket = socket
         return socket
         
@@ -111,7 +111,9 @@ class Service(ClientService):
         
     def _synchronous_command(self, command, payload, keyword=None):
         """Execute a synchronous command."""
-        self.socket.send(str(ZMQCauldronMessage(command, self, keyword, payload, "REQ")))
+        request = ZMQCauldronMessage(command, self, keyword, payload, "REQ")
+        self.log.log(5, "Synchronously requesting '{0}'".format(request))
+        self.socket.send(str(request))
         #TODO: Use polling here to support timeouts.
         message = ZMQCauldronMessage.parse(self.socket.recv(), self)
         if message.direction == "ERR":

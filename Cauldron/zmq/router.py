@@ -226,8 +226,8 @@ def lookup(service):
 
 def _handle_response(service, message):
     """Handle the message response, applying results to the configuration."""
-    service_name = message[0]
-    command = message[1]
+    command = message[0]
+    service_name = message[1]
     host = message[2]
     port = int(message[3])
     bport = int(message[4])
@@ -235,6 +235,7 @@ def _handle_response(service, message):
     service._config.set("zmq", "host", str(host))
     service._config.set("zmq", "dispatch-port", str(port))
     service._config.set("zmq", "broadcast-port", str(bport))
+    service.log.log(5, "{0} {1} response: {2}:({3},{4})".format(service.name, command, host, port, bport))
     return host, port, bport
     
 def shutdown_router(ctx = None, config = None, name = "generic"):

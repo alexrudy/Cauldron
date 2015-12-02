@@ -47,7 +47,8 @@ class _ZMQResponderThread(threading.Thread):
         
     def handle_modify(self, message):
         """Handle a modify command."""
-        return message.keyword.modify(message.payload)
+        message.keyword.modify(message.payload)
+        return message.keyword.value
     
     def handle_update(self, message):
         """Handle an update command."""
@@ -136,7 +137,9 @@ class _ZMQResponderThread(threading.Thread):
     def respond(self, socket):
         """Respond to the command socket."""
         message = ZMQCauldronMessage.parse(socket.recv(), self.service)
-        socket.send(six.binary_type(self.respond_message(message)))
+        response = six.binary_type(self.respond_message(message))
+        self.log.log(5, "Responding '{0}'".format(response))
+        socket.send(response)
             
     def respond_message(self, message):
         """Respond to a message."""
@@ -179,7 +182,7 @@ class Service(DispatcherService):
             self.log.error("Service can't connect to responder address '{0}' because {1}".format(address, e))
             raise
         else:
-            self.log.debug("Connected to {0}".format(address))
+            self.log.debug("Connected dispatcher to {0}".format(address))
             self._sockets.socket = socket
         return socket
         
