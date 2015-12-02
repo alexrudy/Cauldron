@@ -51,7 +51,9 @@ class _ZMQMonitorThread(threading.Thread):
                             keyword = self.service[kwd]
                         except KeyError:
                             self.log.error("Bad request, invalid keyword {0:s}".format(kwd))
-                        keyword._update(value)
+                        else:
+                            self.log.log(5, "Broadcast update to {0} = {1}".format(kwd, value))
+                            keyword._update(value)
         except (zmq.ContextTerminated, zmq.ZMQError) as e:
             self.log.info("Service shutdown and context terminated, closing broadcast thread.")
         socket.close()
