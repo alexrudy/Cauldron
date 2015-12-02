@@ -16,12 +16,14 @@ env:
         - ASTROPY_VERSION=stable
         - CONDA_INSTALL='conda install -c astropy-ci-extras --yes'
         - PIP_INSTALL='pip install'
+        - OPTIONAL_DEPS='redis>=2.10.5 pyzmq'
+        - SETUP_CMD='test'
     matrix:
-        - SETUP_CMD='egg_info'
-
+      - SETUP_CMD='egg_info'
+      - SETUP_CMD='test'
 matrix:
     include:
-
+        
         # Do a coverage test in Python 2.
         - python: 2.7
           env: SETUP_CMD='test --coverage'
@@ -31,11 +33,13 @@ matrix:
         - python: 2.7
           env: SETUP_CMD='build_sphinx -w'
           
-        # Try all python versions with the latest numpy
-        - python: 2.6
-          env: SETUP_CMD='test'
+        # Try without some optional deps
         - python: 2.7
-          env: SETUP_CMD='test'
+          env: OPTIONAL_DEPS='redis>=2.10.5'
+        - python: 2.7
+          env: OPTIONAL_DEPS='pyzmq'
+        - python: 2.7
+          env: OPTIONAL_DEPS=''
           
 
 # Setting sudo to false opts in to Travis-CI container-based builds.
@@ -76,7 +80,7 @@ install:
 
     # CORE DEPENDENCIES
     - if [[ $SETUP_CMD != egg_info ]]; then $CONDA_INSTALL numpy=$NUMPY_VERSION pytest pip Cython jinja2; fi
-    - if [[ $SETUP_CMD != egg_info ]]; then $PIP_INSTALL pytest-xdist; fi
+    - if [[ $SETUP_CMD != egg_info ]]; then $PIP_INSTALL pytest-capturelog pytest-xdist; fi
 
     # ASTROPY
     - if [[ $SETUP_CMD != egg_info ]] && [[ $ASTROPY_VERSION == development ]]; then $PIP_INSTALL git+http://github.com/astropy/astropy.git#egg=astropy; fi
@@ -88,7 +92,7 @@ install:
     # packages. You should leave the `numpy=$NUMPY_VERSION` in the `conda`
     # install since this ensures Numpy does not get automatically upgraded.
     - if [[ $SETUP_CMD != egg_info ]]; then $CONDA_INSTALL numpy=$NUMPY_VERSION six ; fi
-    - if [[ $SETUP_CMD != egg_info ]]; then $PIP_INSTALL redis>=2.10.5 pyzmq; fi
+    - if [[ $SETUP_CMD != egg_info ]]; then $PIP_INSTALL $OPTIONAL_DEPS; fi
 
     # DOCUMENTATION DEPENDENCIES
     # build_sphinx needs sphinx and matplotlib (for plot_directive). Note that

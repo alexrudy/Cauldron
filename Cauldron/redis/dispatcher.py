@@ -69,7 +69,6 @@ class Keyword(DispatcherKeyword):
     def _broadcast(self, value):
         """Broadcast that a value has changed in this keyword."""
         self.service.redis.set(redis_key_name(self), value)
-        self.service.redis.set(redis_key_name(self)+':status', 'ready')
     
     def _redis_callback(self, msg):
         """Take a message."""
