@@ -18,15 +18,11 @@ env:
         - PIP_INSTALL='pip install'
         - OPTIONAL_DEPS='redis>=2.10.5 pyzmq'
         - SETUP_CMD='test'
-
+    matrix:
+      - SETUP_CMD='egg_info'
+      - SETUP_CMD='test'
 matrix:
     include:
-        
-        # Egg-info builds.
-        - python: 2.6
-          env: SETUP_CMD='egg_info'
-        - python: 2.7
-          env: SETUP_CMD='egg_info'
         
         # Do a coverage test in Python 2.
         - python: 2.7
@@ -36,10 +32,6 @@ matrix:
         # may run for a long time
         - python: 2.7
           env: SETUP_CMD='build_sphinx -w'
-          
-        # Try all python versions with the latest numpy
-        - python: 2.6
-        - python: 2.7
           
         # Try without some optional deps
         - python: 2.7
