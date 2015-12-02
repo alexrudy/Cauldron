@@ -141,7 +141,7 @@ class _ZMQResponderThread(threading.Thread):
     def respond_message(self, message):
         """Respond to a message."""
         try:
-            self.log.debug("Handling '{0}'".format(str(message)))
+            self.log.log(5, "Handling '{0}'".format(str(message)))
             response = self.handle(message)
         except (ZMQCauldronErrorResponse, ZMQCauldronParserError) as e:
             return e.response
