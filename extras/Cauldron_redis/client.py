@@ -84,7 +84,6 @@ class Keyword(ClientKeyword, REDISKeywordBase):
         except (TypeError, ValueError):
             pass
         
-        self.service.redis.set(redis_key_name(self) + ":status", "modify")
         self.service.redis.publish(redis_key_name(self), value)
         if wait or timeout is not None:
             self._wait_for_status('ready', timeout, initial_status="modify")

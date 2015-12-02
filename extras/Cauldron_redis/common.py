@@ -246,15 +246,16 @@ class REDISKeywordBase(object):
             if message['channel'].endswith(redis_status_key(self)) and message['data'] == "set":
                 _status = self.service.redis.get(redis_status_key(self))
                 if _status == status:
-                    with self.service.pubsub() as pubsub:
-                        pubsub.unsubscribe("__keyspace@*__:"+redis_status_key(self))
                     triggered.set()
                     if callback is not None:
                         callback()
                 if _status == "error":
                     error = self.service.redis.get(redis_key_name(self)+":error")
                     self.service.log.error(str(DispatcherError(error)))
-                    self.service.redis.set(redis_status_key(self), status)
+                if _status in ["error", status]:
+                    with self.service.pubsub() as pubsub:
+                        pubsub.unsubscribe("__keyspace@*__:"+redis_status_key(self))
+        
         with self.service.pubsub() as pubsub:
             pubsub.subscribe(**{"__keyspace@*__:"+redis_status_key(self):_message_responder})
         self.service._run_thread()
