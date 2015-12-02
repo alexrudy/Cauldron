@@ -164,6 +164,8 @@ class REDISKeywordBase(object):
     def _wait_for_status(self, status, timeout=None, callback=None):
         """Wait for a status value to appear."""
         event = threading.Event()
+        log = self.service.log
+        redis = self.service.redis
         
         def _handle_status(recieved_status):
             """What to do when the status changes."""
@@ -172,41 +174,51 @@ class REDISKeywordBase(object):
                 if callback is not None:
                     callback()
             if "error" == recieved_status:
-                self._error = self.service.redis.get(redis_key_name(self)+":error")
-                self.service.log.debug("Recieved an 'error' notification for '{0}': {1}".format(self.name, self._error))
-                self.service.redis.set(redis_status_key(self), 'ready')
+                _handle_status._error = redis.get(redis_key_name(self)+":error")
+                log.debug("Recieved an 'error' notification for '{0}': {1}".format(self.name, _handle_status._error))
                 event.set()
         
         def _message_responder(message):
             if message is None:
                 return # pragma: no cover
             if message['channel'].endswith(redis_status_key(self)) and message['data'] == "set":
-                _handle_status(self.service.redis.get(redis_status_key(self)))
+                recieved_status = redis.get(redis_status_key(self))
+                log.debug("{1} got status = {0}".format(recieved_status, self.name))
+                _handle_status(recieved_status)
                 
         with self.service.pubsub() as pubsub:
             pubsub.psubscribe(**{"__keyspace@*__:"+redis_status_key(self):_message_responder})
         self.service._run_thread()
-        _handle_status(self.service.redis.get(redis_status_key(self)))
+        _handle_status(redis.get(redis_status_key(self)))
         
         # Process Timeout
         if not event.is_set():
-            self.service.log.debug("Keyword '{0}' is waiting {1} on status == '{2}', currently '{3}'".format(
+            log.debug("Keyword '{0}' is waiting {1} on status == '{2}', currently '{3}'".format(
                 self.name, "for {0:d}s".format(timeout) if timeout else 'indefinitely', status,
-                self.service.redis.get(redis_status_key(self))
+                redis.get(redis_status_key(self))
             ))
             event.wait(timeout)
         
         # Handle the case where the system actually timed out.
-        if not event.is_set():
-            self.service.log.debug("After Keyword '{0}' waiting {1} on status == '{2}', ended, currently, status '{3}'".format(
+        if event.is_set():
+            log.debug("Keyword '{0}' waited {1} on status == '{2}', finished with status '{3}'".format(
+                self.name, "at most {0:d}s".format(timeout) if timeout else 'some time', status,
+                redis.get(redis_status_key(self))
+            ))
+        else:
+            log.debug("After Keyword '{0}' waiting {1} on status == '{2}', ended, currently, status '{3}'".format(
                 self.name, "for {0:d}s".format(timeout) if timeout else 'indefinitely', status,
-                self.service.redis.get(redis_status_key(self))
+                redis.get(redis_status_key(self))
             ))
         with self.service.pubsub() as pubsub:
             pubsub.punsubscribe("__keyspace@*__:"+redis_status_key(self))
-        if getattr(self, '_error', None) is not None:
-            self._error, error = None, self._error
-            raise DispatcherError(error)
+        
+        # We set this back here to ensure that we are consistent when this function ends.
+        redis.set(redis_status_key(self), status)
+        
+        if getattr(_handle_status, '_error', None) is not None:
+            raise DispatcherError(_handle_status._error)
+            
         return event.isSet()
         
     def _trigger_on_status(self, status, callback=None):
