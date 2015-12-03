@@ -146,9 +146,9 @@ class Keyword(ClientKeyword):
         raise CauldronAPINotImplemented("Asynchronous operations are not supported for Cauldron.zmq")
     
     def monitor(self, start=True, prime=True, wait=True):
-        if prime:
-            self.read(wait=wait)
         if start:
+            if prime:
+                self.read(wait=wait)
             self.service._thread.monitored.add(self.name)
         else:
             self.service._thread.monitored.remove(self.name)
