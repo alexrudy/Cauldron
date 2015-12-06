@@ -79,7 +79,8 @@ class ZMQRouter(object):
         
     def handle_shutdown(self, message):
         """Handle a shutdown message."""
-        self.log.info("Router shutdown requested by service '{0}'".format(service))
+        self.log.info("Router shutdown requested by service '{0}'".format(message.service))
+        self._shutdown.set()
         return "acknowledged"
         
     def handle(self, message):
