@@ -8,7 +8,8 @@ from __future__ import absolute_import
 import weakref
 from ..base import ClientService, ClientKeyword
 from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented, DispatcherError
-from .common import zmq_dispatcher_address, zmq_broadcaster_address, check_zmq, teardown, ZMQCauldronMessage
+from .common import zmq_dispatcher_address, zmq_broadcaster_address, check_zmq, teardown
+from .microservice import ZMQCauldronMessage, ZMQCauldronErrorResponse, FRAMEBLANK, FRAMEFAIL
 from .router import lookup
 from .. import registry
 from ..config import cauldron_configuration
@@ -35,23 +36,30 @@ class _ZMQMonitorThread(threading.Thread):
     def run(self):
         """Run the monitoring thread."""
         zmq = check_zmq()
-        ctx = self.service.ctx
+        try:
+            ctx = self.service.ctx
+        except weakref.ReferenceError:
+            self.log.log(5, "Can't start ZMQ monitor, service has disappeared.")
+            return
         socket = ctx.socket(zmq.SUB)
         try:
-            socket.connect(zmq_broadcaster_address(self.service._config))
+            address = zmq_broadcaster_address(self.service._config)
+            socket.connect(address)
         
             # Accept everything belonging to this service.
             socket.setsockopt_string(zmq.SUBSCRIBE, six.text_type(self.service.name))
+            self.log.log(5, "Started Monitor Thread for {0}".format(address))
             while not self.shutdown.isSet():
-                if socket.poll(timeout=1.0):
+                if socket.poll(timeout=0.1):
                     try:
-                        message = ZMQCauldronMessage.parse(socket.recv_multipart(), self.service)
-                        if message.keyword.name in self.monitored:
-                            message.keyword._update(message.payload)
-                            self.log.log(5, "Accepted broadcast for {0}: {1}".format(message.keyword.name, message.payload))
+                        message = ZMQCauldronMessage.parse(socket.recv_multipart())
+                        keyword = message.verify(self.service)
+                        if keyword.name in self.monitored:
+                            keyword._update(message.payload)
+                            self.log.log(5, "Accepted broadcast for {0}: {1}".format(keyword.name, message.payload))
                         else:
-                            self.log.log(5, "Ignored broadcast for {0}, not monitored.".format(message.keyword.name))
-                    except (ZMQCauldronErrorResponse, ZMQCauldronParserError) as e:
+                            self.log.log(5, "Ignored broadcast for {0}, not monitored.".format(keyword.name))
+                    except ZMQCauldronErrorResponse as e:
                         self.log.error("Broadcast Message Error: {0!r}".format(e))
                     except (zmq.ContextTerminated, zmq.ZMQError):
                         raise
@@ -59,7 +67,15 @@ class _ZMQMonitorThread(threading.Thread):
                         self.log.error("Broadcast Error: {0!r}".format(e))
         except (zmq.ContextTerminated, zmq.ZMQError) as e:
             self.log.info("Service shutdown and context terminated, closing broadcast thread.")
-        socket.close()
+        else:
+            try:
+                socket.setsockopt(zmq.LINGER, 0)
+                socket.close()
+            except:
+                pass
+        finally:
+            self.log.log(5, "Stopping Monitor Thread")
+            
 
 @registry.client.service_for("zmq")
 class Service(ClientService):
@@ -107,22 +123,24 @@ class Service(ClientService):
     def has_keyword(self, name):
         """Check if a dispatcher has a keyword."""
         message = self._synchronous_command("identify", name, None)
-        return message.payload == "yes"
+        return message.payload != FRAMEFAIL
         
     def keywords(self):
         """List all available keywords."""
-        message = self._synchronous_command("enumerate", "\x01", None)
+        message = self._synchronous_command("enumerate", FRAMEBLANK, None)
         return message.payload.split(":")
         
     def _synchronous_command(self, command, payload, keyword=None):
         """Execute a synchronous command."""
-        request = ZMQCauldronMessage(command, self, keyword, payload, "REQ")
-        self.log.log(5, "Synchronously requesting |{0}|".format(request))
+        request = ZMQCauldronMessage(command, service=self.name, dispatcher=FRAMEBLANK, 
+            keyword=keyword.name if keyword else FRAMEBLANK, payload=payload, direction="REQ")
+        self.log.log(5, "Request |{0!s}|".format(request))
         self.socket.send_multipart(request.data)
         #TODO: Use polling here to support timeouts.
         message = ZMQCauldronMessage.parse(self.socket.recv_multipart(), self)
         if message.direction == "ERR":
             raise DispatcherError("Dispatcher error on command: {0}".format(message.payload))
+        message.verify(self)
         return message
     
 @registry.client.keyword_for("zmq")
