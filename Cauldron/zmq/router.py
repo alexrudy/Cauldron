@@ -5,11 +5,13 @@ A router to direct ZMQ services across different ports and addresses.
 
 from ..config import read_configuration
 from ..exc import DispatcherError
-from .common import check_zmq, zmq_router_address, zmq_dispatcher_host
+from .common import check_zmq, zmq_router_address, zmq_dispatcher_host, ZMQCauldronMessage, ZMQCauldronErrorResponse, ZMQCauldronParserError
 
 from six.moves import range
 import logging
 import time
+import threading
+import six
 
 __all__ = ['ZMQRouter', 'register', 'lookup', 'main']
 
@@ -27,6 +29,7 @@ class ZMQRouter(object):
         self._listen = self.ctx.socket(zmq.REP)
         self._directory = {}
         self._port = iter(range(self.config.getint("zmq-router", "first-port"), self.config.getint("zmq-router", "last-port"), 2))
+        self._shutdown = threading.Event()
         self.log = logging.getLogger("DFW.Router.zmq")
         self.log.debug("Router serving ports between {0} and {1}".format(self.config.getint("zmq-router", "first-port"), self.config.getint("zmq-router", "last-port")))
         
@@ -39,46 +42,84 @@ class ZMQRouter(object):
         self._listen.bind(address)
         self.log.info("Started Router on {0}".format(address))
         
+    def generate_new_address(self, service, host):
+        """A function to generate a new address for a service."""
+        # Brand-new service, give it some port numbers.
+        port = next(self._port)
+        bport = port + 1
+        self._directory[service] = (host, port, bport)
+        return (host, port, bport)
+        
+    def handle_register(self, message):
+        """Handle a registration message."""
+        service = message.service_name
+        if service not in self._directory:
+            host, port, bport = self.generate_new_address(service, message.payload)
+            self.log.info("Registered service '{0}' at {1}:({2},{3})".format(service, host, port, bport))
+        elif self._directory[service][0] != message.payload:
+            # Updated host name, but retain port numbers.
+            host, port, bport = self._directory[service]
+            self._directory[service] = (message.payload, port, bport)
+            self.log.info("Moved service '{0}' from {1} to {2}".format(service, host, message[2]))
+        else:
+            self.log.debug("Confirming re-registration of service '{0}'".format(service))
+        # Respond with data.
+        host, port, bport = self._directory[service]
+        return ":".join(map(six.binary_type, [host, port, bport]))
+        
+    def handle_lookup(self, message):
+        """Handle a message lookup."""
+        try:
+            host, port, bport = self._directory[message.service_name]
+            self.log.debug("Looked up service '{0}' at {1}:({2},{3})".format(message.service_name, host, port, bport))
+        except KeyError:
+            host, port, bport = self.generate_new_address(service, message.payload)
+            self.log.info("Created service '{0}' at {1}:({2},{3})".format(service, host, port, bport))
+        return ":".join(map(six.binary_type, [host, port, bport]))
+        
+    def handle_shutdown(self, message):
+        """Handle a shutdown message."""
+        self.log.info("Router shutdown requested by service '{0}'".format(service))
+        return "acknowledged"
+        
+    def handle(self, message):
+        """Handle a message."""
+        method_name = "handle_{0:s}".format(message.command)
+        if not hasattr(self, method_name):
+            message.raise_error_response("Bad command '{0:s}'!".format(message['command']))
+        try:
+            response = getattr(self, method_name)(message)
+        except ZMQCauldronErrorResponse as e:
+            raise
+        except Exception as e:
+            self.log.error(repr(e))
+            message.raise_error_response(repr(e))
+        return message.response(response)
+        
+    def respond(self, socket):
+        """Respond to the command socket."""
+        message = ZMQCauldronMessage.parse(socket.recv_multipart())
+        response = self.respond_message(message)
+        self.log.log(5, "Responding |{0!s}|".format(response))
+        socket.send_multipart(response.data)
+            
+    def respond_message(self, message):
+        """Respond to a message."""
+        try:
+            self.log.log(5, "Handling |{0}|".format(str(message)))
+            response = self.handle(message)
+        except (ZMQCauldronErrorResponse, ZMQCauldronParserError) as e:
+            return e.response
+        else:
+            return response
+        
     def run(self):
         """Run the router."""
         self.connect()
-        while True:
-            time.sleep(0.001)
-            message = self._listen.recv_multipart()
-            if not len(message) >= 2:
-                self._listen.send_multipart(["COMMAND ERROR: UNKNOWN MESSAGE"] + message)
-                continue
-            command = message[0]
-            service = message[1]
-            if command == "register":
-                if service not in self._directory:
-                    # Brand-new service, give it some port numbers.
-                    port = next(self._port)
-                    bport = port + 1
-                    host = message[2]
-                    self._directory[service] = (host, port, bport)
-                    self.log.info("Registered service '{0}' at {1}:({2},{3})".format(service, host, port, bport))
-                elif self._directory[service][0] != message[2]:
-                    # Updated host name, but retain port numbers.
-                    host, port, bport = self._directory[service]
-                    self._directory[service] = (message[2], port, bport)
-                    self.log.info("Moved service '{0}' from {1} to {2}".format(service, host, message[2]))
-                else:
-                    self.log.debug("Confirming re-registration of service '{0}'".format(service))
-                # Respond with data.
-                host, port, bport = self._directory[service]
-                self._listen.send_multipart([command, service, host, str(port), str(bport)])
-            elif command == "lookup":
-                host, port, bport = self._directory.get(service, ("unknown", 0, 0))
-                self.log.debug("Looked up service '{0}' at {1}:({2},{3})".format(service, host, port, bport))
-                self._listen.send_multipart([command, service, host, str(port), str(bport)])
-            elif command == "shutdown":
-                self._listen.send_multipart([command, service, "acknowledged"])
-                self.log.info("Router shutdown requested by service '{0}'".format(service))
-                break
-            else:
-                self._listen.send_multipart([command, service, "error: command unknown"])
-                
+        while not self._shutdown.is_set():
+            if self._listen.poll(timeout=0.01):
+                self.respond(self._listen)
+        
         
     @classmethod
     def serve(cls, config=None):
@@ -140,8 +181,9 @@ def register(service):
         # Connect to the router.
         address = zmq_router_address(service._config, bind=False)
         socket.connect(address)
-    
-        socket.send_multipart(["register", service.name, zmq_dispatcher_host(service._config)])
+        message = ZMQCauldronMessage("register", service, payload=zmq_dispatcher_host(service._config))
+        
+        socket.send_multipart(message.data)
     
         timeout = service._config.getint("zmq-router", "timeout")
     
@@ -180,19 +222,18 @@ def register(service):
             socket.connect(address)
             poller.register(socket, zmq.POLLIN)
             
-            socket.send_multipart(["register", service.name, zmq_dispatcher_host(service._config)])
+            socket.send_multipart(message.data)
             
             socks = dict(poller.poll(timeout))
             if socks.get(socket) != zmq.POLLIN:
                 raise ZMQRouterUnavailalbe("Couldn't manage to start router in subprocess at '{0}'. {1!r}".format(address, router))
             service._router = router
     
-        message = socket.recv_multipart()
+        message = ZMQCauldronMessage.parse(socket.recv_multipart())
     except Exception as e:
         service.log.error(e)
         raise
     else:
-        
         return _handle_response(service, message)
     finally:
         socket.setsockopt(zmq.LINGER, 0)
@@ -208,13 +249,14 @@ def lookup(service):
         # Connect to the router.
         address = zmq_router_address(service._config, bind=False)
         socket.connect(address)
-
-        socket.send_multipart(["lookup", service.name, zmq_dispatcher_host(service._config)])
+        
+        
+        socket.send_multipart(ZMQCauldronMessage("lookup", service, payload=zmq_dispatcher_host(service._config)).data)
 
         timeout = service._config.getint("zmq-router", "timeout")
         
         socket.poll(timeout)
-        message = socket.recv_multipart()
+        message = ZMQCauldronMessage.parse(socket.recv_multipart())
     except Exception as e:
         service.log.error(e)
         raise
@@ -226,19 +268,19 @@ def lookup(service):
 
 def _handle_response(service, message):
     """Handle the message response, applying results to the configuration."""
-    command = message[0]
-    service_name = message[1]
-    host = message[2]
-    port = int(message[3])
-    bport = int(message[4])
+    command = message.command
+    service_name = message.service_name
+    host, port, bport = message.payload.split(":",3)
+    port = int(port)
+    bport = int(bport)
     
     service._config.set("zmq", "host", str(host))
     service._config.set("zmq", "dispatch-port", str(port))
     service._config.set("zmq", "broadcast-port", str(bport))
-    service.log.log(5, "{0} {1} response: {2}:({3},{4})".format(service.name, command, host, port, bport))
+    service.log.log(5, "{0} {1} response: {2}:({3},{4}).".format(service.name, command, host, port, bport))
     return host, port, bport
     
-def shutdown_router(ctx = None, config = None, name = "generic"):
+def shutdown_router(ctx = None, config = None, name = None):
     """Shutdown a router."""
     zmq = check_zmq()
     ctx = ctx or zmq.Context.instance()
@@ -252,15 +294,15 @@ def shutdown_router(ctx = None, config = None, name = "generic"):
     try:
         # Connect to the router.
         socket.connect(zmq_router_address(config, bind=False))
-        socket.send_multipart(["shutdown", name])
+        socket.send_multipart(ZMQCauldronMessage(command='shutdown', service=name).data)
         socket.poll(timeout)
-        message = socket.recv_multipart()
+        message = ZMQCauldronMessage.parse(socket.recv_multipart())
     except zmq.ZMQError as e:
         pass
     finally:
         socket.setsockopt(zmq.LINGER, 0)
         socket.close()
-    return message[2] == 'acknowledged'
+    return message.payload == 'acknowledged'
 
 def _shutdown_router(service):
     """Shutdown a router attached to a service."""
