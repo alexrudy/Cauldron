@@ -34,7 +34,7 @@ def test_Service_with_xml(xmlvar, backend, servicename, config):
     finally:
         svc.shutdown()
     
-def test_Service_with_strict_xml(backend, servicename, config):
+def test_Service_with_strict_xml(backend, servicename, config, dispatcher_name):
     """Test the backend with strict xml enabled, so it should raise an exception."""
     from Cauldron.api import use_strict_xml
     use_strict_xml()
@@ -42,10 +42,10 @@ def test_Service_with_strict_xml(backend, servicename, config):
     
     os.environ.pop('RELDIR', None)
     with pytest.raises(KeyError):
-        svc = DFW.Service(servicename, config)
+        svc = DFW.Service(servicename, config, dispatcher=dispatcher_name)
     os.environ['RELDIR'] = "directory/does/not/exist"
     with pytest.raises(IOError):
-        svc = DFW.Service(servicename, config)
+        svc = DFW.Service(servicename, config, dispatcher=dispatcher_name)
     
 
 def test_Keyword_with_xml(xmlvar, dispatcher):
