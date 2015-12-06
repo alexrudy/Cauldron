@@ -67,7 +67,7 @@ class ZMQCauldronErrorResponse(Exception):
     @property
     def response(self):
         """The response data."""
-        return str(self.message)
+        return self.message
         
 class ZMQCauldronParserError(Exception):
     """An error caused by a failed parser."""
@@ -76,7 +76,7 @@ class ZMQCauldronParserError(Exception):
     @property
     def response(self):
         """Return response data when parsing failed."""
-        return ":".join(["", "", "ERR", "", str(self)])
+        return map(six.binary_type, ["\x01", "\x01", "\x01", "ERR", "error", str(self)])
 
 class ZMQCauldronMessage(object):
     """A message object."""
@@ -91,13 +91,30 @@ class ZMQCauldronMessage(object):
     @property
     def keyword_name(self):
         """The keyword name associated with this message."""
-        return "" if self.keyword is None else self.keyword.name
+        return "\x01" if self.keyword is None else self.keyword.name
         
     @property
     def service_name(self):
         """The service name associated with this message."""
-        return "" if self.service is None else self.service.name
+        return "\x01" if self.service is None else self.service.name
         
+    @property
+    def dispatcher_name(self):
+        """The dispatcher name associated with this message."""
+        if self.service is not None and hasattr(self.service, 'dispatcher'):
+            return self.service.dispatcher
+        else:
+            return "\x01"
+            
+    @property
+    def _message_parts(self):
+        """Message parts."""
+        return [self.service_name, self.dispatcher_name, self.keyword_name, self.direction, self.command, self.payload]
+        
+    @property
+    def data(self):
+        """The full message."""
+        return map(six.binary_type, self._message_parts)
         
     def response(self, payload):
         """Compose a response."""
@@ -124,7 +141,7 @@ class ZMQCauldronMessage(object):
         
     def to_string(self):
         """Compose a string."""
-        return ":".join(map(check_message_part,[self.service_name, self.keyword_name, self.direction, self.command, self.payload]))
+        return "|".join(self._message_parts)
     
     def __str__(self):
         """String types in python3"""
@@ -138,21 +155,26 @@ class ZMQCauldronMessage(object):
     def parse(cls, data, service):
         """Parse data. Errors are rasied """
         try:
-            service_name, keyword_name, direction, command, payload = data.split(":",4)
+            service_name, dispatcher_name, keyword_name, direction, command, payload = data
         except ValueError as e:
             raise ZMQCauldronParserError("Can't parse message '{0}' because {1}".format(data, str(e)))
-        if service_name == "":
+        if service_name == "\x01":
             service = None
-            if keyword_name != "":
+            if keyword_name != "\x01":
                 raise ZMQCauldronParserError("Can't parse message '{0}' because essage can't specify a keyword with no service.".format(data))
             keyword = None
         elif service_name != service.name:
-            raise DispatcherError("Message was sent to the wrong dispatcher!")
+            raise DispatcherError("Message was sent to the wrong service!")
+        if dispatcher_name != "\x01":
+            if hasattr(service, 'dispatcher') and dispatcher_name != service.dispatcher:
+                raise DispatcherError("Message was sent to the wrong dispatcher! Sent to {0}, received by {1}".format(
+                    dispatcher_name, service.dispatcher
+                ))
+        
+        if keyword_name != "\x01":
+            keyword = service[keyword_name]
         else:
-            if keyword_name is not "":
-                keyword = service[keyword_name]
-            else:
-                keyword = None
+            keyword = None
         return cls(command, service, keyword, payload, direction)
     
 
