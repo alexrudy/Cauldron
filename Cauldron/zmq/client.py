@@ -41,19 +41,22 @@ class _ZMQMonitorThread(threading.Thread):
             socket.connect(zmq_broadcaster_address(self.service._config))
         
             # Accept everything belonging to this service.
-            socket.setsockopt_string(zmq.SUBSCRIBE, six.text_type("broadcast:{0}".format(self.service.name)))
+            socket.setsockopt_string(zmq.SUBSCRIBE, six.text_type(self.service.name))
             while not self.shutdown.isSet():
                 if socket.poll(timeout=1.0):
-                    message = socket.recv()
-                    cmd, service, kwd, value = message.split(":", 3)
-                    if kwd in self.monitored:
-                        try:
-                            keyword = self.service[kwd]
-                        except KeyError:
-                            self.log.error("Bad request, invalid keyword {0:s}".format(kwd))
+                    try:
+                        message = ZMQCauldronMessage.parse(socket.recv_multipart(), self.service)
+                        if message.keyword.name in self.monitored:
+                            message.keyword._update(message.payload)
+                            self.log.log(5, "Accepted broadcast for {0}: {1}".format(message.keyword.name, message.payload))
                         else:
-                            self.log.log(5, "Broadcast update to {0} = {1}".format(kwd, value))
-                            keyword._update(value)
+                            self.log.log(5, "Ignored broadcast for {0}, not monitored.".format(message.keyword.name))
+                    except (ZMQCauldronErrorResponse, ZMQCauldronParserError) as e:
+                        self.log.error("Broadcast Message Error: {0!r}".format(e))
+                    except (zmq.ContextTerminated, zmq.ZMQError):
+                        raise
+                    except Exception as e:
+                        self.log.error("Broadcast Error: {0!r}".format(e))
         except (zmq.ContextTerminated, zmq.ZMQError) as e:
             self.log.info("Service shutdown and context terminated, closing broadcast thread.")
         socket.close()
@@ -115,17 +118,16 @@ class Service(ClientService):
         
     def keywords(self):
         """List all available keywords."""
-        message = self._synchronous_command("enumerate", "", None)
+        message = self._synchronous_command("enumerate", "\x01", None)
         return message.payload.split(":")
         
     def _synchronous_command(self, command, payload, keyword=None):
         """Execute a synchronous command."""
         request = ZMQCauldronMessage(command, self, keyword, payload, "REQ")
-        self.log.log(5, "Synchronously requesting '{0}'".format(request))
-        self.socket.send(str(request))
+        self.log.log(5, "Synchronously requesting |{0}|".format(request))
+        self.socket.send_multipart(request.data)
         #TODO: Use polling here to support timeouts.
-        message = ZMQCauldronMessage.parse(self.socket.recv(), self)
-        self.log.log(5, "Synchronous response '{0}'".format(message))
+        message = ZMQCauldronMessage.parse(self.socket.recv_multipart(), self)
         if message.direction == "ERR":
             raise DispatcherError("Dispatcher error on command: {0}".format(message.payload))
         return message

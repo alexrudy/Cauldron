@@ -69,7 +69,8 @@ class _ZMQResponderThread(threading.Thread):
         """Handle the broadcast command."""
         if not hasattr(self, '_broadcast_socket'):
             message.raise_error_response("Can't broadcast when responder thread hasn't started.")
-        self._broadcast_socket.send("broadcast:{0}:{1}:{2}".format(self.service.name, message.keyword.name, message.payload))
+        message = ZMQCauldronMessage("broadcast", self.service, message.keyword, message.payload, "PUB")
+        self._broadcast_socket.send_multipart(message.data)
         return "success"
     
     def run(self):
@@ -139,15 +140,15 @@ class _ZMQResponderThread(threading.Thread):
     
     def respond(self, socket):
         """Respond to the command socket."""
-        message = ZMQCauldronMessage.parse(socket.recv(), self.service)
-        response = six.binary_type(self.respond_message(message))
-        self.log.log(5, "Responding '{0}'".format(response))
-        socket.send(response)
+        message = ZMQCauldronMessage.parse(socket.recv_multipart(), self.service)
+        response = self.respond_message(message)
+        self.log.log(5, "Responding |{0!s}|".format(response))
+        socket.send_multipart(response.data)
             
     def respond_message(self, message):
         """Respond to a message."""
         try:
-            self.log.log(5, "Handling '{0}'".format(str(message)))
+            self.log.log(5, "Handling |{0}|".format(str(message)))
             response = self.handle(message)
         except (ZMQCauldronErrorResponse, ZMQCauldronParserError) as e:
             return e.response
@@ -214,8 +215,8 @@ class Service(DispatcherService):
             raise DispatcherError(msg)
         
         while len(self._message_queue):
-            self.socket.send(six.binary_type(self._message_queue.pop()))
-            response = ZMQCauldronMessage.parse(self.socket.recv(), self)
+            self.socket.send_multipart(self._message_queue.pop().data)
+            response = ZMQCauldronMessage.parse(self.socket.recv_multipart(), self)
         
     def shutdown(self):
         """Shutdown this object."""
@@ -236,8 +237,8 @@ class Service(DispatcherService):
         elif not self._thread.is_alive():
             return self._thread.respond_message(message)
         else:
-            self.socket.send(six.binary_type(message))
-            return ZMQCauldronMessage.parse(self.socket.recv(), self)
+            self.socket.send_multipart(message.data)
+            return ZMQCauldronMessage.parse(self.socket.recv_multipart(), self)
         
 
 @registry.dispatcher.keyword_for("zmq")
