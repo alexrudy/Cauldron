@@ -5,7 +5,7 @@ Tools common to all ZMQ services.
 import six
 
 from ..api import APISetting
-from ..exc import DispatcherError
+from ..exc import DispatcherError, WrongDispatcher
 
 ZMQ_AVAILABLE = APISetting("ZMQ_AVAILABLE", False)
 try:
@@ -49,14 +49,6 @@ def zmq_broadcaster_address(config, bind=False):
     return "{0}://{1}:{2}".format(config.get("zmq", "protocol"),
          "*" if bind else zmq_dispatcher_host(config), 
          config.get("zmq", "broadcast-port"))
-         
-
-def check_message_part(part):
-    """Check the message part."""
-    part = six.text_type(part)
-    if ":" in part:
-        raise ValueError("Message parts can't contain the delimiter ':', got {0:s}".format(part))
-    return part
 
 class ZMQCauldronErrorResponse(Exception):
     """A container for ZMQ Cauldron error responses."""
@@ -69,7 +61,7 @@ class ZMQCauldronErrorResponse(Exception):
         """The response data."""
         return self.message
         
-class ZMQCauldronParserError(Exception):
+class ZMQCauldronParserError(ZMQCauldronErrorResponse):
     """An error caused by a failed parser."""
     pass
     
@@ -80,27 +72,57 @@ class ZMQCauldronParserError(Exception):
 
 class ZMQCauldronMessage(object):
     """A message object."""
-    def __init__(self, command, service, keyword=None, payload=None, direction="REQ"):
+    
+    _service_name = "\x01"
+    _keyword_name = "\x01"
+    _dispatcher_name = "\x01"
+    
+    def __init__(self, command, service, keyword=None, payload=None, direction="REQ", dispatcher_name=None):
         super(ZMQCauldronMessage, self).__init__()
-        self.command = check_message_part(command)
-        self.service = service
-        self.keyword = keyword
-        self.payload = check_message_part(payload)
-        self.direction = check_message_part(direction)
+        self.command = six.text_type(command)
+        if isinstance(service, six.string_types):
+            self._service_name = six.text_type(service)
+            self.service = None
+        else:
+            self.service = service
+        
+        if isinstance(keyword, six.string_types):
+            self._keyword_name = six.text_type(keyword)
+            self.keyword = None
+        else:
+            self.keyword = keyword
+        
+        if dispatcher_name is None and self.service is not None:
+            if hasattr(self.service, 'dispatcher'):
+                self._dispatcher_name = self.service.dispatcher
+        elif dispatcher_name is not None and self.service is not None:
+            if dispatcher_name != "\x01" and hasattr(self.service, 'dispatcher') and dispatcher_name != self.service.dispatcher:
+                raise WrongDispatcher("Message was sent to the wrong dispatcher! Sent to {0}, received by {1}".format(
+                                        dispatcher_name, service.dispatcher
+                                    ))
+        
+        self.payload = six.text_type(payload)
+        self.direction = six.text_type(direction)
     
     @property
     def keyword_name(self):
         """The keyword name associated with this message."""
+        if self._keyword_name != "\x01":
+            return self._keyword_name
         return "\x01" if self.keyword is None else self.keyword.name
         
     @property
     def service_name(self):
         """The service name associated with this message."""
+        if self._service_name != "\x01":
+            return self._service_name
         return "\x01" if self.service is None else self.service.name
         
     @property
     def dispatcher_name(self):
         """The dispatcher name associated with this message."""
+        if self._dispatcher_name != "\x01":
+            return self._dispatcher_name
         if self.service is not None and hasattr(self.service, 'dispatcher'):
             return self.service.dispatcher
         else:
@@ -116,23 +138,30 @@ class ZMQCauldronMessage(object):
         """The full message."""
         return map(six.binary_type, self._message_parts)
         
+    def _copy_args_(self):
+        """Return the keyword arguments required to initialize a new copy of this object."""
+        return {
+            'command' : self.command,
+            'service' : self.service_name if self.service is None else self.service,
+            'keyword' : self.keyword_name if self.keyword is None else self.keyword,
+            'payload' : self.payload,
+            'direction' : self.direction,
+        }
+        
     def response(self, payload):
         """Compose a response."""
-        return self.__class__(
-            command = self.command,
-            service = self.service,
-            keyword = self.keyword,
-            payload = payload,
-            direction = "REP")
+        kwargs = self._copy_args_()
+        kwargs['payload'] = payload
+        kwargs['direction'] = "REP"
+        return self.__class__(**kwargs)
             
     def error_response(self, payload):
         """Compose an error response message."""
-        return self.__class__(
-            command = self.command,
-            service = self.service,
-            keyword = self.keyword,
-            payload = payload,
-            direction = "ERR")
+        kwargs = self._copy_args_()
+        kwargs['payload'] = payload
+        kwargs['direction'] = "ERR"
+        return self.__class__(**kwargs)
+            
             
     def raise_error_response(self, payload):
         """Raise an error response"""
@@ -152,29 +181,34 @@ class ZMQCauldronMessage(object):
             return self.to_string()
     
     @classmethod
-    def parse(cls, data, service):
+    def parse(cls, data, service=None):
         """Parse data. Errors are rasied """
         try:
             service_name, dispatcher_name, keyword_name, direction, command, payload = data
         except ValueError as e:
             raise ZMQCauldronParserError("Can't parse message '{0}' because {1}".format(data, str(e)))
+            
         if service_name == "\x01":
             service = None
             if keyword_name != "\x01":
                 raise ZMQCauldronParserError("Can't parse message '{0}' because essage can't specify a keyword with no service.".format(data))
             keyword = None
+        elif service is None:
+            service = service_name
+            keyword = keyword_name
         elif service_name != service.name:
             raise DispatcherError("Message was sent to the wrong service!")
-        if dispatcher_name != "\x01":
-            if hasattr(service, 'dispatcher') and dispatcher_name != service.dispatcher:
-                raise DispatcherError("Message was sent to the wrong dispatcher! Sent to {0}, received by {1}".format(
-                    dispatcher_name, service.dispatcher
-                ))
-        
-        if keyword_name != "\x01":
-            keyword = service[keyword_name]
         else:
-            keyword = None
+            if keyword_name == "\x01":
+                keyword = None
+            else:
+                keyword = service[keyword_name]
+            if dispatcher_name != "\x01":
+                if hasattr(service, 'dispatcher') and dispatcher_name != service.dispatcher:
+                    raise WrongDispatcher("Message was sent to the wrong dispatcher! Sent to {0}, received by {1}".format(
+                        dispatcher_name, service.dispatcher
+                    ))
+        
         return cls(command, service, keyword, payload, direction)
     
 
