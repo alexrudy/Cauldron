@@ -159,10 +159,15 @@ def backend(request):
     return request.param
 
 @pytest.fixture
-def dispatcher(request, backend, servicename, config):
+def dispatcher_name():
+    """The dispatcher name"""
+    return "+service+_dispatch_1"
+
+@pytest.fixture
+def dispatcher(request, backend, servicename, config, dispatcher_name):
     """Establish the dispatcher for a particular kind of service."""
     from Cauldron import DFW
-    svc = DFW.Service(servicename, config)
+    svc = DFW.Service(servicename, config, dispatcher=dispatcher_name)
     request.addfinalizer(lambda : svc.shutdown())
     return svc
     
