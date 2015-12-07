@@ -3,7 +3,6 @@
 A simple microservice framework for ZMQ Messaging.
 """
 
-import zmq
 import weakref
 import logging
 import threading
@@ -141,6 +140,7 @@ class ZMQMicroservice(threading.Thread):
     
     def __init__(self, context, address, name="microservice", timeout=10):
         super(ZMQMicroservice, self).__init__(name=six.text_type(name))
+        import zmq
         self.ctx = weakref.proxy(context or zmq.Context.instance())
         self.running = threading.Event()
         self.timeout = float(timeout)
@@ -166,6 +166,7 @@ class ZMQMicroservice(threading.Thread):
             
     def connect(self):
         """Connect to the address and return a socket."""
+        import zmq
         socket = self.ctx.socket(zmq.REP)
         try:
             socket.bind(self.address)
@@ -177,6 +178,7 @@ class ZMQMicroservice(threading.Thread):
             
     def respond(self):
         """Run the responder"""
+        import zmq
         try:
             # This is a local variable to ensure that the socket doesn't leak
             # into another thread, because ZMQ sockets aren't thread-safe.
