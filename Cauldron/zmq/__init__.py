@@ -6,8 +6,10 @@ implement the request-reply pattern for keyword passing
 interfaces, including error handling responses.
 
 """
+from .common import ZMQ_AVAILABLE
 
-from . import client
-from . import dispatcher
+if ZMQ_AVAILABLE:
+    from . import client
+    from . import dispatcher
 
 
