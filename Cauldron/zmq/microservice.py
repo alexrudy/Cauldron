@@ -139,7 +139,7 @@ class ZMQMicroservice(threading.Thread):
     
     _error = None
     
-    def __init__(self, context, name="microservice", timeout=10, address=""):
+    def __init__(self, context, address, name="microservice", timeout=10):
         super(ZMQMicroservice, self).__init__(name=six.text_type(name))
         self.ctx = weakref.proxy(context or zmq.Context.instance())
         self.running = threading.Event()
@@ -164,19 +164,23 @@ class ZMQMicroservice(threading.Thread):
         else:
             return message.response(response_payload)
             
+    def connect(self):
+        """Connect to the address and return a socket."""
+        socket = self.ctx.socket(zmq.REP)
+        try:
+            socket.bind(self.address)
+        except zmq.ZMQError as e:
+            self.log.error("Service can't bind to address '{0}' because {1}".format(address, e))
+            self._error = e
+            raise
+        return socket
+            
     def respond(self):
         """Run the responder"""
         try:
             # This is a local variable to ensure that the socket doesn't leak
             # into another thread, because ZMQ sockets aren't thread-safe.
-            socket = self.ctx.socket(zmq.REP)
-            
-            try:
-                socket.bind(self.address)
-            except zmq.ZMQError as e:
-                self.log.error("Service can't bind to address '{0}' because {1}".format(address, e))
-                self._error = e
-                raise
+            socket = self.connect()
             
             self.running.set()
             self.log.log(5, "Starting responder loop.")
