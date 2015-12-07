@@ -5,7 +5,7 @@ Dispatcher implementation for ZMQ
 """
 
 from .common import zmq_dispatcher_address, zmq_broadcaster_address, check_zmq, teardown
-from .microservice import ZMQMicroservice, ZMQCauldronMessage, FRAMEFAIL
+from .microservice import ZMQMicroservice, ZMQCauldronMessage, FRAMEFAIL, FRAMEBLANK
 from .router import register, _shutdown_router
 from ..base import DispatcherService, DispatcherKeyword
 from .. import registry
@@ -61,8 +61,13 @@ class _ZMQResponder(ZMQMicroservice):
         self.log.log(5, "Broadcast |{0!s}|".format(message))
         socket.send_multipart(message.data)
         return "success"
+        
+    def connect(self):
+        """Connect, and add a broadcaster."""
+        self._get_broadcaster(wait=False)
+        return super(_ZMQResponder, self).connect()
     
-    def _get_broadcaster(self):
+    def _get_broadcaster(self, wait=True):
         """Connect the broadcast socket."""
         zmq = check_zmq()
         if self._socket is not None:
@@ -77,7 +82,8 @@ class _ZMQResponder(ZMQMicroservice):
             raise
         else:
             self.log.log(5, "Broadcaster bound to {0}".format(address))
-            time.sleep(0.2)
+            if wait:
+                time.sleep(0.2)
             return self._socket
     
 
@@ -147,7 +153,7 @@ class Service(DispatcherService):
     def _synchronous_command(self, command, payload, keyword=None):
         """Execute a synchronous command."""
         message = ZMQCauldronMessage(command, service=self.name, dispatcher=self.dispatcher,
-            keyword=keyword.name if keyword else "\x01", payload=payload, direction="REQ")
+            keyword=keyword.name if keyword else FRAMEBLANK, payload=payload, direction="REQ")
         self.log.log(5, "Request |{0!s}|".format(message))
         if threading.current_thread() == self._thread or not self._thread.is_alive():
             response = self._thread.handle(message)
