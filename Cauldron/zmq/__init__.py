@@ -8,8 +8,7 @@ interfaces, including error handling responses.
 """
 from .common import ZMQ_AVAILABLE
 
-if ZMQ_AVAILABLE:
-    from . import client
-    from . import dispatcher
+from . import client
+from . import dispatcher
 
 
