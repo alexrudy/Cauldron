@@ -52,7 +52,8 @@ class _ZMQMonitorThread(threading.Thread):
                 if socket.poll(timeout=0.1):
                     try:
                         message = ZMQCauldronMessage.parse(socket.recv_multipart())
-                        keyword = message.verify(self.service)
+                        message.verify(self.service)
+                        keyword = self.service[message.keyword]
                         if keyword.name in self.monitored:
                             keyword._update(message.payload)
                             self.log.log(5, "Accepted broadcast for {0}: {1}".format(keyword.name, message.payload))
@@ -111,7 +112,7 @@ class Service(ClientService):
     def _prepare(self):
         """Prepare step."""
         self._thread = _ZMQMonitorThread(self)
-        address = self._synchronous_command("lookup", "subscribe").payload
+        address = self._synchronous_command("lookup", "subscribe", direction="BRI").payload
         self._thread.address = address
         self._thread.start()
         
@@ -129,18 +130,24 @@ class Service(ClientService):
         
     def has_keyword(self, name):
         """Check if a dispatcher has a keyword."""
-        message = self._synchronous_command("identify", name, None)
-        return message.payload == name
+        assert name.upper() != self.name.upper()
+        name = name.upper()
+        message = self._synchronous_command("identify", name, name, direction="FAN")
+        items = set(message.payload.split(":"))
+        if len(items) == 1:
+            return items.pop() != FRAMEBLANK
         
     def keywords(self):
         """List all available keywords."""
-        message = self._synchronous_command("enumerate", FRAMEBLANK, None)
+        message = self._synchronous_command("enumerate", FRAMEBLANK, direction="FAN")
         return message.payload.split(":")
         
-    def _synchronous_command(self, command, payload, keyword=None):
+    def _synchronous_command(self, command, payload, keyword=None, direction="REQ"):
         """Execute a synchronous command."""
-        request = ZMQCauldronMessage(command, service=self.name, dispatcher=FRAMEBLANK, 
-            keyword=keyword.name if keyword else FRAMEBLANK, payload=payload, direction="REQ")
+        request = ZMQCauldronMessage(command, direction=direction,
+            service=self.name, dispatcher=FRAMEBLANK,
+            keyword=keyword if keyword else FRAMEBLANK, 
+            payload=payload if payload else FRAMEBLANK)
         self.log.log(5, "Request {0!s}".format(request))
         self.socket.send_multipart(request.data)
         #TODO: Use polling here to support timeouts.
@@ -169,7 +176,7 @@ class Keyword(ClientKeyword):
         
     def _synchronous_command(self, command, payload):
         """Execute a synchronous command."""
-        return self.service._synchronous_command(command, payload, self)
+        return self.service._synchronous_command(command, payload, self.name)
         
     def wait(self, timeout=None, operator=None, value=None, sequence=None, reset=False, case=False):
         raise CauldronAPINotImplemented("Asynchronous operations are not supported for Cauldron.zmq")

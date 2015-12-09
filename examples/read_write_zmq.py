@@ -27,7 +27,7 @@ dtest = disp["TEST"]
 log.info("Dispatcher Keyword {0!r}".format(dtest))
 
 VALUE = "SOMEVALUE"
-time.sleep(10.0)
+time.sleep(1.0)
 log.info("Starting KTL client...")
 from Cauldron import ktl
 svc = ktl.Service("testsvc")
@@ -37,6 +37,7 @@ log.info("Writing '{0}'".format(VALUE))
 test.write(VALUE)
 log.info("'{0}' =? '{1}'".format(VALUE, test.read()))
 log.info("Done!")
+svc
 disp.shutdown()
 log.info("Shutdown complete.")
 import zmq

@@ -8,7 +8,7 @@ from .common import zmq_dispatcher_address, zmq_broadcaster_address, zmq_address
 from .microservice import ZMQMicroservice, ZMQCauldronMessage, FRAMEFAIL, FRAMEBLANK
 from ..base import DispatcherService, DispatcherKeyword
 from .. import registry
-from ..exc import DispatcherError
+from ..exc import DispatcherError, WrongDispatcher
 
 import threading
 import logging
@@ -47,27 +47,30 @@ class _ZMQResponder(ZMQMicroservice):
     
     def handle_modify(self, message):
         """Handle a modify command."""
-        keyword = message.verify(self.service)
+        message.verify(self.service)
+        keyword = self.service[message.keyword]
         keyword.modify(message.payload)
         return keyword.value
     
     def handle_update(self, message):
         """Handle an update command."""
-        keyword = message.verify(self.service)
+        message.verify(self.service)
+        keyword = self.service[message.keyword]
         return keyword.update()
         
     def handle_identify(self, message):
         """Handle an identify command."""
-        keyword = message.verify(self.service)
-        
+        message.verify(self.service)
+        if message.keyword not in self.service:
+            return FRAMEBLANK
         # This seems harsh, not using "CONTAINS", etc,
         # but it handles dispatchers correctly.
         try:
             kwd = self.service[message.payload]
-        except Exception:
-            return FRAMEFAIL
+        except WrongDispatcher:
+            return FRAMEBLANK
         else:
-            return message.payload
+            return self.service.dispatcher
         
     def handle_enumerate(self, message):
         """Handle enumerate command."""

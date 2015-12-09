@@ -46,7 +46,21 @@ class ZMQCauldronParserError(ZMQCauldronErrorResponse):
 class ZMQCauldronMessage(object):
     """A message object."""
     
-    DIRECTIONS = "REQ REP ERR PUB BRQ FAN COL".split()
+    RESPONSES = {
+        "REQ" : "REP",
+        "BRQ" : "BRP",
+        "BRI" : "BRR",
+        "FAN" : "COL",
+        "ERC" : "ERR",
+        "PUB" : "PUB",
+    }
+    DIRECTIONS = RESPONSES.keys() + RESPONSES.values()
+    CLIENT_DIRECTIONS = RESPONSES.keys()
+    CLIENT_DIRECTIONS.remove("BRQ")
+    SERVICE_DIRECTIONS = RESPONSES.values() + ["BRQ"]
+    SERVICE_DIRECTIONS.remove("BRP")
+    SERVICE_DIRECTIONS.remove("BRR")
+    BROKER_DIRECTIONS = ["BRP", "BRR", "ERR"]
     
     def __init__(self, command=FRAMEBLANK, service=FRAMEBLANK, dispatcher=FRAMEBLANK, 
         keyword=FRAMEBLANK, payload=FRAMEBLANK, direction="REQ", prefix=None):
@@ -59,7 +73,7 @@ class ZMQCauldronMessage(object):
         if direction not in self.DIRECTIONS:
             raise ValueError("Invalid choice of message direction: {0}".format(direction))
         self.direction = six.text_type(direction)
-        self.prefix = prefix or []
+        self.prefix = map(six.binary_type, prefix or [])
         
     def verify(self, service):
         """Given a service object, verify that it matches this message."""
@@ -67,7 +81,7 @@ class ZMQCauldronMessage(object):
             if self.service != service.name:
                 raise MessageVerifyError("Message was sent to the wrong service! Got {0} expected {1}".format(self.service, service.name))
         else:
-            self.service = service
+            self.service = service.name
         
         if self.dispatcher != FRAMEBLANK:
             if hasattr(service, 'dispatcher') and self.dispatcher != service.dispatcher:
@@ -75,11 +89,6 @@ class ZMQCauldronMessage(object):
         elif hasattr(service, 'dispatcher'):
             self.dispatcher = service.dispatcher
         
-        if self.keyword != FRAMEBLANK:
-            keyword = service[self.keyword]
-        else:
-            keyword = None
-        return keyword
     
     @property
     def _message_parts(self):
@@ -91,7 +100,7 @@ class ZMQCauldronMessage(object):
         """The full message data, to be sent over a ZMQ Socket.."""
         return self.prefix + map(lambda s : s.encode('utf-8'), map(six.text_type, self._message_parts))
         
-    def _copy_args_(self):
+    def __getstate__(self):
         """Return the keyword arguments required to initialize a new copy of this object."""
         return {
             'command' : self.command,
@@ -103,17 +112,20 @@ class ZMQCauldronMessage(object):
             'prefix': self.prefix,
         }
         
-    def response(self, payload, direction="REP"):
+    def copy(self):
+        """A copy of this message."""
+        return self.__class__(**self.__getstate__())
+        
+    def response(self, payload):
         """Compose a response."""
-        kwargs = self._copy_args_()
+        kwargs = self.__getstate__()
         kwargs['payload'] = payload
-        if direction is not None:
-            kwargs['direction'] = direction
+        kwargs['direction'] = self.RESPONSES[self.direction]
         return self.__class__(**kwargs)
             
     def error_response(self, payload):
         """Compose an error response message."""
-        kwargs = self._copy_args_()
+        kwargs = self.__getstate__()
         kwargs['payload'] = payload
         kwargs['direction'] = "ERR"
         return self.__class__(**kwargs)
@@ -125,12 +137,7 @@ class ZMQCauldronMessage(object):
         
     def to_string(self):
         """Compose a string."""
-        message_parts = []
-        for part in self._message_parts:
-            if isinstance(part, six.binary_type):
-                binascii.hexlify(part)
-            message_parts.append(part)
-        return "|".join(message_parts)
+        return "|".join(self._message_parts)
     
     def __str__(self):
         """String types in python3"""
@@ -140,6 +147,11 @@ class ZMQCauldronMessage(object):
         def __unicode__(self):
             """Unicode types in python2"""
             return unicode("|{0}|".format(self.to_string()))
+    
+    def __repr__(self):
+        """Represent the message, including prefix."""
+        return "<{0} |{1}|{2}>".format(self.__class__.__name__,
+            "|".join(map(binascii.hexlify, self.prefix)), self.to_string())
     
     @classmethod
     def parse(cls, data):
