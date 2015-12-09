@@ -24,12 +24,14 @@ def setup(service):
 
 disp = DFW.Service("testsvc", setup = setup, config=None)
 dtest = disp["TEST"]
-log.info(dtest)
+log.info("Dispatcher Keyword {0!r}".format(dtest))
 
 VALUE = "SOMEVALUE"
-
+time.sleep(10.0)
+log.info("Starting KTL client...")
 from Cauldron import ktl
 svc = ktl.Service("testsvc")
+log.info("Getting KTL keyword object...")
 test = svc["TEST"]
 log.info("Writing '{0}'".format(VALUE))
 test.write(VALUE)
