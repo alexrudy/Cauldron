@@ -47,8 +47,12 @@ else:
     PYTEST_HEADER_MODULES['zmq'] = 'zmq'
     if "zmq" in registry.keys():
         available_backends.append("zmq")
+<<<<<<< febd7285a9d0064ef5bd66b66336a3d66f4e1d95
     ROUTER = None
 
+=======
+    
+>>>>>>> Initial implementaion of a message broker.
 
 import pkg_resources
 import os
