@@ -41,7 +41,7 @@ def test_zmq_available():
 
 def test_router(zmq, config_zmq):
     """Test the router."""
-    broker = Broker.thread(config_zmq)
+    broker = ZMQBroker.thread(config_zmq)
     
     from Cauldron import DFW
     svc = DFW.Service("test-router", config=config_zmq)

@@ -5,6 +5,7 @@ A single message broker service to distribute messages between clients and dispa
 from __future__ import absolute_import
 
 import threading
+import time
 import logging
 import collections
 import binascii
@@ -14,7 +15,11 @@ from .microservice import ZMQCauldronMessage, ZMQCauldronErrorResponse, FRAMEBLA
 from .common import zmq_address
 from ..exc import DispatcherError
 
-CLIENT_DIRECTIONS = set(["REQ"])
+CLIENT_DIRECTIONS = ZMQCauldronMessage.CLIENT_DIRECTIONS
+
+class NoResponseNecessary(Exception):
+    """NoResponseNecessary"""
+    pass
 
 class NoDispatcherAvailable(DispatcherError):
     """Raised when no dispatcher is available."""
@@ -24,27 +29,43 @@ class MultipleDispatchersFound(DispatcherError):
     """Raised when too many dispatchers are identified for a keyword."""
     pass
     
-class Identification(object):
+class FanMessage(object):
     """An identification message request"""
-    def __init__(self, client_id, message, log):
-        super(Identification, self).__init__()
+    def __init__(self, client_id, message, timeout=1.0):
+        super(FanMessage, self).__init__()
         self.message = message # The original message.
+        self.client_id = client_id # The original identifier.
+        
+        self.id = binascii.hexlify(client_id) # A human-readable binary identifier.
+        self.timeout = time.time() + timeout
+        # Store the results.
         self.pending = set()
-        self.identities = set()
-        self.client_id = client_id
-        self.log = log
+        self.responses = list()
+        
+    @property
+    def done(self):
+        """Is this fan complete?"""
+        return (not len(self.pending)) or (time.time() > self.timeout)
+        
+    def generate_message(self, dispatcher):
+        """Generate a message for a specific dispatcher."""
+        message = self.message.copy()
+        self.pending.add(dispatcher.id)
+        message.prefix = [dispatcher.id, b"", self.client_id, b""]
+        return message
+        
+    def add(self, dispatcher_id, item):
+        """Add item to the fan message."""
+        if item != FRAMEBLANK:
+            self.responses.append(item)
+        self.pending.remove(dispatcher_id)
         
     def resolve(self):
-        """docstring for start"""
-        if len(self.identities) == 1:
-            dispatcher = self.identities.pop()
-            self.log.log(5, "Identify success, dispatcher {0}".format(dispatcher))
-            return dispatcher
-        elif len(self.identities) == 0:
-            self.log.log(5, "Identify failure for keyword {0}, no identities found.".format())
-            raise NoDispatcherAvailable("No dispatcher found for service '{0}'".format(message.service))
+        """Fan message responses."""
+        if len(self.responses):
+            return ":".join(self.responses)
         else:
-            raise MultipleDispatchersFound("Found multiple dispatchers for {0}:{1}".format(message.service, message.keyword))
+            return FRAMEBLANK
         
 
 class Client(object):
@@ -62,26 +83,29 @@ class Dispatcher(object):
 
 class Service(object):
     """A simple representation of a service"""
-    def __init__(self, name, log):
+    def __init__(self, name):
         super(Service, self).__init__()
         self.name = name.upper()
         self.keywords = {}
         self.dispatchers = {}
-        self.log = log
         
-        self._identifies = {}
+        self._fans = {}
         
     def get_dispatcher(self, dispatcher, dispatcher_id):
         """Try to get a service."""
         try:
             dispatcher_object = self.dispatchers[dispatcher]
         except KeyError:
-            dispatcher_object = self.dispatchers[dispatcher] = Dispatcher(dispatcher, dispatcher_id)
+            if dispatcher_id is not None:
+                dispatcher_object = self.dispatchers[dispatcher] = Dispatcher(dispatcher, dispatcher_id)
+            else:
+                raise DispatcherError("No dispatcher available for {0}".format(dispatcher))
         
         #TODO: I'm not sure that this is correct.
         # Always reset the identity. It might have changed, in which case we want to use the
         # version of this dispatcher which responded most recently.
-        dispatcher_object.id = dispatcher_id
+        if dispatcher_id is not None:
+            dispatcher_object.id = dispatcher_id
         return dispatcher_object
         
     def scrape(self, message):
@@ -91,65 +115,60 @@ class Service(object):
             if message.payload != FRAMEFAIL and message.direction != "ERR" and message.keyword != FRAMEBLANK:
                 # If this message can identify the disptacher, save it for later.
                 self.keywords[message.keyword.upper()] = message.dispatcher
+        elif message.direction == "COL" and message.command == "identify":
+            items = set(message.payload.split(":"))
+            if len(items) == 1:
+                self.keywords[message.keyword.upper()] = items.pop()
                 
     def paste(self, message):
         """Opposite of scrape, paste the dispatcher back into the message."""
         if message.dispatcher == FRAMEBLANK:
             # Locate the correct dispatcher.
             if message.keyword != FRAMEBLANK:
-                dispatcher = self.keywords.get(message.keyword.upper(), FRAMEFAIL)
-                if dispatcher == FRAMEFAIL:
+                try:
+                    dispatcher_name = self.keywords[message.keyword.upper()]
+                    dispatcher = self.dispatchers[dispatcher_name]
+                except KeyError:
                     raise NoDispatcherAvailable("No dispatcher is available for '{0}'".format(message.service))
-                dispatcher = self.dispatchers.get(dispatcher, FRAMEFAIL)
                 message.dispatcher = dispatcher.name
             else:
                 raise DispatcherError("Ambiguous dispatcher specification in message {0!s}".format(message))
-        else:
-            # Explicitly specified dispatcher.
-            dispatcher = message.dispatcher
-            dispatcher = self.dispatchers.get(dispatcher, FRAMEFAIL)
-        return FRAMEFAIL if dispatcher == FRAMEFAIL else dispatcher.id
     
-    def start_identify_messages(self, client_id, message):
+    def start_fan_messages(self, client_id, message):
         """Start an identify process, with a generator over identify messages."""
-        identify_id = binascii.hexlify(client_id)
-        self._identifies[identify_id] = identify = Identification(client_id, message, self.log)
-        for dispatcher in self.dispatchers.values():
-            identify.pending.add(dispatcher.id)
-            self.log.log(5, "Requesting identify from {0}: {1!s}".format(binascii.hexlify(client_id), message))
-            yield [dispatcher.id, b"", client_id, b""] + message.data
-        if not len(self.dispatchers):
-            self.log.log(5, "Identify failed because there are no registered dispatchers.")
-            raise NoDispatcherAvailable("No dispatcher found for service '{0}'".format(message.service))
-            
+        fmessage = FanMessage(client_id, message)
+        self._fans[fmessage.id] = fmessage
         
-    def collect_identify_message(self, dispatcher_id, client_id, message):
-        """Collect a single identify message."""
-        identify_id = binascii.hexlify(client_id)
-        identify = self._identifies[identify_id]
-        identify.pending.remove(dispatcher_id)
-        if message.payload != FRAMEFAIL and message.dispatcher not in [FRAMEFAIL,FRAMEBLANK]:
-            identify.identities.add(message.dispatcher)
-            
-        if len(identify.pending):
-            return FRAMEBLANK
+        for dispatcher in self.dispatchers.values():
+            yield fmessage.generate_message(dispatcher)
+        
+        if not len(fmessage.pending):
+            raise NoDispatcherAvailable("No dispatcher found for service '{0}'".format(message.service))
         else:
-            del self._identifies[identify_id]
-            dispatcher = identify.resolve()
-            self.keywords[identify.message.payload.upper()] = dispatcher
-            return dispatcher
+            raise NoResponseNecessary("Started a fan, no response yet, block the client.")
+        
+    def collect_fan_message(self, dispatcher_id, client_id, message):
+        """Collect a single identify message."""
+        fmessage = self._fans[binascii.hexlify(client_id)]
+        if message.payload != FRAMEFAIL:
+            fmessage.add(dispatcher_id, message.payload)
+        raise NoResponseNecessary("We aren't done with the fan yet, no response necessary.")
+            
+    def finish_fan_messages(self):
+        """Finish a fan message"""
+        for fmessage in list(self._fans.values()):
+            if fmessage.done:
+                message = fmessage.message
+                del self._fans[fmessage.id]
+                response = message.response(fmessage.resolve())
+                response.prefix = [ fmessage.client_id, b"" ]
+                yield response
         
     def response(self, dispatcher_id, client_id, message):
         """Figure out the appropriate backend response."""
-        if message.command == "identify":
+        if message.direction == "COL":
             # Handle the special case, the explicity identify command.
-            dispatcher = self.collect_identify_message(dispatcher_id, client_id, message)
-            if dispatcher == FRAMEBLANK:
-                message.service = FRAMEBLANK
-            else:
-                message.dispatcher = dispatcher
-        elif message.command == "enumerate":
-            
+            message = self.collect_fan_message(dispatcher_id, client_id, message)
         return message
 
 class ZMQBroker(threading.Thread):
@@ -221,8 +240,8 @@ class ZMQBroker(threading.Thread):
         try:
             service_object = self.services[service.upper()]
         except KeyError:
-            service_object = self.services[service.upper()] = Service(service, self.log)
-            self.log.log(5, "Registered new service '{0}'".format(service))
+            service_object = self.services[service.upper()] = Service(service)
+            self.log.debug("Registered new service '{0}'".format(service))
         return service_object
     
     def handle_dispatcher(self, request, socket):
@@ -233,45 +252,49 @@ class ZMQBroker(threading.Thread):
         if dispatcher_id in self._active:
             self._active.remove(dispatcher_id)
         message.prefix = []
-        service_known = message.service in self.services
         
-        service = self.get_service(message.service)
-        dispatcher_known = message.dispatcher in service.dispatchers
-        
+        service = self.get_service(message.service)        
         dispatcher = service.get_dispatcher(message.dispatcher, dispatcher_id)
         
-        if client_id != FRAMEBLANK:
+        if message.direction != "BRQ":
             # This is a reply to a specific client.
             try:
                 message = service.response(dispatcher_id, client_id, message)
             except DispatcherError as e:
                 message = message.error_response(repr(e))
+            except NoResponseNecessary:
+                return
             else:
+                # Don't scrape any errors, but do pass some errors back to the client.
                 service.scrape(message)
-        
-            if message.service != FRAMEBLANK:
-                # Pass the original reply on to the original requester.
-                self.log.log(5, "Client reply: {0!s}".format(message))
-                socket.send_multipart([client_id, b""] + message.data)
-                if client_id in self._active:
-                    self._active.remove(client_id)
-            else:
-                # If the service was blank, we discard the message.
-                self.log.log(5, "Discarding dispatcher message {0!s}".format(message))
+            
+            # Pass the original reply on to the original requester.
+            self.log.log(5, "Client reply: {0!s}".format(message))
+            message.prefix = [client_id, b""]
+            socket.send_multipart(message.data)
+            if client_id in self._active:
+                self._active.remove(client_id)
         else:
-            # We have a new service.
-            if dispatcher_known:
-                self.log.log(5, "Re-identified dispatcher {0}".format(dispatcher.name))
-            else:
-                self.log.log(5, "Identified new dispatcher {0}".format(dispatcher.name))
+            # We have a broker-specific query.
             service.scrape(message)
             if message.command == "welcome":
                 response = message.response("confirmed")
-                socket.send_multipart([dispatcher_id, b""] + response.data)
+                response.prefix = [dispatcher_id, b""]
+                self.log.log(5, "Broker reply: {0!s}".format(response))
+                socket.send_multipart(response.data)
             elif message.command == "ready":
                 pass # Do nothing, the dispatcher is ready.
             else:
                 self.log.log(5, "Malformed dispatcher command: {0!s}".format(message))
+            
+    def finish_fanout(self, socket):
+        """Finish fanout messages"""
+        for service in self.services.values():
+            for fan_message in service.finish_fan_messages():
+                service.scrape(fan_message)
+                
+                self.log.log(5, "Client COL: {0!s}".format(fan_message))
+                socket.send_multipart(fan_message.data)
             
     def handle_client(self, request, socket):
         """Handle a client message."""
@@ -287,44 +310,45 @@ class ZMQBroker(threading.Thread):
         service = self.get_service(message.service)
         
         try:
-            if message.command == "identify":
+            if message.direction == "FAN":
                 # Handle the identify command by asking all dispatchers.
-                for identify_message in service.start_identify_messages(client_id, message):
-                    socket.send_multipart(identify_message)
-                    self._active.append(identify_message[0])
+                for fan_message in service.start_fan_messages(client_id, message):
+                    self.log.log(5, "Fanout message {0!s}".format(fan_message))
+                    socket.send_multipart(fan_message.data)
+                    self._active.append(fan_message.prefix[0])
                 # End early here, we've already sent what we needed.
-                return
-            elif message.command == "lookup":
-                if message.payload == "subscribe":
+                raise NoResponseNecessary("Already started identify.")                
+            elif message.direction == "BRI":
+                if message.command == "lookup":
                     # The client has asked for the subscription address, we should send that to them.
                     response = message.response(self._pub_address)
+                elif message.command == "locate":
+                    # The client has asked us if a service is locatable.
+                    response = message.response("yes" if len(service.dispatchers) else "no")
                 else:
-                    response = message.error_response("Unknown lookup value.")
-                self.log.log(5, "Client lookup reply {0!s}".format(response))
+                    response = message.error_response("Unknown inquiry command.")
+                self.log.log(5, "Client inquiry reply {0!s}".format(response))
                 socket.send_multipart([client_id, b""] + response.data)
                 if client_id in self._active:
                     self._active.remove(client_id)
-                return
-            elif message.command == "locate":
-                # The client has asked us if a service is locatable.
-                response = message.response("yes" if len(service.dispatchers) else "no")
-                self.log.log(5, "Client locate reply {0!s}".format(response))
-                socket.send_multipart([client_id, b""] + response.data)
-                return
+                raise NoResponseNecessary("Already responded to client.")
             else:
-                dispatcher_id = service.paste(message)
+                service.paste(message)
             
-            if dispatcher_id == FRAMEFAIL:
-                raise NoDispatcherAvailable("No dispatcher is available for '{0}'".format(message.service))
         except DispatcherError as e:
-            response =  message.error_response(repr(e))
+            response = message.error_response(repr(e))
             self.log.log(5, "Client error reply: {0!s}".format(response))
             socket.send_multipart([client_id, b""] +response.data)
             if client_id in self._active:
                 self._active.remove(client_id)
+        except NoResponseNecessary:
+            pass
         else:
-            socket.send_multipart([dispatcher_id, b"", client_id, b""] + message.data)
-            self._active.append(dispatcher_id)
+            dispatcher = service.get_dispatcher(message.dispatcher, None)
+            message.prefix = [dispatcher.id, b"", client_id, b""]
+            self.log.log(5, "Client forward: {0!s}".format(message))
+            socket.send_multipart(message.data)
+            self._active.append(dispatcher.id)
     
     def respond(self):
         """Respond"""
@@ -353,6 +377,7 @@ class ZMQBroker(threading.Thread):
                         self.handle_dispatcher(request, socket)
                 else:
                     self.log.log(5, "Malofrmed request: |{0}|".format("|".join(request)))
+            self.finish_fanout(socket)
             if sockets.get(xsub) == zmq.POLLIN:
                 request = xsub.recv_multipart()
                 xpub.send_multipart(request)
@@ -360,9 +385,6 @@ class ZMQBroker(threading.Thread):
                 request = xpub.recv_multipart()
                 xsub.send_multipart(request)
             
-            if not len(sockets):
-                self.log.debug("Broker got nothing...")
-            #TODO: Add heartbeats here.
         self.log.debug("Broker done.")
         
     
