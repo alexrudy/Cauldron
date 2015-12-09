@@ -51,7 +51,9 @@ class _ZMQMonitorThread(threading.Thread):
                             keyword = self.service[kwd]
                         except KeyError:
                             self.log.error("Bad request, invalid keyword {0:s}".format(kwd))
-                        keyword._update(value)
+                        else:
+                            self.log.log(5, "Broadcast update to {0} = {1}".format(kwd, value))
+                            keyword._update(value)
         except (zmq.ContextTerminated, zmq.ZMQError) as e:
             self.log.info("Service shutdown and context terminated, closing broadcast thread.")
         socket.close()
@@ -84,7 +86,7 @@ class Service(ClientService):
             self.log.error("Service can't connect to responder address '{0}' because {1}".format(address, e))
             raise
         else:
-            self.log.debug("Connected to {0}".format(address))
+            self.log.debug("Connected client to {0}".format(address))
             self._sockets.socket = socket
         return socket
         
@@ -111,9 +113,14 @@ class Service(ClientService):
         
     def _synchronous_command(self, command, payload, keyword=None):
         """Execute a synchronous command."""
-        self.socket.send(str(ZMQCauldronMessage(command, self, keyword, payload, "REQ")))
+        request = ZMQCauldronMessage(command, self, keyword, payload, "REQ")
+        self.log.log(5, "Synchronously requesting '{0}'".format(request))
+        self.socket.send(str(request))
         #TODO: Use polling here to support timeouts.
-        return ZMQCauldronMessage.parse(self.socket.recv(), self)
+        message = ZMQCauldronMessage.parse(self.socket.recv(), self)
+        if message.direction == "ERR":
+            raise DispatcherError("Dispatcher error on command: {0}".format(message.payload))
+        return message
     
 @registry.client.keyword_for("zmq")
 class Keyword(ClientKeyword):
@@ -139,9 +146,9 @@ class Keyword(ClientKeyword):
         raise CauldronAPINotImplemented("Asynchronous operations are not supported for Cauldron.zmq")
     
     def monitor(self, start=True, prime=True, wait=True):
-        if prime:
-            self.read(wait=wait)
         if start:
+            if prime:
+                self.read(wait=wait)
             self.service._thread.monitored.add(self.name)
         else:
             self.service._thread.monitored.remove(self.name)

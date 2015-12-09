@@ -7,7 +7,7 @@ import warnings
 
 from .dispatcher import Service as Dispatcher
 from ..base import ClientService, ClientKeyword
-from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented, ServiceNotStarted
+from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented, ServiceNotStarted, DispatcherError
 from .. import registry
 
 __all__ = ['Service', 'Keyword']
@@ -50,7 +50,13 @@ class Keyword(ClientKeyword):
         if not wait or timeout is not None:
             warnings.warn("Cauldron.local doesn't support asynchronous reads.", CauldronAPINotImplementedWarning)
         
-        self._update(self.source.update())
+        try:
+            new_value = self.source.update()
+        except Exception as e:
+            raise DispatcherError("Error in Dispatcher: {0}".format(str(e)))
+        else:
+            self._update(new_value)
+            
         return self._current_value(binary=binary, both=both)
         
     def write(self, value, wait=True, binary=False, timeout=None):
@@ -66,10 +72,11 @@ class Keyword(ClientKeyword):
         except (TypeError, ValueError): #pragma: no cover
             pass
         
-        #TODO: Typechecking? Error munging?
-        self.source.modify(value)
+        try:
+            self.source.modify(value)
+        except Exception as e:
+            raise DispatcherError("Error in Dispatcher: {0}".format(str(e)))
         
-        #TODO: Anything additional here?
         
     def wait(self, timeout=None, operator=None, value=None, sequence=None, reset=False, case=False):
         raise CauldronAPINotImplemented("Asynchronous operations are not supported for Cauldron.local")

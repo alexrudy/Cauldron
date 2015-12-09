@@ -1,10 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-Test clients.
+Test dispatcher.
 """
 import pytest
+import threading
 
 pytestmark = pytest.mark.usefixtures("teardown_cauldron")
+
+@pytest.fixture
+def waittime():
+    """Event waiting time."""
+    return 0.1
 
 def test_callbacks(dispatcher):
     """Test callback propagation."""
@@ -23,6 +29,44 @@ def test_callbacks(dispatcher):
     assert not dispatcher['MODE']._acting
     dispatcher['MODE'].callback(cb, remove=True)
     dispatcher['MODE'].modify('1')
+    
+def test_callbacks_from_client(dispatcher, client, waittime):
+    """Test that when modified from a client, exceptions don't kill the responder thread."""
+    from Cauldron.exc import DispatcherError
+    
+    class CallbackRecieved(Exception): pass
+    
+    def cb(kw):
+        """Dummy Callback"""
+        cb.triggered.set()
+        raise CallbackRecieved("Notification that {0!r} recieved a callback.".format(kw))
+    
+    cb.triggered = threading.Event()
+    
+    dispatcher['MODE'].callback(cb)
+    with pytest.raises(CallbackRecieved):
+        dispatcher['MODE'].modify('1')
+        
+    cb.triggered.wait(waittime)
+    assert cb.triggered.is_set()
+    cb.triggered.clear()
+    
+    with pytest.raises(DispatcherError):
+        client['MODE'].write('2')
+    
+    cb.triggered.wait(waittime)
+    assert cb.triggered.is_set()
+    cb.triggered.clear()
+    
+    with pytest.raises(CallbackRecieved):
+        dispatcher['MODE'].modify('3')
+    
+    cb.triggered.wait(waittime)
+    assert cb.triggered.is_set()
+    cb.triggered.clear()
+    
+    dispatcher['MODE'].callback(cb, remove=True)
+    dispatcher['MODE'].modify('4')
     
 def test_recursive_callbacks(dispatcher):
     """Test a recursive callback function."""

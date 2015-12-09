@@ -19,6 +19,7 @@ from ..utils.helpers import api_not_required, api_not_implemented, api_required,
 from ..utils.callbacks import Callbacks
 from ..bundled import ktlxml
 from ..api import STRICT_KTL_XML
+from .. import registry
 
 __all__ = ['Keyword', 'Service']
 
@@ -106,7 +107,7 @@ class Keyword(_BaseKeyword):
             if STRICT_KTL_XML:
                 raise
             else:
-                warnings.warn("XML setup for keyword {0} failed. {1}".format(name, e), CauldronXMLWarning)
+                warnings.warn("XML setup for keyword '{0}' failed. {1}".format(name, e), CauldronXMLWarning)
         
         # Handle XML-specified initial values here.
         self.initial = str(initial)
@@ -286,6 +287,7 @@ class Service(object):
         self.dispatcher = dispatcher
         self.name = name.lower()
         self.log = logging.getLogger("DFW.Service.{0}".format(self.name))
+        self.log.info("Starting Service '{0}' using backend '{1}'".format(self.name, registry.dispatcher.backend))
         
         self._keywords = {}
         self.status_keyword = None
@@ -297,7 +299,7 @@ class Service(object):
                 raise
             warning = CauldronXMLWarning("KTLXML was not loaded correctly. Keywords will not be validated against XML. Exception was {0!s}.".format(e))
             warnings.warn(warning)
-            self.log.warning(warning)
+            self.log.warning(str(warning))
             self.xml = None
         else:
             # Implementors will be expected to assign Keyword instances
@@ -317,6 +319,12 @@ class Service(object):
     def __repr__(self):
         """Represent this object"""
         return "<{0} name='{1}' at {2}>".format(self.__class__.__name__, self.name, hex(id(self)))
+    
+    @property
+    def _Keyword_cls(self):
+        """Get the keyword class."""
+        from Cauldron import DFW
+        return DFW.Keyword.Keyword
     
     def keywords(self):
         """The list of available keywords"""
@@ -382,8 +390,7 @@ class Service(object):
         
     def __missing__(self, key):
         """What to do with missing keys."""
-        from .._DFW.Keyword import Keyword
-        return Keyword(key, self)
+        return self._Keyword_cls(key, self)
     
     def __setitem__(self, name, value):
         """Set a keyword instance in this server."""

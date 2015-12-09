@@ -24,11 +24,12 @@ Your backend should be something that you chose once per python invocation. It i
 Configuring the backend
 =======================
 
-Some backends must be configured before use. For example, the REDIS backend requires settings to find the REDIS database instance. You configure the REIDS backend via :func:`~Cauldron.redis.configure_pool`::
-
-    from Cauldron.redis import configure_pool
-    configure_pool(host='localhost', port=6379, db=0, socket_timeout=None)
-
+Backends which require configuration get their configuration values from an ini-style configuration document. If the default configuration values are not acceptable, you should provide a configuration file via :func:`Cauldron.config.read_configuration`::
+    
+    from Cauldron.config import read_configuration
+    read_configuration("my_cauldron_config.cfg")
+    
+For more information, see :ref:`configuration`.
 
 Activate the backend
 ====================

@@ -27,6 +27,7 @@ class _ZMQResponderThread(threading.Thread):
         self.service = weakref.proxy(service)
         self.log = logging.getLogger(self.service.log.name + ".Responder")
         self.running = threading.Event()
+        self._error = None
         super(_ZMQResponderThread, self).__init__(name="ZMQResponderThread-{0:s}".format(self.service.name))
         
     def handle(self, message):
@@ -46,7 +47,8 @@ class _ZMQResponderThread(threading.Thread):
         
     def handle_modify(self, message):
         """Handle a modify command."""
-        return message.keyword.modify(message.payload)
+        message.keyword.modify(message.payload)
+        return message.keyword.value
     
     def handle_update(self, message):
         """Handle an update command."""
@@ -83,6 +85,7 @@ class _ZMQResponderThread(threading.Thread):
                 socket.bind(address)
             except zmq.ZMQError as e:
                 self.log.error("Service can't bind to address '{0}' because {1}".format(address, e))
+                self._error = e
                 raise
                 
             self._broadcast_socket = ctx.socket(zmq.PUB)
@@ -91,6 +94,7 @@ class _ZMQResponderThread(threading.Thread):
                 self._broadcast_socket.bind(address)
             except zmq.ZMQError as e:
                 self.log.error("Service can't bind to broadcaster address '{0}' because {1}".format(address, e))
+                self._error = e
                 raise
                 
             self.running.set()
@@ -102,12 +106,15 @@ class _ZMQResponderThread(threading.Thread):
                 
         except weakref.ReferenceError as e:
             self.log.info("Service reference error, shutting down, {0}".format(repr(e)))
+            self._error = e
         except zmq.ContextTerminated as e:
             self.log.info("Service shutdown and context terminated, closing command thread.")
             # We need to return here, because the socket was closed when the context terminated.
+            self._error = e
             return
         except zmq.ZMQError as e:
             self.log.info("ZMQ Error '{0}' terminated thread.".format(e))
+            self._error = e
             return
         finally:
             self.running.clear()
@@ -119,6 +126,7 @@ class _ZMQResponderThread(threading.Thread):
             self._broadcast_socket.setsockopt(zmq.LINGER, 0)
             self._broadcast_socket.close()
         except zmq.ZMQError as e:
+            self._error = e
             pass
         finally:
             del self._broadcast_socket
@@ -129,12 +137,14 @@ class _ZMQResponderThread(threading.Thread):
     def respond(self, socket):
         """Respond to the command socket."""
         message = ZMQCauldronMessage.parse(socket.recv(), self.service)
-        socket.send(six.binary_type(self.respond_message(message)))
+        response = six.binary_type(self.respond_message(message))
+        self.log.log(5, "Responding '{0}'".format(response))
+        socket.send(response)
             
     def respond_message(self, message):
         """Respond to a message."""
         try:
-            self.log.debug("Handling '{0}'".format(str(message)))
+            self.log.log(5, "Handling '{0}'".format(str(message)))
             response = self.handle(message)
         except (ZMQCauldronErrorResponse, ZMQCauldronParserError) as e:
             return e.response
@@ -172,7 +182,7 @@ class Service(DispatcherService):
             self.log.error("Service can't connect to responder address '{0}' because {1}".format(address, e))
             raise
         else:
-            self.log.debug("Connected to {0}".format(address))
+            self.log.debug("Connected dispatcher to {0}".format(address))
             self._sockets.socket = socket
         return socket
         
@@ -195,7 +205,10 @@ class Service(DispatcherService):
             
         self._thread.running.wait(1.0)
         if not self._thread.running.is_set():
-            raise DispatcherError("The dispatcher responder thread did not start.")
+            msg = "The dispatcher responder thread did not start."
+            if self._thread._error is not None:
+                msg += " Thread Error: {0}".format(repr(self._thread._error))
+            raise DispatcherError(msg)
         
         while len(self._message_queue):
             self.socket.send(six.binary_type(self._message_queue.pop()))
