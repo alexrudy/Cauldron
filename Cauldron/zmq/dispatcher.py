@@ -4,9 +4,8 @@ Dispatcher implementation for ZMQ
 
 """
 
-from .common import zmq_dispatcher_address, zmq_broadcaster_address, check_zmq, teardown
+from .common import zmq_dispatcher_address, zmq_broadcaster_address, zmq_address, check_zmq, teardown
 from .microservice import ZMQMicroservice, ZMQCauldronMessage, FRAMEFAIL, FRAMEBLANK
-from .router import register, _shutdown_router
 from ..base import DispatcherService, DispatcherKeyword
 from .. import registry
 from ..exc import DispatcherError
@@ -29,9 +28,23 @@ class _ZMQResponder(ZMQMicroservice):
     
     def __init__(self, service):
         self.service = weakref.proxy(service)
-        super(_ZMQResponder, self).__init__(address=zmq_dispatcher_address(self.service._config, bind=True), context=self.service.ctx, name="ZMQResponder-{0:s}".format(self.service.name))
-        self.log = logging.getLogger(self.service.log.name + ".Responder")
+        address = zmq_address(self.service._config, "broker", bind=False)
+        super(_ZMQResponder, self).__init__(address=address, use_broker=True,
+            context=self.service.ctx, name="DFW.Service.{0:s}.Responder".format(self.service.name))
         
+    def greet_broker(self, socket):
+        """Send the appropriate greeting to the broker."""
+        welcome = ZMQCauldronMessage(command="welcome", service=self.service.name, dispatcher=self.service.dispatcher, direction="BRQ", prefix=[FRAMEBLANK, b""])
+        socket.send_multipart(welcome.data)
+        self.log.log(5, "Sent broker a welcome message: {0!s}.".format(welcome))
+        message = ZMQCauldronMessage.parse(socket.recv_multipart())
+        if message.payload != "confirmed":
+            raise DispatcherError("Message confirming welcome was malformed! {0!s}".format(message))
+        ready = ZMQCauldronMessage(command="ready", service=self.service.name, dispatcher=self.service.dispatcher, direction="BRQ", prefix=[FRAMEBLANK, b""])
+        socket.send_multipart(ready.data)
+        self.log.log(5, "Sent broker a ready message: {0!s}.".format(ready))
+        
+    
     def handle_modify(self, message):
         """Handle a modify command."""
         keyword = message.verify(self.service)
@@ -46,7 +59,15 @@ class _ZMQResponder(ZMQMicroservice):
     def handle_identify(self, message):
         """Handle an identify command."""
         keyword = message.verify(self.service)
-        return self.service.dispatcher if message.payload in self.service else FRAMEFAIL
+        
+        # This seems harsh, not using "CONTAINS", etc,
+        # but it handles dispatchers correctly.
+        try:
+            kwd = self.service[message.payload]
+        except Exception:
+            return FRAMEFAIL
+        else:
+            return message.payload
         
     def handle_enumerate(self, message):
         """Handle enumerate command."""
@@ -58,7 +79,7 @@ class _ZMQResponder(ZMQMicroservice):
         message.verify(self.service)
         message = ZMQCauldronMessage(command="broadcast", service=self.service.name, dispatcher=self.service.dispatcher, keyword=message.keyword, payload=message.payload, direction="PUB")
         socket = self._get_broadcaster()
-        self.log.log(5, "Broadcast |{0!s}|".format(message))
+        self.log.log(5, "Broadcast {0!s}".format(message))
         socket.send_multipart(message.data)
         return "success"
         
@@ -74,8 +95,8 @@ class _ZMQResponder(ZMQMicroservice):
             return self._socket
         self._socket = self.ctx.socket(zmq.PUB)
         try:
-            address = zmq_broadcaster_address(self.service._config, bind=True)
-            self._socket.bind(address)
+            address = zmq_address(self.service._config, "publish", bind=False)
+            self._socket.connect(address)
         except zmq.ZMQError as e:
             self.log.error("Service can't bind to broadcaster address '{0}' because {1}".format(address, e))
             self._error = e
@@ -107,7 +128,7 @@ class Service(DispatcherService):
         zmq = check_zmq()
         socket = self.ctx.socket(zmq.REQ)
         try:
-            address = zmq_dispatcher_address(self._config)
+            address = zmq_address(self._config, "broker")
             socket.connect(address)
         except zmq.ZMQError as e:
             self.log.error("Service can't connect to responder address '{0}' because {1}".format(address, e))
@@ -119,11 +140,6 @@ class Service(DispatcherService):
         
     def _prepare(self):
         """Begin this service."""
-        zmq = check_zmq()
-        
-        if self._config.getboolean("zmq-router", "enable"):
-            register(self)
-        
         self._thread = _ZMQResponder(self)
         self._message_queue = []
     
@@ -134,7 +150,7 @@ class Service(DispatcherService):
             self._thread.start()
             self.log.debug("Started ZMQ Responder Thread.")
             
-        self._thread.check_alive()
+        self._thread.check_alive(timeout=10)
         
         while len(self._message_queue):
             self.socket.send_multipart(self._message_queue.pop().data)
@@ -146,20 +162,20 @@ class Service(DispatcherService):
         zmq = check_zmq()
         if hasattr(self, '_thread') and self._thread.is_alive():
             self._thread.stop()
-        if hasattr(self, '_router'):
-            _shutdown_router(self)
         self.ctx.destroy()
         
     def _synchronous_command(self, command, payload, keyword=None):
         """Execute a synchronous command."""
         message = ZMQCauldronMessage(command, service=self.name, dispatcher=self.dispatcher,
             keyword=keyword.name if keyword else FRAMEBLANK, payload=payload, direction="REQ")
-        self.log.log(5, "Request |{0!s}|".format(message))
-        if threading.current_thread() == self._thread or not self._thread.is_alive():
-            response = self._thread.handle(message)
-        elif not self._thread.running.is_set():
+        if not self._thread.running.is_set():
+            self.log.log(5, "Queue {0!s}".format(message))
             return self._message_queue.append(message)
+        elif threading.current_thread() == self._thread:
+            self.log.log(5, "Request-local {0!s}".format(message))
+            response = self._thread.handle(message)
         else:
+            self.log.log(5, "Request {0!s}".format(message))
             self.socket.send_multipart(message.data)
             response = ZMQCauldronMessage.parse(self.socket.recv_multipart())
         response.verify(self)

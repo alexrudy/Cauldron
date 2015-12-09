@@ -48,8 +48,6 @@ else:
     if "zmq" in registry.keys():
         available_backends.append("zmq")
     
-    from Cauldron.zmq.router import ZMQRouter
-    ZMQRouter.daemon()
 
 import pkg_resources
 import os

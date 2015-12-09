@@ -7,9 +7,20 @@ import weakref
 import logging
 import threading
 import six
+import binascii
+import atexit
+
+from ..exc import DispatcherError
 
 FRAMEBLANK = "\x01"
 FRAMEFAIL = "\x02"
+
+def _exit_handler(thread_ref):
+    """Exit handler"""
+    thread = thread_ref()
+    if thread is not None:
+        thread.stop()
+    
 
 class MessageVerifyError(Exception):
     """Verify the message error."""
@@ -18,7 +29,8 @@ class MessageVerifyError(Exception):
 class ZMQCauldronErrorResponse(Exception):
     """A container for ZMQ Cauldron error responses."""
     
-    def __init__(self, message):
+    def __init__(self, msg, message):
+        super(ZMQCauldronErrorResponse, self).__init__(msg)
         self.message = message
         
 class ZMQCauldronParserError(ZMQCauldronErrorResponse):
@@ -28,15 +40,16 @@ class ZMQCauldronParserError(ZMQCauldronErrorResponse):
     @classmethod
     def with_message(cls, message):
         """Add a message to a Cauldron Parser error."""
-        return cls(ZMQCauldronMessage(command="parser", payload=message, direction="ERR"))
+        response = ZMQCauldronMessage(command="parser", payload=message, direction="ERR")
+        return cls(message, response)
 
 class ZMQCauldronMessage(object):
     """A message object."""
     
-    DIRECTIONS = "REQ REP ERR PUB".split()
+    DIRECTIONS = "REQ REP ERR PUB BRQ FAN COL".split()
     
     def __init__(self, command=FRAMEBLANK, service=FRAMEBLANK, dispatcher=FRAMEBLANK, 
-        keyword=FRAMEBLANK, payload=FRAMEBLANK, direction="REQ"):
+        keyword=FRAMEBLANK, payload=FRAMEBLANK, direction="REQ", prefix=None):
         super(ZMQCauldronMessage, self).__init__()
         self.command = six.text_type(command or FRAMEBLANK)
         self.service = six.text_type(service or FRAMEBLANK)
@@ -46,15 +59,22 @@ class ZMQCauldronMessage(object):
         if direction not in self.DIRECTIONS:
             raise ValueError("Invalid choice of message direction: {0}".format(direction))
         self.direction = six.text_type(direction)
+        self.prefix = prefix or []
         
     def verify(self, service):
         """Given a service object, verify that it matches this message."""
         if self.service != FRAMEBLANK:
             if self.service != service.name:
                 raise MessageVerifyError("Message was sent to the wrong service! Got {0} expected {1}".format(self.service, service.name))
+        else:
+            self.service = service
+        
         if self.dispatcher != FRAMEBLANK:
             if hasattr(service, 'dispatcher') and self.dispatcher != service.dispatcher:
                 raise MessageVerifyError("Message was sent to the wrong dispatcher! Got {0} expected {1}".format(self.dispatcher, service.dispatcher))
+        elif hasattr(service, 'dispatcher'):
+            self.dispatcher = service.dispatcher
+        
         if self.keyword != FRAMEBLANK:
             keyword = service[self.keyword]
         else:
@@ -69,7 +89,7 @@ class ZMQCauldronMessage(object):
     @property
     def data(self):
         """The full message data, to be sent over a ZMQ Socket.."""
-        return map(lambda s : s.encode('utf-8'), map(six.text_type, self._message_parts))
+        return self.prefix + map(lambda s : s.encode('utf-8'), map(six.text_type, self._message_parts))
         
     def _copy_args_(self):
         """Return the keyword arguments required to initialize a new copy of this object."""
@@ -80,13 +100,15 @@ class ZMQCauldronMessage(object):
             'keyword' : self.keyword,
             'payload' : self.payload,
             'direction' : self.direction,
+            'prefix': self.prefix,
         }
         
-    def response(self, payload):
+    def response(self, payload, direction="REP"):
         """Compose a response."""
         kwargs = self._copy_args_()
         kwargs['payload'] = payload
-        kwargs['direction'] = "REP"
+        if direction is not None:
+            kwargs['direction'] = direction
         return self.__class__(**kwargs)
             
     def error_response(self, payload):
@@ -103,20 +125,30 @@ class ZMQCauldronMessage(object):
         
     def to_string(self):
         """Compose a string."""
-        return "|".join(self._message_parts)
+        message_parts = []
+        for part in self._message_parts:
+            if isinstance(part, six.binary_type):
+                binascii.hexlify(part)
+            message_parts.append(part)
+        return "|".join(message_parts)
     
     def __str__(self):
         """String types in python3"""
-        return str(self.to_string())
+        return str("|{0}|".format(self.to_string()))
     
     if six.PY2:
         def __unicode__(self):
             """Unicode types in python2"""
-            return unicode(self.to_string())
+            return unicode("|{0}|".format(self.to_string()))
     
     @classmethod
-    def parse(cls, data, service=None):
+    def parse(cls, data):
         """Parse data. Errors are raised when appropriate."""
+        if len(data) > 6:
+            prefix = data[:-6]
+            data = data[-6:]
+        else:
+            prefix = None
         data = [ d.decode('utf-8') for d in data ]
         try:
             service, dispatcher, keyword, direction, command, payload = data
@@ -131,14 +163,14 @@ class ZMQCauldronMessage(object):
             elif dispatcher != FRAMEBLANK:
                 raise ZMQCauldronParserError.with_message(
                     "Can't parser message '{0}' because message can't specify a dispatcher with no service.".format(data))
-        return cls(command, service, dispatcher, keyword, payload, direction)
+        return cls(command, service, dispatcher, keyword, payload, direction, prefix)
 
 class ZMQMicroservice(threading.Thread):
     """A ZMQ Responder tool."""
     
     _error = None
     
-    def __init__(self, context, address, name="microservice", timeout=10):
+    def __init__(self, context, address, name="microservice", use_broker=False, timeout=10):
         super(ZMQMicroservice, self).__init__(name=six.text_type(name))
         import zmq
         self.ctx = weakref.proxy(context or zmq.Context.instance())
@@ -146,12 +178,13 @@ class ZMQMicroservice(threading.Thread):
         self.timeout = float(timeout)
         self.log = logging.getLogger(name)
         self.address = address
+        self.use_broker = bool(use_broker)
         
         
     def handle(self, message):
         """Handle a message, raising an error if appropriate."""
         try:
-            self.log.log(5, "Handling |{0!s}|".format(message))
+            self.log.log(5, "Handling {0!s}".format(message))
             method_name = "handle_{0:s}".format(message.command)
             if not hasattr(self, method_name):
                 message.raise_error_response("Bad command '{0:s}'!".format(message.command))
@@ -167,14 +200,32 @@ class ZMQMicroservice(threading.Thread):
     def connect(self):
         """Connect to the address and return a socket."""
         import zmq
-        socket = self.ctx.socket(zmq.REP)
+        if self.use_broker:
+            socket = self.ctx.socket(zmq.REQ)
+        else:
+            socket = self.ctx.socket(zmq.REP)
+        
         try:
-            socket.bind(self.address)
+            if self.use_broker:
+                socket.connect(self.address)
+            else:
+                socket.bind(self.address)
         except zmq.ZMQError as e:
-            self.log.error("Service can't bind to address '{0}' because {1}".format(address, e))
+            self.log.error("Service can't bind to address '{0}' because {1}".format(self.address, e))
             self._error = e
             raise
+        else:
+            self.log.debug("Microservice {0} connected to address '{1}'".format(self.name, self.address))
+            
+        if self.use_broker:
+            # Ready sentinel for broker.
+            self.greet_broker(socket)
         return socket
+        
+    def greet_broker(self, socket):
+        """Send the appropriate greeting to the broker."""
+        socket.send_multipart([FRAMEBLANK] + ZMQCauldronMessage(command="ready").data)
+        self.log.log(5, "Sent broker a welcome message.")
             
     def respond(self):
         """Run the responder"""
@@ -189,7 +240,7 @@ class ZMQMicroservice(threading.Thread):
             while self.running.is_set():
                 if socket.poll(timeout=self.timeout):
                     response = self.handle(ZMQCauldronMessage.parse(socket.recv_multipart()))
-                    self.log.log(5, "Responds |{0!s}|".format(response))
+                    self.log.log(5, "Responds {0!s}".format(response))
                     socket.send_multipart(response.data)
                 
         except (zmq.ContextTerminated, weakref.ReferenceError, zmq.ZMQError) as e:
@@ -203,11 +254,13 @@ class ZMQMicroservice(threading.Thread):
             except:
                 pass
         finally:
+            self.log.log(5, "Stopped responder loop.")
             self.running.clear()
         
         
     def run(self):
         """Run the thread."""
+        atexit.register(_exit_handler, weakref.ref(self))
         try:
             self.respond()
         finally:
@@ -217,9 +270,11 @@ class ZMQMicroservice(threading.Thread):
         """Check that the thread is actually alive."""
         self.running.wait(timeout)
         if not self.running.is_set():
-            msg = "The dispatcher responder thread did not start."
+            msg = "The dispatcher responder thread is not alive."
             if self._error is not None:
                 msg += " Thread Error: {0}".format(repr(self._thread._error))
+            else:
+                msg += " No error was reported."
             raise DispatcherError(msg)
         
     def stop(self):

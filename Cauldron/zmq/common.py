@@ -34,6 +34,13 @@ def zmq_router_host(config):
     return config.get("zmq-router", "host")
     
 
+def zmq_address(config, name, bind=False, sequence=0):
+    """Construct a ZMQ address."""
+    protocol = config.get("zmq", "protocol")
+    host = "*" if bind else config.get("zmq", "host")
+    port = int(config.get("zmq", name)) + int(sequence)
+    return "{0}://{1}:{2:d}".format(protocol, host, port)
+
 def zmq_dispatcher_host(config):
     """docstring for zmq_dispatcher_host"""
     return config.get("zmq", "host")

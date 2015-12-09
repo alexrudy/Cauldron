@@ -8,9 +8,8 @@ from __future__ import absolute_import
 import weakref
 from ..base import ClientService, ClientKeyword
 from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented, DispatcherError
-from .common import zmq_dispatcher_address, zmq_broadcaster_address, check_zmq, teardown
+from .common import zmq_dispatcher_address, zmq_broadcaster_address, check_zmq, teardown, zmq_address
 from .microservice import ZMQCauldronMessage, ZMQCauldronErrorResponse, FRAMEBLANK, FRAMEFAIL
-from .router import lookup
 from .. import registry
 from ..config import cauldron_configuration
 
@@ -43,7 +42,7 @@ class _ZMQMonitorThread(threading.Thread):
             return
         socket = ctx.socket(zmq.SUB)
         try:
-            address = zmq_broadcaster_address(self.service._config)
+            address = zmq_address(self.service._config, "broadcast", bind=False)
             socket.connect(address)
         
             # Accept everything belonging to this service.
@@ -99,7 +98,7 @@ class Service(ClientService):
         zmq = check_zmq()
         socket = self.ctx.socket(zmq.REQ)
         try:
-            address = zmq_dispatcher_address(self._config)
+            address = zmq_address(self._config, "broker")
             socket.connect(address)
         except zmq.ZMQError as e:
             self.log.error("Service can't connect to responder address '{0}' because {1}".format(address, e))
@@ -111,7 +110,8 @@ class Service(ClientService):
         
     def _prepare(self):
         """Prepare step."""
-        lookup(self)
+        address = self._synchronous_command("lookup", "subscribe").payload
+        self._thread.address = address
         self._thread.start()
         
         
@@ -123,7 +123,7 @@ class Service(ClientService):
     def has_keyword(self, name):
         """Check if a dispatcher has a keyword."""
         message = self._synchronous_command("identify", name, None)
-        return message.payload != FRAMEFAIL
+        return message.payload == name
         
     def keywords(self):
         """List all available keywords."""
@@ -134,10 +134,11 @@ class Service(ClientService):
         """Execute a synchronous command."""
         request = ZMQCauldronMessage(command, service=self.name, dispatcher=FRAMEBLANK, 
             keyword=keyword.name if keyword else FRAMEBLANK, payload=payload, direction="REQ")
-        self.log.log(5, "Request |{0!s}|".format(request))
+        self.log.log(5, "Request {0!s}".format(request))
         self.socket.send_multipart(request.data)
         #TODO: Use polling here to support timeouts.
-        message = ZMQCauldronMessage.parse(self.socket.recv_multipart(), self)
+        message = ZMQCauldronMessage.parse(self.socket.recv_multipart())
+        self.log.log(5, "Response {0!s}".format(message))
         if message.direction == "ERR":
             raise DispatcherError("Dispatcher error on command: {0}".format(message.payload))
         message.verify(self)

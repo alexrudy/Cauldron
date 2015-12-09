@@ -4,7 +4,7 @@
 import pytest
 import time
 
-from .router import ZMQRouter, register, lookup, shutdown_router
+from .broker import ZMQBroker
 from ..conftest import fail_if_not_teardown, available_backends
 from ..api import use
 from ..config import cauldron_configuration
@@ -23,10 +23,9 @@ def zmq(request):
 def config_zmq(request):
     """Get the configuration item."""
     config = cauldron_configuration
-    config.set("zmq-router","port", "7700")
-    config.set("zmq-router","first-port","7710")
-    config.set("zmq-router","last-port","7800")
-    config.set("zmq-router","allow-spawn","no")
+    config.set("zmq","publish", "7802")
+    config.set("zmq","broadcast","7801")
+    config.set("zmq","broker","7800")
     return config
     
 def test_zmq_available():
@@ -42,7 +41,7 @@ def test_zmq_available():
 
 def test_router(zmq, config_zmq):
     """Test the router."""
-    router = ZMQRouter.thread(config_zmq)
+    broker = Broker.thread(config_zmq)
     
     from Cauldron import DFW
     svc = DFW.Service("test-router", config=config_zmq)
@@ -54,9 +53,9 @@ def test_router(zmq, config_zmq):
     svc = DFW.Service("test-router", config=config_zmq)
     svc.shutdown()
     
-    assert shutdown_router(None, config_zmq)
+    broker.stop()
     time.sleep(0.1)
-    assert not router.is_alive()
+    assert not broker.is_alive()
     
 def test_setup(zmq, config):
     """Test setup and broadcast functions"""
