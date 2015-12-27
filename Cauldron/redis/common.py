@@ -161,11 +161,12 @@ class REDISPubsubBase(object):
 class REDISKeywordBase(object):
     """A base class for managing REDIS Keywords"""
     
-    def _wait_for_status(self, status, timeout=None, callback=None):
+    def _wait_for_status(self, status, timeout=None, callback=None, initial_status=None):
         """Wait for a status value to appear."""
         event = threading.Event()
         log = self.service.log
         redis = self.service.redis
+        initial_status = initial_status or redis.get(redis_status_key(self))
         
         def _handle_status(recieved_status):
             """What to do when the status changes."""
@@ -173,9 +174,9 @@ class REDISKeywordBase(object):
                 event.set()
                 if callback is not None:
                     callback()
-            if "error" == recieved_status:
+            elif initial_status != recieved_status:
                 _handle_status._error = redis.get(redis_key_name(self)+":error")
-                log.debug("Recieved an 'error' notification for '{0}': {1}".format(self.name, _handle_status._error))
+                log.debug("Recieved an '{0}' notification for '{1}': {2}".format(recieved_status, self.name, _handle_status._error))
                 event.set()
         
         def _message_responder(message):
