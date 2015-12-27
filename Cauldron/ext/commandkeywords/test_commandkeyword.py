@@ -12,7 +12,7 @@ def command_keyword(dispatcher):
 def test_write_command_keyword(dispatcher, client, command_keyword):
     """Write to a command keyword."""
     command_keyword.modify('1')
-    assert client[command_keyword.name].read() in ['False', '0']
+    assert client[command_keyword.name].read() == False
     
 def test_callback(dispatcher, client, command_keyword, waittime):
     """Attach a callback to command keywords."""
