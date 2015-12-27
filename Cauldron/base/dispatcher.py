@@ -339,10 +339,28 @@ class Service(object):
         self.status_keyword = keyword
         return True
     
-    @api_override
     def setupOrphans(self):
         """Set up orphaned keywords, that is keywords which aren't attached to a specific keyword class."""
-        pass
+        for name, keyword in self._keywords.items():
+            if keyword is None:
+                self._setupOrphan(name)
+    
+    def _setupOrphan(self, name):
+        """Set up a single orphan."""
+        from Cauldron import DFW
+        try:
+            xml = self.xml[name]
+            ktl_type = ktlxml.getValue(xml, 'type')
+            cls = DFW.Keyword.types[ktl_type]
+        except Exception as e:
+            if STRICT_KTL_XML:
+                raise
+            cls = DFW.Keyword.Keyword
+        
+        try:
+            cls(name, service=self)
+        except WrongDispatcher:
+            pass
     
     @api_override
     def _prepare(self):
