@@ -16,6 +16,7 @@ import types
 import sys
 import abc
 import six
+import logging
 from .exc import CauldronAPINotImplementedWarning, CauldronXMLWarning
 from .api import guard_use, STRICT_KTL_XML
 from .bundled import ktlxml
@@ -23,6 +24,7 @@ from . import registry
 
 __all__ = ['KeywordType', 'Basic', 'Keyword', 'Boolean', 'Double', 'Float', 'Integer', 'Enumerated', 'Mask', 'String', 'IntegerArray', 'FloatArray', 'DoubleArray', 'dispatcher_keyword', 'client_keyword']
 
+log = logging.getLogger(__name__)
 
 _dispatcher = set()
 def dispatcher_keyword(cls):
@@ -51,6 +53,9 @@ def setup_client_keyword_module():
         setattr(Keyword, kwcls.__name__, kwcls)
         Keyword.__all__.append(kwcls.__name__)
         Keyword.types[kwcls.KTL_TYPE] = kwcls
+        for alias in kwcls.KTL_ALIASES:
+            Keyword.types[alias] = kwcls
+    Keyword.__all__ = list(set(Keyword.__all__))
     
 @registry.dispatcher.setup_for('all')
 def setup_dispatcher_keyword_module():
@@ -62,6 +67,10 @@ def setup_dispatcher_keyword_module():
         setattr(Keyword, kwcls.__name__, kwcls)
         Keyword.__all__.append(kwcls.__name__)
         Keyword.types[kwcls.KTL_TYPE] = kwcls
+        for alias in kwcls.KTL_ALIASES:
+            Keyword.types[alias] = kwcls
+    Keyword.__all__ = list(set(Keyword.__all__))
+    
 
 @six.add_metaclass(abc.ABCMeta)
 class KeywordType(object):
@@ -70,6 +79,7 @@ class KeywordType(object):
     The name of each type specialization is available as the :attr:`KTL_TYPE` class attribute.
     """
     KTL_TYPE = 'basic'
+    KTL_ALIASES = ()
     
     def __init__(self, *args, **kwargs):
         super(KeywordType, self).__init__(*args, **kwargs)
@@ -156,7 +166,7 @@ class Float(Double):
 @client_keyword
 class Numeric(Double):
     """A numerical value keyword."""
-    pass
+    KTL_ALIASES = ('float',)
 
 @dispatcher_keyword
 @client_keyword
