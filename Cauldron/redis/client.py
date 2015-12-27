@@ -66,7 +66,7 @@ class Keyword(ClientKeyword, REDISKeywordBase):
             raise NotImplementedError("Keyword '{0}' does not support reads.".format(self.name))
         
         if wait or timeout is not None:
-            self._wait_for_status('ready', timeout)
+            self._wait_for_status('ready', timeout, initial_status='modify')
             self._update_from_redis()
             return self._current_value(binary=binary, both=both)
         else:
@@ -87,7 +87,7 @@ class Keyword(ClientKeyword, REDISKeywordBase):
         self.service.redis.set(redis_key_name(self) + ":status", "modify")
         self.service.redis.publish(redis_key_name(self), value)
         if wait or timeout is not None:
-            self._wait_for_status('ready', timeout)
+            self._wait_for_status('ready', timeout, initial_status="modify")
         
     def wait(self, timeout=None, operator=None, value=None, sequence=None, reset=False, case=False):
         raise CauldronAPINotImplemented("Asynchronous operations are not supported for Cauldron.redis")
