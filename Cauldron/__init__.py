@@ -20,6 +20,8 @@ def _init_log():
     if hasattr(logging, 'NullHandler'):
         logging.getLogger("DFW").addHandler(logging.NullHandler())
         logging.getLogger("ktl").addHandler(logging.NullHandler())
+        logging.getLogger("Cauldron").addHandler(logging.NullHandler())
+        
     del logging
 
 
