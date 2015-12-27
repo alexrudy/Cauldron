@@ -82,6 +82,10 @@ class _Setting(object):
     def inverse(self):
         """A setting which is always the inverse of this setting."""
         return _SettingInverse(self)
+        
+    def __invert__(self):
+        """Handle inversion."""
+        return _SettingInverse(self)
     
     def __repr__(self):
         """Represent this value"""
