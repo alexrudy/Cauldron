@@ -58,7 +58,7 @@ import os
 from .utils._weakrefset import WeakSet
 
 def _pytest_get_option(config, name, default):
-    """docstring for _pytest_get_option"""
+    """Get pytest options in a version independent way, with allowed defaults."""
     
     try:
         value = config.getoption(name, default=default)
@@ -77,6 +77,13 @@ def pytest_configure(config):
         try:
             import lumberjack
             lumberjack.setup_logging("", mode='stream', level=1)
+            lumberjack.setup_warnings_logger("")
+        except:
+            pass
+    else:
+        try:
+            import lumberjack
+            lumberjack.setup_logging("", mode='none', level=1)
             lumberjack.setup_warnings_logger("")
         except:
             pass
