@@ -28,7 +28,7 @@ class _ZMQMonitorThread(threading.Thread):
         super(_ZMQMonitorThread, self).__init__()
         self.service = weakref.proxy(service)
         self.shutdown = threading.Event()
-        self.log = logging.getLogger("KTL.Service.Broadcasts")
+        self.log = logging.getLogger("ktl.Service.{0}.Broadcasts".format(service.name))
         self.monitored = set()
         self.daemon = True
         
@@ -67,7 +67,7 @@ class Service(ClientService):
         self.ctx = zmq.Context.instance()
         self._sockets = threading.local()
         self._config = cauldron_configuration
-        self._thread = _ZMQMonitorThread(self)
+        self._thread = None
         super(Service, self).__init__(name, populate)
         
     @property
@@ -92,9 +92,16 @@ class Service(ClientService):
         
     def _prepare(self):
         """Prepare step."""
+        self._thread = _ZMQMonitorThread(self)
         lookup(self)
         self._thread.start()
         
+    def _ktl_type(self, key):
+        """Get the KTL type of a specific keyword."""
+        ktl_type = self._synchronous_command("identify", key, None).payload
+        if ktl_type == 'no':
+            raise KeyError("Keyword {0} does not exist.".format(key))
+        return ktl_type
         
     def shutdown(self):
         """When this client is shutdown, close the subscription thread."""
@@ -104,7 +111,7 @@ class Service(ClientService):
     def has_keyword(self, name):
         """Check if a dispatcher has a keyword."""
         message = self._synchronous_command("identify", name, None)
-        return message.payload == "yes"
+        return message.payload != "no"
         
     def keywords(self):
         """List all available keywords."""
@@ -118,6 +125,7 @@ class Service(ClientService):
         self.socket.send(str(request))
         #TODO: Use polling here to support timeouts.
         message = ZMQCauldronMessage.parse(self.socket.recv(), self)
+        self.log.log(5, "Synchronous response '{0}'".format(message))
         if message.direction == "ERR":
             raise DispatcherError("Dispatcher error on command: {0}".format(message.payload))
         return message

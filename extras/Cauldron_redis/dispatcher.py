@@ -65,6 +65,7 @@ class Keyword(DispatcherKeyword):
         if not self.service.redis.exists(redis_key_name(self)):
             self.service.redis.set(redis_key_name(self), '')
             self.service.redis.set(redis_key_name(self)+':status', 'init')
+            self.service.redis.set(redis_key_name(self)+':type', self.KTL_TYPE)
     
     def _broadcast(self, value):
         """Broadcast that a value has changed in this keyword."""
