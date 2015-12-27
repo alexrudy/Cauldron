@@ -57,7 +57,7 @@ class Keyword(_BaseKeyword):
     
     _ALLOWED_KEYS = ['ascii', 'binary', 'broadcasts', 'name', 'monitored', 'monitor', 'populated', 'reads', 'writes', 'timestamp', 'units']
     
-    def __init__(self, service, name, type=str):
+    def __init__(self, service, name, type=None):
         super(Keyword, self).__init__(service, name, type)
         self._callbacks = Callbacks()
     
