@@ -9,10 +9,12 @@ from Cauldron.exc import NoWriteNecessary
 
 @dispatcher_keyword
 class CommandKeyword(Boolean):
-    """This keyword will recieve boolean writes as 1, and will always be set to 0. 
+    """This keyword will receive boolean writes as 1, and will always be set to 0. 
         
         Actions can then be performed in callbacks, etc., every time this keyword is triggered.
     """
+    
+    KTL_TYPE = 'command'
     
     def __init__(self, *args, **kwargs):
         kwargs['initial'] = '0'
@@ -21,7 +23,7 @@ class CommandKeyword(Boolean):
     def prewrite(self, value):
         """Before writing, trigger no-write-necssary if value is False"""
         if self.translate(value) == '0':
-            raise NoWriteNecessary("No write needed, command not triggerd.")
+            raise NoWriteNecessary("No write needed, command not triggered.")
         return super(CommandKeyword, self).prewrite(value)
     
     def postwrite(self, value):
