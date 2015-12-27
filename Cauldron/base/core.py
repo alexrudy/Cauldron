@@ -72,7 +72,7 @@ class _BaseKeyword(object):
         
     def _ktl_ascii(self):
         """Return the ascii value (String type.)"""
-        return self._ktl_value()
+        return str(self._ktl_value())
     
     def _maybe_read(self):
         """Maybe perform a read operation, if one is not already in progress."""

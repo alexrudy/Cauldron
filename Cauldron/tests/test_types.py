@@ -58,7 +58,8 @@ def modify_update(keyword, modify, update):
             keyword.modify(modify)
     else:
         keyword.modify(modify)
-        assert keyword.update() == update
+        keyword.update()
+        assert keyword._ktl_binary() == update
     
 @pytest.fixture
 def keyword_enumerated(dispatcher):

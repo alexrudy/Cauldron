@@ -155,7 +155,7 @@ class Keyword(_BaseKeyword):
     def set(self, value, force=False):
         """Set the keyword to the value provided, and broadcast changes.
         
-        :param value: The keywrod value.
+        :param value: The keyword value.
         :param bool force: Whether to force the change, or ignore repeatedly setting a keyword to the same value.
         """
         value = self.translate(value)

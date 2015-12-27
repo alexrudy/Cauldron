@@ -132,9 +132,6 @@ class Boolean(Basic):
         """Check value before writing."""
         return super(Boolean, self).prewrite(self.translate(value))
         
-    def postread(self, value):
-        """Translate the value for python binary return."""
-        return super(Boolean, self).postread(self._type(value))
         
 @dispatcher_keyword
 class Double(Basic):
