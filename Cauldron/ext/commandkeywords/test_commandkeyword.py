@@ -52,6 +52,7 @@ def test_callback(dispatcher, client, command_keyword, waittime):
     assert not cb.triggered.is_set()
     cb.triggered.clear()
     
+    dispatcher.log.debug("Client 0 write...")
     client[name].write('0')
     cb.triggered.wait(waittime)
     assert not cb.triggered.is_set()
