@@ -67,6 +67,16 @@ class Keyword(DispatcherKeyword):
             self.service.redis.set(redis_key_name(self)+':status', 'init')
             self.service.redis.set(redis_key_name(self)+':type', self.KTL_TYPE)
     
+    def _redis_set_status(self, status):
+        """Set REDIS status for a keyword."""
+        self.service.log.log(5, "Setting '{0}' status = '{1}' from '{2}'".format(self.name, status, 
+            self.service.redis.get(redis_key_name(self)+':status')))
+        self.service.redis.set(redis_key_name(self)+':status', status)
+        if status != "error":
+            if self.service.redis.exists(redis_key_name(self)+':error'):
+                self.service.log.log(5, "Clearing error for '{0}'".format(self.name))
+                self.service.redis.delete(redis_key_name(self)+':error')
+    
     def _broadcast(self, value):
         """Broadcast that a value has changed in this keyword."""
         self.service.redis.set(redis_key_name(self), value)
@@ -75,9 +85,10 @@ class Keyword(DispatcherKeyword):
         """Take a message."""
         if msg['channel'] == redis_key_name(self):
             try:
+                self.service.log.log(5, "'{0}' modify({1})".format(self.name, msg["data"]))
                 self.modify(msg["data"])
             except Exception as e:
-                self.service.log.error("Error in the REDIS responder thread: {0!s}".format(e))
+                self.service.log.error("Error in the REDIS responder thread for set({0!s}): {1!s}".format(msg["data"], e))
                 self.service.redis.set(redis_key_name(self)+':error', str(e))
                 self.service.redis.set(redis_key_name(self)+':status', 'error')
             
@@ -87,6 +98,8 @@ class Keyword(DispatcherKeyword):
         try:
             super(Keyword, self).set(value, force)
         except Exception as e:
+            self.service.redis.set(redis_key_name(self)+':error', str(e))
+            self._redis_set_status('error')
             raise
         else:
             self.service.redis.set(redis_key_name(self)+':status', 'ready')
