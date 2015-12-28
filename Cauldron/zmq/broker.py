@@ -202,6 +202,7 @@ class ZMQBroker(threading.Thread):
         """Make a broker which serves."""
         obj = cls.from_config(config, name)
         obj.respond()
+        return obj
         
     @classmethod
     def daemon(cls, config=None):
@@ -215,7 +216,7 @@ class ZMQBroker(threading.Thread):
     @classmethod
     def thread(cls, config=None):
         """Serve in a thread."""
-        obj = cls.serve(config)
+        obj = cls.from_config(config)
         obj.daemon = True
         obj.start()
         return obj
@@ -366,7 +367,7 @@ class ZMQBroker(threading.Thread):
         self.running.set()
         self.log.debug("Broker running. Timeout={0}".format(self.timeout))
         while self.running.is_set() or len(self._active):
-            sockets = dict(poller.poll(timeout=self.timeout * 1e3))
+            sockets = dict(poller.poll(timeout=self.timeout * 1e-3))
             if sockets.get(socket) == zmq.POLLIN:
                 request = socket.recv_multipart()
                 
