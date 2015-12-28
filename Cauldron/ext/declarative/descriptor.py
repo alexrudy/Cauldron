@@ -121,7 +121,8 @@ class KeywordDescriptor(object):
     
     """
     
-    _EVENTS = ['preread', 'read', 'postread', 'prewrite', 'write', 'postwrite', 'check']
+    _EVENTS =       ['preread',      'read',        'postread',   'prewrite',   'write',       'postwrite',   'check'      ]
+    _EVENT_PARAMS = [(False, False), (False, True), (True, True), (True, True), (True, False), (True, False), (True, False)]
     _service = None
     
     def __init__(self, name, initial=None, type=lambda v : v, doc=None, readonly=False, writeonly=False):
@@ -136,8 +137,8 @@ class KeywordDescriptor(object):
         
         # Prepare the events interface.
         self._events = []
-        for event in self._EVENTS:
-            evt = _DescriptorEvent(event)
+        for event, args in zip(self._EVENTS, self._EVENT_PARAMS):
+            evt = _DescriptorEvent(event, *args)
             setattr(self, event, evt)
             self._events.append(evt)
             
@@ -151,7 +152,6 @@ class KeywordDescriptor(object):
         self._initial = initial
         self._attr_initial = initial
         self._bound = False
-        self._events.append(self.callback)
         
     def __repr__(self):
         """Represent"""

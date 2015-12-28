@@ -12,10 +12,24 @@ def cls():
     class DescriptorTestClass(DescriptorBase):
         mykeyword = KeywordDescriptor("MYKEYWORD", initial="SomeValue")
         typedkeyword = KeywordDescriptor("TYPEDKEYWORD", type=int, initial=10)
+        mungedkeyword = KeywordDescriptor("MUNGEDKEYWORD", initial="SomeValue")
+        
         def __init__(self):
             super(DescriptorTestClass, self).__init__()
             self.called = set()
-    
+            
+        @mungedkeyword.prewrite
+        def mungedkeyword_write(self, keyword, value):
+            """Munge before writing."""
+            print("Write-munging {0} from {1}".format(keyword, value))
+            return "OtherValue"
+            
+        @mungedkeyword.postread
+        def mungedkeyword_read(self, keyword):
+            """Munge before reading."""
+            print("Read-munging {0}".format(keyword))
+            return "OtherValue"
+        
         @mykeyword.callback
         def callback(self, keyword):
             """Changed value callback"""
@@ -27,6 +41,7 @@ def cls():
             """Pre-write listener."""
             print("Calling 'prewrite'")
             self.called.add("prewrite")
+            return value
         
         @mykeyword.preread
         def preread(self, keyword):
@@ -72,6 +87,15 @@ def test_descriptor_basics(dispatcher, cls):
     assert newinstance.mykeyword == "Hello"
     
     newinstance.mykeyword = "Goodbye"
+    
+def test_descriptor_params(dispatcher, cls):
+    """Test descriptor parameter use."""
+    instance = cls()
+    assert instance.mungedkeyword == "SomeValue"
+    instance.bind(dispatcher)
+    assert instance.mungedkeyword == "OtherValue"
+    instance.mungedkeyword = "SomeValue"
+    assert instance.mungedkeyword == "OtherValue"
     
 def test_bind(dispatcher, cls):
     """Test the bind method"""
