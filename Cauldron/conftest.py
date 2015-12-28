@@ -17,7 +17,7 @@ try:
     del PYTEST_HEADER_MODULES['h5py']
     del PYTEST_HEADER_MODULES['Scipy']
     del PYTEST_HEADER_MODULES['Matplotlib']
-    del PYTEST_HEADER_MODULES['Pandas']
+    PYTEST_HEADER_MODULES.pop('Pandas', None)
 except NameError:  # needed to support Astropy < 1.0
     pass
 
