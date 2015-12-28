@@ -90,11 +90,11 @@ class Keyword(DispatcherKeyword):
             except Exception as e:
                 self.service.log.error("Error in the REDIS responder thread for set({0!s}): {1!s}".format(msg["data"], e))
                 self.service.redis.set(redis_key_name(self)+':error', str(e))
-                self.service.redis.set(redis_key_name(self)+':status', 'error')
+                self._redis_set_status('error')
             
     def set(self, value, force=False):
         """During set, lock status."""
-        self.service.redis.set(redis_key_name(self)+':status', 'modify')
+        self._redis_set_status('modify')
         try:
             super(Keyword, self).set(value, force)
         except Exception as e:
@@ -102,6 +102,7 @@ class Keyword(DispatcherKeyword):
             self._redis_set_status('error')
             raise
         else:
-            self.service.redis.set(redis_key_name(self)+':status', 'ready')
+            self.service.log.log(5, "Setting 'ready' from set({0}) which raised no errors.".format(value))
+            self._redis_set_status('ready')
     
 

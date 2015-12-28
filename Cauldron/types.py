@@ -143,7 +143,6 @@ class Boolean(Basic):
         """Check value before writing."""
         return super(Boolean, self).prewrite(self.translate(value))
         
-        
 @dispatcher_keyword
 class Double(Basic):
     """A numerical value keyword."""

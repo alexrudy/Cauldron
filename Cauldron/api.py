@@ -122,7 +122,10 @@ def teardown():
         It is likely that if you call this method with instances of Keyword or Service still active in your application,
         those instances will become unusable.
     """
-    name = registry.client.backend
+    if registry.client.backend is not None:
+        name = registry.client.backend
+    else:
+        name = "unknown"
     registry.teardown()
     try:
         Cauldron = sys.modules[BASENAME]
