@@ -56,7 +56,10 @@ class _ZMQResponderThread(threading.Thread):
         
     def handle_identify(self, message):
         """Handle an identify command."""
-        return "yes" if message.payload in message.service else "no"
+        if message.payload in message.service:
+            return message.service[message.payload].KTL_TYPE
+        else:
+            return "no"
         
     def handle_enumerate(self, message):
         """Handle enumerate command."""
