@@ -29,7 +29,6 @@ def _init_log():
 if not _ASTROPY_SETUP_:
     from .api import use, install
     from . import local
-    from . import redis
     from . import mock
     from . import zmq
     from . import types
