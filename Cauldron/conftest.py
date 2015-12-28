@@ -17,6 +17,7 @@ try:
     del PYTEST_HEADER_MODULES['h5py']
     del PYTEST_HEADER_MODULES['Scipy']
     del PYTEST_HEADER_MODULES['Matplotlib']
+    del PYTEST_HEADER_MODULES['Pandas']
 except NameError:  # needed to support Astropy < 1.0
     pass
 
@@ -36,9 +37,6 @@ except NameError:   # Needed to support Astropy <= 1.0.0
     pass
 
 available_backends = ["local"]
-
-from .redis.common import testing_enable_redis
-available_backends.extend(testing_enable_redis())
 
 try:
     import zmq
