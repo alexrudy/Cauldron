@@ -11,11 +11,14 @@ from __future__ import absolute_import
 
 import six
 import abc
+import sys
 import time
 import weakref
 import datetime
 import logging
+import warnings
 from .core import _BaseKeyword
+from ..exc import CauldronWarning
 from ..utils.callbacks import Callbacks
 from ..utils.helpers import api_not_required, api_not_implemented, api_required, api_override
 
@@ -57,7 +60,7 @@ class Keyword(_BaseKeyword):
     
     _ALLOWED_KEYS = ['ascii', 'binary', 'broadcasts', 'name', 'monitored', 'monitor', 'populated', 'reads', 'writes', 'timestamp', 'units']
     
-    def __init__(self, service, name, type=str):
+    def __init__(self, service, name, type=None):
         super(Keyword, self).__init__(service, name, type)
         self._callbacks = Callbacks()
     
@@ -251,10 +254,22 @@ class Service(object):
         else:
             raise KeyError("{0} has no key '{1}'".format(self, key.upper()))
     
+    @api_required
+    def _ktl_type(self, key):
+        """Return the KTL type for a keyword."""
+        return 'basic'
+    
     def __missing__(self, key):
         """Populate and return a missing key."""
         from Cauldron import ktl
-        keyword = ktl.Keyword.Keyword(self, key)
+        ktl_type = self._ktl_type(key)
+        if ktl_type in ktl.Keyword.types:
+            keyword = ktl.Keyword.types[ktl_type](self, key)
+            self.log.debug("Using KTL_TYPE '{0}' for keyword '{1}'".format(keyword.KTL_TYPE, keyword.name))
+        else:
+            self.log.warning("Using generic keyword for KTL_TYPE '{0}' for keyword '{1}'".format(ktl_type, key))
+            self.log.debug("Available types: {0}".format(", ".join(ktl.Keyword.types)))
+            keyword = ktl.Keyword.Keyword(self, key)
         self._keywords[keyword.name] = keyword
         return keyword
     

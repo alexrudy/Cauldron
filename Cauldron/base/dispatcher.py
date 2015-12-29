@@ -155,7 +155,7 @@ class Keyword(_BaseKeyword):
     def set(self, value, force=False):
         """Set the keyword to the value provided, and broadcast changes.
         
-        :param value: The keywrod value.
+        :param value: The keyword value.
         :param bool force: Whether to force the change, or ignore repeatedly setting a keyword to the same value.
         """
         value = self.translate(value)
@@ -339,10 +339,28 @@ class Service(object):
         self.status_keyword = keyword
         return True
     
-    @api_override
     def setupOrphans(self):
         """Set up orphaned keywords, that is keywords which aren't attached to a specific keyword class."""
-        pass
+        for name, keyword in self._keywords.items():
+            if keyword is None:
+                self._setupOrphan(name)
+    
+    def _setupOrphan(self, name):
+        """Set up a single orphan."""
+        from Cauldron import DFW
+        try:
+            xml = self.xml[name]
+            ktl_type = ktlxml.getValue(xml, 'type')
+            cls = DFW.Keyword.types[ktl_type]
+        except Exception as e:
+            if STRICT_KTL_XML:
+                raise
+            cls = DFW.Keyword.Keyword
+        
+        try:
+            cls(name, service=self)
+        except WrongDispatcher:
+            pass
     
     @api_override
     def _prepare(self):

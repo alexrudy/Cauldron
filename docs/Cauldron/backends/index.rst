@@ -9,7 +9,6 @@ Cauldron has a few backends implemented, and it is easy to implement additional 
     :maxdepth: 2
     
     local
-    redis
     zmq
 
 Implementing a Backend

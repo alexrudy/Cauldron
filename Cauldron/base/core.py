@@ -15,7 +15,6 @@ class _BaseKeyword(object):
     """Some common keyword implementation details between the client and dispatcher"""
     
     _ALLOWED_KEYS = None
-    _type = str
     
     def __init__(self, service, name, type=None):
         super(_BaseKeyword, self).__init__()
@@ -28,6 +27,10 @@ class _BaseKeyword(object):
         self._acting = False
         if type is not None:
             self._type = type
+            
+    def _type(self, value):
+        """When in doubt, just stringify."""
+        return str(value)
         
     def __repr__(self):
         """Represent this keyword"""
@@ -37,15 +40,6 @@ class _BaseKeyword(object):
             repr_str += " value={value}".format(value=self._last_value)
         return repr_str + ">"
     
-    # @property
-    # def service(self):
-    #     """The parent service for this keyword.
-    #
-    #     This is retained via weak-reference, so the service may be garbage collected
-    #     and destroyed, in which case this property will become ``None``.
-    #     """
-    #     return self._service()
-        
     @property
     def full_name(self):
         """Full name"""
@@ -72,7 +66,7 @@ class _BaseKeyword(object):
         
     def _ktl_ascii(self):
         """Return the ascii value (String type.)"""
-        return self._ktl_value()
+        return str(self._ktl_value())
     
     def _maybe_read(self):
         """Maybe perform a read operation, if one is not already in progress."""

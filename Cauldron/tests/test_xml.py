@@ -31,6 +31,8 @@ def test_Service_with_xml(xmlvar, backend, servicename, config):
         assert "KEYWORD" not in svc
         kwd = svc["KEYWORD"]
         assert "KEYWORD" in svc
+        kwd = svc["LOOP"]
+        assert kwd.KTL_TYPE == 'enumerated'
     finally:
         svc.shutdown()
     

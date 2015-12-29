@@ -16,7 +16,7 @@ env:
         - ASTROPY_VERSION=stable
         - CONDA_INSTALL='conda install -c astropy-ci-extras --yes'
         - PIP_INSTALL='pip install'
-        - OPTIONAL_DEPS='redis>=2.10.5 pyzmq'
+        - OPTIONAL_DEPS='pyzmq'
         - SETUP_CMD='test'
     matrix:
       - SETUP_CMD='egg_info'
@@ -34,8 +34,6 @@ matrix:
           env: SETUP_CMD='build_sphinx -w'
           
         # Try without some optional deps
-        - python: 2.7
-          env: OPTIONAL_DEPS='redis>=2.10.5'
         - python: 2.7
           env: OPTIONAL_DEPS='pyzmq'
         - python: 2.7

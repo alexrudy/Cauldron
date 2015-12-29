@@ -44,12 +44,14 @@ for kwtype, modify, update in keyword_types:
         keyword_types.append(('float', modify, update))
 
 @pytest.mark.parametrize("kwtype,modify,update", keyword_types)
-def test_keyword_types(kwtype, modify, update, dispatcher):
+def test_keyword_types(kwtype, modify, update, dispatcher, client):
     """Test a keyword type."""
     name = "my{0}".format(kwtype.replace(" ","")).upper()
     from Cauldron import DFW
     DFW.Keyword.types[kwtype](name, dispatcher)
     modify_update(dispatcher[name], modify, update)
+    check_client_type(dispatcher[name], client, update)
+    
     
 def modify_update(keyword, modify, update):
     """Run a modify-update test on a keyword."""
@@ -58,7 +60,21 @@ def modify_update(keyword, modify, update):
             keyword.modify(modify)
     else:
         keyword.modify(modify)
-        assert keyword.update() == update
+        keyword.update()
+        assert keyword._ktl_binary() == update
+    
+def check_client_type(keyword, client, update):
+    """Check client keyword type."""
+    cli_kwd = client[keyword.name]
+    from Cauldron import ktl
+    if keyword.KTL_TYPE in ktl.Keyword.types:
+        target = set([keyword.KTL_TYPE] + list(keyword.KTL_ALIASES))
+        assert any([t in target for t in set([cli_kwd.KTL_TYPE] + list(cli_kwd.KTL_ALIASES)) ])
+    else:
+        assert cli_kwd.KTL_TYPE == 'basic'
+    if not (inspect.isclass(update) and issubclass(update, Exception)):
+        cli_kwd.read()
+        assert cli_kwd['binary'] == update
     
 @pytest.fixture
 def keyword_enumerated(dispatcher):

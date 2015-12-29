@@ -8,11 +8,14 @@ from __future__ import absolute_import
 import types
 import sys
 import warnings
+import logging
 
 from . import registry
 from .utils.helpers import _Setting
 
 __all__ = ['install', 'use', 'teardown', 'use_strict_xml', 'STRICT_KTL_XML', 'APISetting']
+
+log = logging.getLogger("Cauldron.api")
 
 CAULDRON_SETUP = _Setting("CAULDRON_SETUP", False)
 
@@ -50,17 +53,18 @@ def use(name):
     if CAULDRON_SETUP:
         raise RuntimeError("You may only call Cauldron.use() once! It is an error to activate again.")
     
-    if name not in registry.keys():
-        raise ValueError("The Cauldron backend '{0}' is not registered. Available backends are {1!r}".format(
-            name, list(registry.keys())))
-    
     # Allow imports of backend modules now.
     CAULDRON_SETUP.on()
     
     # Set up the LROOT KTL installation differently
     if name in KTL_DEFAULT_NAMES: # pragma: no cover
         return setup_ktl_backend()
+        
+    if name not in registry.keys():
+        raise ValueError("The Cauldron backend '{0}' is not registered. Available backends are {1!r}".format(
+            name, list(registry.keys())))
     
+    log.info("Cauldron initialized using backend '{0}'".format(name))
     registry.client.use(name)
     registry.dispatcher.use(name)
     
@@ -118,6 +122,10 @@ def teardown():
         It is likely that if you call this method with instances of Keyword or Service still active in your application,
         those instances will become unusable.
     """
+    if registry.client.backend is not None:
+        name = registry.client.backend
+    else:
+        name = "unknown"
     registry.teardown()
     try:
         Cauldron = sys.modules[BASENAME]
@@ -140,6 +148,8 @@ def teardown():
     finally:
         CAULDRON_SETUP.off()
         STRICT_KTL_XML.off()
+        log.info("Cauldron teardown from backend '{0}'".format(name))
+        
     
     
 def install():

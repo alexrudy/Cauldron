@@ -17,6 +17,7 @@ try:
     del PYTEST_HEADER_MODULES['h5py']
     del PYTEST_HEADER_MODULES['Scipy']
     del PYTEST_HEADER_MODULES['Matplotlib']
+    PYTEST_HEADER_MODULES.pop('Pandas', None)
 except NameError:  # needed to support Astropy < 1.0
     pass
 
@@ -37,9 +38,6 @@ except NameError:   # Needed to support Astropy <= 1.0.0
 
 available_backends = ["local"]
 
-from .redis.common import testing_enable_redis
-available_backends.extend(testing_enable_redis())
-
 try:
     import zmq
 except ImportError:
@@ -58,7 +56,7 @@ import os
 from .utils._weakrefset import WeakSet
 
 def _pytest_get_option(config, name, default):
-    """docstring for _pytest_get_option"""
+    """Get pytest options in a version independent way, with allowed defaults."""
     
     try:
         value = config.getoption(name, default=default)
@@ -77,6 +75,13 @@ def pytest_configure(config):
         try:
             import lumberjack
             lumberjack.setup_logging("", mode='stream', level=1)
+            lumberjack.setup_warnings_logger("")
+        except:
+            pass
+    else:
+        try:
+            import lumberjack
+            lumberjack.setup_logging("", mode='none', level=1)
             lumberjack.setup_warnings_logger("")
         except:
             pass
