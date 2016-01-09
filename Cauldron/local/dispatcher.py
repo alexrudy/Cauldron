@@ -26,12 +26,33 @@ def clear():
 @registry.dispatcher.service_for("local")
 class Service(DispatcherService):
     
+    def _enable_cache(self):
+        """Enable caching."""
+        
+        if not self._config.getboolean('local', 'enable-cache'):
+            self._cache_enabled = False
+            return
+        
+        try:
+            import yaml
+        except ImportError:
+            self._cache_enabled = False
+            self.log.debug("Caching disabled, YAML is not installed.")
+            return
+            
+        cachedir = self._config.get('local', 'cache')
+        if os.path.exists(cachedir):
+            self._load_cache(cachedir)
+        else:
+            os.makedirs(cachedir)
+        self._cache_location = cachedir
+        self._cache_enabled = True
+    
     def _save_cache(self, location):
         """Cache this service to disk."""
         try:
             import yaml
         except ImportError:
-            self.log.debug("Caching disabled, YAML is not installed.")
             return
         
         filename = os.path.join(location, "{0}.yml".format(self._fqn))
@@ -55,7 +76,6 @@ class Service(DispatcherService):
         try:
             import yaml
         except ImportError:
-            self.log.debug("Caching disabled, YAML is not installed.")
             return
         
         from Cauldron import DFW
@@ -77,6 +97,7 @@ class Service(DispatcherService):
                     self[keyword].value = properties['value']
             except WrongDispatcher as e:
                 pass
+        
     
     @classmethod
     def get_service(cls, name):
@@ -88,16 +109,12 @@ class Service(DispatcherService):
     def __init__(self, name, config, setup=None, dispatcher=None):
         if str(name).lower() in _registry:
             raise ValueError("Cannot have two services with name '{0}' in local registry.".format(name))
+        self._cache_enabled = False
         super(Service, self).__init__(name, config, setup, dispatcher)
         
     def _prepare(self):
         """Prepare for operation."""
-        cachedir = self._config.get('local', 'cache')
-        if os.path.exists(cachedir):
-            self._load_cache(cachedir)
-        else:
-            os.makedirs(cachedir)
-        self._cache_location = cachedir
+        self._enable_cache()
         
     def _begin(self):
         """Indicate that this service is ready to act, by inserting it into the local registry."""

@@ -43,7 +43,10 @@ def test_teardown(servicename, teardown_cauldron):
     use("local")
     from Cauldron.DFW import Service
     svc2 = Service(servicename+"2", None)
-    assert svc2['MYKEYWORD'].read() == '10'
+    if svc2._cache_enabled:
+        assert svc2['MYKEYWORD'].read() == '10'
+    else:
+        assert svc2['MYKEYWORD'].read() == None
 
 def test_duplicate_services(backend, servicename):
     """Test duplicate services."""
