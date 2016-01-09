@@ -38,10 +38,10 @@ def test_read_configuration_path(configfile):
 def test_read_nonexistent_path(tmpdir):
     """Ensure that we read safely from a non-existent path."""
     cfg = read_configuration(tmpdir.join("does-not-exist.cfg"))
-    assert cfg.has_option("zmq", "broker") # Test that we still got the default configuration.
+    assert cfg.has_option("local", "cache") # Test that we still got the default configuration.
     
 def test_read_bad_configuration_file(badconfigfile):
     """Test that we can plow through a bad config file."""
     cfg = read_configuration(badconfigfile)
-    assert cfg.has_option("zmq", "broker") # Test that we still got the default configuration.
+    assert cfg.has_option("local", "cache") # Test that we still got the default configuration.
     
