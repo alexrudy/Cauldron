@@ -104,17 +104,22 @@ def pytest_generate_tests(metafunc):
 @pytest.fixture(scope='function')
 def config(tmpdir):
     """DFW configuration."""
-    from .config import cauldron_configuration
-    cauldron_configuration.set("zmq", "broker", "inproc://broker")
-    cauldron_configuration.set("zmq", "publish", "inproc://publish")
-    cauldron_configuration.set("zmq", "subscribe", "inproc://subscribe")
-    cauldron_configuration.set("core", "timeout", "5")
-    return cauldron_configuration
+    from six.moves import configparser
+    config_filename = pkg_resources.resource_filename("Cauldron", os.path.join("data", "testing.cfg"))
+    config = configparser.ConfigParser()
+    config.add_section('local')
+    config.set('local', 'cache', str(tmpdir))
+    config.set("zmq", "broker", "inproc://broker")
+    config.set("zmq", "publish", "inproc://publish")
+    config.set("zmq", "subscribe", "inproc://subscribe")
+    with open(config_filename, 'w') as f:
+        config.write(f)
+    return config_filename
     
 
 @pytest.fixture(scope='function')
 def teardown_cauldron(request):
-    """A specific fixture to force cauldron teardown."""
+    """A fixture to facilitate teardown"""
     request.addfinalizer(fail_if_not_teardown)
     return None
 

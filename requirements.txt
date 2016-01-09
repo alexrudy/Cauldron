@@ -1,3 +1,4 @@
 astropy_helpers
 six
 pyzmq
+pyyaml

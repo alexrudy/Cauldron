@@ -29,6 +29,21 @@ def local_client(local_service, servicename):
     """Test a client."""
     from Cauldron import ktl
     return ktl.Service(servicename)
+    
+def test_teardown(servicename, teardown_cauldron):
+    """Check that teardown really does tear things down, in local mode."""
+    from Cauldron.api import teardown, use
+    use("local")
+    from Cauldron.DFW import Service
+    svc = Service(servicename+"2", None)
+    svc['MYKEYWORD'].modify('10')
+    teardown()
+    del svc
+    
+    use("local")
+    from Cauldron.DFW import Service
+    svc2 = Service(servicename+"2", None)
+    assert svc2['MYKEYWORD'].read() == '10'
 
 def test_duplicate_services(backend, servicename):
     """Test duplicate services."""
