@@ -65,6 +65,13 @@ class _KeywordEvent(object):
     def __init__(self, keyword, instance, event):
         super(_KeywordEvent, self).__init__()
         
+        # Important implementation note here: this object behaves like a singleton
+        # due to the override in __new__ above, this method will be called on both
+        # new objects and already existing objects which are re-bound to a particular
+        # function. The re-binding allows us to add additional listeners to this
+        # object on an as-needed basis. However, everything done in this method
+        # should be ok with multiple invocations.
+        
         func = getattr(keyword, event.name)
         if func is not self:
             self.func = func
