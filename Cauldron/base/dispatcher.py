@@ -307,6 +307,7 @@ class Service(_BaseService):
         self._config = read_configuration(config)
         self._configuration_location = config if isinstance(config, six.string_types) else "???"
         self.dispatcher = dispatcher if dispatcher else "DEFAULT"
+        self._fqn = "{0}+{1}".format(self.name, self.dispatcher)
         self.log = logging.getLogger("DFW.Service.{0}".format(self.name))
         self.log.info("Starting Service '{0}' using backend '{1}'".format(self.name, registry.dispatcher.backend))
         
