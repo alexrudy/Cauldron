@@ -38,7 +38,7 @@ class _DescriptorEvent(object):
                 args[0] = value
             try:
                 returned = callback(keyword, *args, **kwargs)
-            except TypeError:
+            except (TypeError, weakref.ReferenceError):
                 returned = callback.bound(instance)(keyword, *args, **kwargs)
             if self.value_as_return:
                 value = returned
