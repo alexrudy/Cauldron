@@ -419,7 +419,8 @@ class Service(object):
         
         if name not in self._keywords:
             if not STRICT_KTL_XML:
-                warnings.warn(CauldronXMLWarning("service '{0}' does not have a keyword '{1}' in XML".format(self.name, name)))
+                if self.xml is not None:
+                    warnings.warn(CauldronXMLWarning("service '{0}' does not have a keyword '{1}' in XML".format(self.name, name)))
             else:
                 raise KeyError("service '%s' does not have a keyword '%s'" % (self.name, name))
             
