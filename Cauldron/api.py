@@ -71,7 +71,7 @@ def use(name):
     Cauldron = sys.modules[BASENAME]
     # Install the client side libraries.
     from Cauldron import _ktl
-    sys.modules.setdefault('Cauldron._ktl', _ktl)
+    _ktl = sys.modules.setdefault('Cauldron._ktl', _ktl)
     reload(_ktl)
     
     from Cauldron._ktl.Service import Service
@@ -82,7 +82,7 @@ def use(name):
     
     # Install the dispatcher side libraries.
     from Cauldron import _DFW
-    sys.modules.setdefault('Cauldron._DFW', _DFW)
+    _DFW = sys.modules.setdefault('Cauldron._DFW', _DFW)
     reload(_DFW)
     from Cauldron._DFW.Service import Service
     from Cauldron._DFW import Keyword

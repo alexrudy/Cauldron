@@ -113,7 +113,8 @@ def fail_if_not_teardown():
         for failure in failures:
             if failure in module.split("."):
                 mod = sys.modules[module]
-                pytest.fail("Module {0}/{1} not properly torn down.".format(module, sys.modules[module]))
+                if mod is not None:
+                    pytest.fail("Module {0}/{1} not properly torn down.".format(module, sys.modules[module]))
     try:
         from Cauldron import DFW
     except ImportError as e:
