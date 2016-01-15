@@ -57,11 +57,15 @@ class WeakMethod(object):
         if not self.valid:
             return "<{0} invalid at {1}>".format(self.__class__.__name__, hex(id(self)))
         try:
-            name = self.get().__name__
+            name = self.func.__name__
             instance = repr(self.instance)
-            if self.method:
+            if self.method and self.instance is not None:
                 return "<{0} to '{1}' bound to '{2}' at {3}>".format(
                     self.__class__.__name__, name, instance, hex(id(self))
+                )
+            elif self.method and self.instance is None:
+                return "<{0} to '{1}' unbound at {2}>".format(
+                    self.__class__.__name__, name, hex(id(self))
                 )
             else:
                 return "<{0} to '{1}' at {2}>".format(
@@ -107,6 +111,11 @@ class WeakMethod(object):
     @instance.setter
     def instance(self, value):
         """Set the instance."""
+        if value is None:
+            self._instance = lambda : None
+            self.method = False
+            return
+        
         def remove(wr, weakself=weakref.ref(self)):
             self = weakself()
             if self is not None:

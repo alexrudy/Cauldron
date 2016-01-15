@@ -13,10 +13,10 @@ from astropy.tests.pytest_plugins import *
 ## from the list of packages for which version numbers are displayed
 ## when running the tests
 try:
-    PYTEST_HEADER_MODULES['astropy'] = 'astropy'
-    del PYTEST_HEADER_MODULES['h5py']
-    del PYTEST_HEADER_MODULES['Scipy']
-    del PYTEST_HEADER_MODULES['Matplotlib']
+    PYTEST_HEADER_MODULES['Astropy'] = 'astropy'
+    PYTEST_HEADER_MODULES.pop('h5py', None)
+    PYTEST_HEADER_MODULES.pop('Scipy', None)
+    PYTEST_HEADER_MODULES.pop('Matplotlib', None)
     PYTEST_HEADER_MODULES.pop('Pandas', None)
 except NameError:  # needed to support Astropy < 1.0
     pass
