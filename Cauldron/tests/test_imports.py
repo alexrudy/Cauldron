@@ -73,6 +73,31 @@ def test_teardown():
     assert "DFW" not in sys.modules
     assert "ktl" not in sys.modules
 
+def test_double_teardown():
+    """Test teardown twice"""
+    from Cauldron.api import use, install, teardown
+    use("local")
+    from Cauldron import ktl
+    del ktl
+    
+    from Cauldron import DFW
+    del DFW
+    
+    install()
+    teardown()
+    teardown()
+    
+    with pytest.raises(ImportError):
+        from Cauldron import ktl
+    with pytest.raises(ImportError):
+        from Cauldron import DFW
+    
+    assert "DFW" not in sys.modules
+    assert "ktl" not in sys.modules
+    
+    use('local')
+    from Cauldron import ktl, DFW
+
 def test_install():
     """Test the install feature."""
     from Cauldron.api import use, install
