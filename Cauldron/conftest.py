@@ -13,7 +13,7 @@ from astropy.tests.pytest_plugins import *
 ## from the list of packages for which version numbers are displayed
 ## when running the tests
 try:
-    PYTEST_HEADER_MODULES['Astropy'] = 'astropy'
+    PYTEST_HEADER_MODULES['astropy'] = 'astropy'
     del PYTEST_HEADER_MODULES['h5py']
     del PYTEST_HEADER_MODULES['Scipy']
     del PYTEST_HEADER_MODULES['Matplotlib']
@@ -119,6 +119,13 @@ def fail_if_not_teardown():
         pass
     else:
         pytest.fail("Shouldn't be able to import DFW now!")
+    
+    try:
+        from Cauldron import ktl
+    except ImportError as e:
+        pass
+    else:
+        pytest.fail("Shouldn't be able to import ktl now!")
     
     import threading, time
     if threading.active_count() > 1:
