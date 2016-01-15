@@ -13,7 +13,7 @@ from astropy.tests.pytest_plugins import *
 ## from the list of packages for which version numbers are displayed
 ## when running the tests
 try:
-    PYTEST_HEADER_MODULES['Astropy'] = 'astropy'
+    PYTEST_HEADER_MODULES['astropy'] = 'astropy'
     PYTEST_HEADER_MODULES.pop('h5py', None)
     PYTEST_HEADER_MODULES.pop('Scipy', None)
     PYTEST_HEADER_MODULES.pop('Matplotlib', None)
