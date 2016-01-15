@@ -47,9 +47,8 @@ else:
     PYTEST_HEADER_MODULES['zmq'] = 'zmq'
     if "zmq" in registry.keys():
         available_backends.append("zmq")
-    
-    from Cauldron.zmq.router import ZMQRouter
-    ZMQRouter.daemon()
+    ROUTER = None
+
 
 import pkg_resources
 import os
@@ -142,7 +141,11 @@ def teardown_cauldron(request):
 @pytest.fixture(params=available_backends)
 def backend(request):
     """The backend name."""
+    global ROUTER
     from Cauldron.api import use, teardown, CAULDRON_SETUP
+    if request.param == 'zmq' and ROUTER is None:
+        from Cauldron.zmq.router import ZMQRouter
+        ROUTER = ZMQRouter.daemon()
     use(request.param)
     request.addfinalizer(fail_if_not_teardown)
     return request.param
