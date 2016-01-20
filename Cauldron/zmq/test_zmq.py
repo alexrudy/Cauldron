@@ -11,7 +11,6 @@ from ..config import cauldron_configuration
 
 pytestmark = pytest.mark.skipif("zmq" not in available_backends, reason="requires zmq")
 
-
 @pytest.fixture
 def zmq(request):
     """docstring for backend"""
@@ -23,10 +22,10 @@ def zmq(request):
 def config_zmq(request):
     """Get the configuration item."""
     config = cauldron_configuration
-    config.set("zmq-router","port", "7700")
-    config.set("zmq-router","first-port","7710")
-    config.set("zmq-router","last-port","7800")
-    config.set("zmq-router","allow-spawn","no")
+    config.set("zmq-router", "port", "7700")
+    config.set("zmq-router", "first-port", "7710")
+    config.set("zmq-router", "last-port", "7800")
+    config.set("zmq-router", "allow-spawn", "no")
     return config
     
 def test_zmq_available():
