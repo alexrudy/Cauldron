@@ -318,3 +318,31 @@ def test_multiple_binds_initial_values(dispatcher):
     MKO.bind(dispatcher)
     with pytest.raises(IntegrityError):
         i3 = MKO()
+
+def test_multiple_class_binding():
+    """docstring for test_multiple_class_binding"""
+    with pytest.raises(ValueError):
+        class MKO(DescriptorBase):
+            """Keyword observer with multiple prewrite callbacks."""
+            mykeyword = KeywordDescriptor("MYKEYWORD", initial="SomeValue")
+            
+            @mykeyword.prewrite
+            def cb1(self):
+                pass
+            
+            @mykeyword.prewrite
+            def cb2(self):
+                pass
+
+def test_multiple_replacements(dispatcher, cls):
+    """Test that multiple replacements raise errors."""
+    
+    
+    instance = cls()
+    instance.bind(dispatcher)
+    
+    with pytest.raises(ValueError):
+        instance2 = cls()
+        
+    
+    
