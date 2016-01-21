@@ -11,40 +11,31 @@ __all__ = ['_DescriptorEvent', '_KeywordEvent', '_KeywordListener']
 
 class _DescriptorEvent(object):
     """Manage events attached to a keyword descriptor."""
-    def __init__(self, name, value_as_argument=False, value_as_return=False):
+    def __init__(self, name, replace_method=False):
         super(_DescriptorEvent, self).__init__()
         self.name = name
-        self.value_as_argument = value_as_argument
-        self.value_as_return = value_as_return
+        self.replace_method = replace_method
         self.callbacks = Callbacks()
         
     def listen(self, func):
         """Listen to a function."""
         self.callbacks.add(func)
+        if self.replace_method and len(self.callbacks) > 1:
+            raise ValueError("There is more than one replacement for '{0}'".format(self.name))
         
     def __repr__(self):
         return "<{0} name={1}>".format(self.__class__.__name__, self.name)
     
     def propagate(self, instance, keyword, *args, **kwargs):
         """Propagate a listener event through to the keyword."""
-        if self.value_as_argument:
-            args = list(args)
-            value = args[0]
-        else:
-            value = None
-    
+        returned = None
         for callback in self.callbacks:
-            if self.value_as_argument:
-                args[0] = value
             try:
                 returned = callback(keyword, *args, **kwargs)
             except (TypeError, weakref.ReferenceError):
                 returned = callback.bound(instance)(keyword, *args, **kwargs)
-            if self.value_as_return:
-                value = returned
-    
-        if self.value_as_return:
-            return value
+        
+        return returned
         
     def __call__(self, func):
         """Use the event as a descriptor."""
@@ -55,6 +46,7 @@ class _KeywordEvent(object):
     """Instrumentation to apply an event to a keyword."""
     
     name = ""
+    replace_method = False
     
     def __new__(cls, keyword, instance, event):
         """Construct or intercept the construction of a keyword event."""
@@ -82,9 +74,18 @@ class _KeywordEvent(object):
         listener = _KeywordListener(keyword, instance, event)
         if listener not in self.listeners:
             self.listeners.append(listener)
+        if event.replace_method and self.nlisteners > 1:
+            raise ValueError("There is more than one method replacement for '{0}'"
+                 " on keyword '{1}'".format(event.name, keyword.name))
+        
+        self.replace_method |= event.replace_method
         self.name = event.name
         self.keyword = weakref.ref(keyword)
-        self.value_as_argument, self.value_as_return = event.value_as_argument, event.value_as_return
+        
+    @property
+    def nlisteners(self):
+        """Number of listening callbacks."""
+        return sum(len(listener.event.callbacks) for listener in self.listeners)
         
     def __repr__(self):
         return "<{0} name={1} at {2}>".format(self.__class__.__name__, self.name, hex(id(self)))
@@ -92,21 +93,14 @@ class _KeywordEvent(object):
     def __call__(self, *args, **kwargs):
         """This is used to call the underlying method, and to notify listeners."""
         _remove = []
-        
-        if self.value_as_argument:
-            value = args[0]
-            args = list(args)
+        returned = None
         for callback in self.listeners:
-            if self.value_as_argument:
-                args[0] = value
             try:
                 returned = callback(*args, **kwargs)
             except weakref.ReferenceError:
                 _remove.append(callback)
                 continue
-            if self.value_as_return:
-                value = returned
-        
+            
         for listener in _remove:
             self.listeners.remove(listener)
         
@@ -115,11 +109,10 @@ class _KeywordEvent(object):
         if not len(self.listeners) and keyword is not None:
             setattr(keyword, self.name, self.func)
         
-        if self.value_as_argument:
-            args = list(args)
-            args[0] = value
-        
-        return self.func(*args, **kwargs)
+        if self.replace_method and self.nlisteners:
+            return returned
+        else:
+            return self.func(*args, **kwargs)
         
 class _KeywordListener(object):
     """A listener to help fire events on a keyword object."""

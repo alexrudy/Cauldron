@@ -51,17 +51,37 @@ def cls():
             
     return DescriptorTestClass
 
-def test_descriptor_basics(dispatcher, cls):
+@pytest.fixture
+def dualcls():
+    """A class which allows for multiple openings."""
+    class DescriptorTestClass(DescriptorBase):
+        mykeyword = KeywordDescriptor("MYKEYWORD", initial="SomeValue")
+        
+        def __init__(self):
+            super(DescriptorTestClass, self).__init__()
+            self.called = set()
+            
+        @mykeyword.callback
+        def callback(self, keyword):
+            """Changed value callback"""
+            print("Calling 'callback'")
+            self.called.add("callback")
+        
+    return DescriptorTestClass
+
+def test_descriptor_basics(dispatcher, cls, dualcls):
     """Test basic features of the descriptor protocol"""
     
     instance = cls()
-    newinstance = cls()    
+    newinstance = dualcls()
     
     print("Starting bind.")
     instance.bind(dispatcher)
     instance.bind()
+    dualcls.bind(dispatcher)
     print("Bind done.")
     
+    print("Setting 'Hello'")
     instance.mykeyword = "Hello"
     
     assert len(newinstance.called) == 0
@@ -108,21 +128,17 @@ def test_bind(dispatcher, cls):
     
     instance.bind()
     
-def test_class_bind(dispatcher, cls):
+def test_class_bind(dispatcher, dualcls):
     """Test class-level bind."""
+    cls = dualcls
     cls.bind(dispatcher)
     instance_a = cls()
     instance = cls()
     instance.mykeyword = "Hello"
     
     assert "callback" in instance.called
-    assert "prewrite" in instance.called
-    assert "preread" not in instance.called
     assert dispatcher["MYKEYWORD"]["value"] == "Hello"
-    assert "preread" not in instance.called
-    
     value = instance.mykeyword
-    assert "preread" in instance.called
     
 def test_class_bind_no_arguments(cls):
     """Test class-level bind with no service specified."""
@@ -302,3 +318,31 @@ def test_multiple_binds_initial_values(dispatcher):
     MKO.bind(dispatcher)
     with pytest.raises(IntegrityError):
         i3 = MKO()
+
+def test_multiple_class_binding():
+    """docstring for test_multiple_class_binding"""
+    with pytest.raises(ValueError):
+        class MKO(DescriptorBase):
+            """Keyword observer with multiple prewrite callbacks."""
+            mykeyword = KeywordDescriptor("MYKEYWORD", initial="SomeValue")
+            
+            @mykeyword.prewrite
+            def cb1(self):
+                pass
+            
+            @mykeyword.prewrite
+            def cb2(self):
+                pass
+
+def test_multiple_replacements(dispatcher, cls):
+    """Test that multiple replacements raise errors."""
+    
+    
+    instance = cls()
+    instance.bind(dispatcher)
+    
+    with pytest.raises(ValueError):
+        instance2 = cls()
+        
+    
+    
