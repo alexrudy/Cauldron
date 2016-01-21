@@ -257,7 +257,7 @@ class Service(object):
     @api_required
     def _ktl_type(self, key):
         """Return the KTL type for a keyword."""
-        return 'basic'
+        return 'basic' # pragma: no cover
     
     def __missing__(self, key):
         """Populate and return a missing key."""
