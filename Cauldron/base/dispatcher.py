@@ -11,6 +11,8 @@ import six
 import weakref
 import logging
 import warnings
+import collections
+import time
 from ..compat import WeakOrderedSet
 from .core import _BaseKeyword
 from ..config import read_configuration
@@ -93,7 +95,7 @@ class Keyword(_BaseKeyword):
             raise ValueError("keyword named '%s' already exists." % name)
         self._acting = False
         self._callbacks = Callbacks()
-        self._history = list()
+        self._history = collections.deque(maxlen=100)
         self.writeonly = False
         self.readonly = False
         self._period = None
@@ -168,7 +170,7 @@ class Keyword(_BaseKeyword):
         
         self.check(value)
         
-        self._history.append(value)
+        self._history.append((value, time.time()))
         self.value = value
         
         if value != None:
