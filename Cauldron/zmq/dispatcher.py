@@ -15,6 +15,7 @@ import logging
 import weakref
 import six
 import time
+import sys, traceback
 
 __all__ = ["Service", "Keyword"]
 
@@ -40,7 +41,7 @@ class _ZMQResponderThread(threading.Thread):
         except ZMQCauldronErrorResponse as e:
             raise
         except Exception as e:
-            self.log.error(repr(e))
+            self.log.exception(repr(e))
             message.raise_error_response(repr(e))
         return message.response(response)
         

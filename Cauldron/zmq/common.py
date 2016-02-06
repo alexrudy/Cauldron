@@ -147,7 +147,7 @@ class ZMQCauldronMessage(object):
                 raise ZMQCauldronParserError("Can't parse message '{0}' because essage can't specify a keyword with no service.".format(data))
             keyword = None
         elif service_name != service.name:
-            raise DispatcherError("Message was sent to the wrong dispatcher!")
+            raise DispatcherError("Message was sent to the wrong dispatcher! This is {0}, expected {1}".format(service.name, service_name))
         else:
             if keyword_name is not "":
                 keyword = service[keyword_name]
