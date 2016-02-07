@@ -11,7 +11,6 @@ from ..config import cauldron_configuration
 
 pytestmark = pytest.mark.skipif("zmq" not in available_backends, reason="requires zmq")
 
-
 @pytest.fixture
 def zmq(request):
     """docstring for backend"""

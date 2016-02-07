@@ -100,5 +100,8 @@ class Service(ClientService):
         """Return the list of all available keywords in this service instance."""
         return self._dispatcher.keywords()
         
+    def _ktl_type(self, key):
+        """Return the KTL type of a named keyword."""
+        return self._dispatcher[key].KTL_TYPE
 
     

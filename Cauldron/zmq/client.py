@@ -28,7 +28,7 @@ class _ZMQMonitorThread(threading.Thread):
         super(_ZMQMonitorThread, self).__init__()
         self.service = weakref.proxy(service)
         self.shutdown = threading.Event()
-        self.log = logging.getLogger("KTL.Service.Broadcasts")
+        self.log = logging.getLogger("ktl.Service.{0}.Broadcasts".format(service.name))
         self.monitored = set()
         self.daemon = True
         
@@ -86,7 +86,7 @@ class Service(ClientService):
         self.ctx = zmq.Context.instance()
         self._sockets = threading.local()
         self._config = cauldron_configuration
-        self._thread = _ZMQMonitorThread(self)
+        self._thread = None
         super(Service, self).__init__(name, populate)
         
     @property
@@ -115,6 +115,12 @@ class Service(ClientService):
         self._thread.address = address
         self._thread.start()
         
+    def _ktl_type(self, key):
+        """Get the KTL type of a specific keyword."""
+        ktl_type = self._synchronous_command("identify", key, None).payload
+        if ktl_type == 'no':
+            raise KeyError("Keyword {0} does not exist.".format(key))
+        return ktl_type
         
     def shutdown(self):
         """When this client is shutdown, close the subscription thread."""

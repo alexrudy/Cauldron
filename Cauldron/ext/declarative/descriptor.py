@@ -137,21 +137,21 @@ class KeywordDescriptor(object):
         # Prepare the events interface.
         self._events = []
         for event in self._EVENTS:
-            evt = _DescriptorEvent(event)
+            evt = _DescriptorEvent(event, replace_method=True)
             setattr(self, event, evt)
             self._events.append(evt)
             
         # We handle 'callback' separately, as it triggers on the keyword's _propogate method.
         #TODO: We should check that this works with DFW and ktl builtins, its kind of a hack
         # here
-        self.callback = _DescriptorEvent("_propogate")
+        # Note the distinction is important, replace_method=False in this case.
+        self.callback = _DescriptorEvent("_propogate", replace_method=False)
         self._events.append(self.callback)
         
         self._attr = "_{0}_{1}".format(self.__class__.__name__, self.name)
         self._initial = initial
         self._attr_initial = initial
         self._bound = False
-        self._events.append(self.callback)
         
     def __repr__(self):
         """Represent"""

@@ -16,10 +16,13 @@ def check_weak_method(wm, func, instance=None):
         assert wm.func == func
         assert not wm.method
         assert wm.get() == func
+        assert repr(wm) == "<{0} to '{1}' at {2}>".format(wm.__class__.__name__, func.__name__, hex(id(wm)))
+        
     else:
         assert wm.method
         assert wm.instance == instance
         assert wm.get() == func.__get__(instance, type(instance))
+        assert repr(wm) ==  "<{0} to '{1}' bound to '{2}' at {3}>".format(wm.__class__.__name__, func.__name__, repr(instance), hex(id(wm)))
     assert wm.__doc__ == func.__doc__
     assert isinstance(hash(wm), int)
 
@@ -65,7 +68,7 @@ def test_manual_bind(my_class):
     """Test a bind manually."""
     wm = WeakMethod(my_class.my_method)
     assert wm.method
-    with pytest.raises(TypeError):
+    with pytest.raises(weakref.ReferenceError):
         wm()
     my_instance = wm.instance = my_class()
     assert wm.method
@@ -111,6 +114,7 @@ def test_drop_instance_reference(my_class):
         wm.get()
     with pytest.raises(weakref.ReferenceError):
         wm()
+    assert repr(wm) == "<{0} invalid at {1}>".format(wm.__class__.__name__, hex(id(wm)))
     
 def test_drop_func_reference():
     """docstring for test_drop_func_reference"""
@@ -127,6 +131,7 @@ def test_drop_func_reference():
         wm.get()
     with pytest.raises(weakref.ReferenceError):
         wm()
+    assert repr(wm) == "<{0} invalid at {1}>".format(wm.__class__.__name__, hex(id(wm)))
         
 def test_callback():
     """Test the invalidation callback."""

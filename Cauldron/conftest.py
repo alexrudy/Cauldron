@@ -13,10 +13,10 @@ from astropy.tests.pytest_plugins import *
 ## from the list of packages for which version numbers are displayed
 ## when running the tests
 try:
-    PYTEST_HEADER_MODULES['Astropy'] = 'astropy'
-    del PYTEST_HEADER_MODULES['h5py']
-    del PYTEST_HEADER_MODULES['Scipy']
-    del PYTEST_HEADER_MODULES['Matplotlib']
+    PYTEST_HEADER_MODULES['astropy'] = 'astropy'
+    PYTEST_HEADER_MODULES.pop('h5py', None)
+    PYTEST_HEADER_MODULES.pop('Scipy', None)
+    PYTEST_HEADER_MODULES.pop('Matplotlib', None)
     PYTEST_HEADER_MODULES.pop('Pandas', None)
 except NameError:  # needed to support Astropy < 1.0
     pass
@@ -47,7 +47,7 @@ else:
     PYTEST_HEADER_MODULES['zmq'] = 'zmq'
     if "zmq" in registry.keys():
         available_backends.append("zmq")
-    
+    ROUTER = None
 
 import pkg_resources
 import os
@@ -111,13 +111,21 @@ def fail_if_not_teardown():
         for failure in failures:
             if failure in module.split("."):
                 mod = sys.modules[module]
-                pytest.fail("Module {0}/{1} not properly torn down.".format(module, sys.modules[module]))
+                if mod is not None:
+                    pytest.fail("Module {0}/{1} not properly torn down.".format(module, sys.modules[module]))
     try:
         from Cauldron import DFW
     except ImportError as e:
         pass
     else:
         pytest.fail("Shouldn't be able to import DFW now!")
+    
+    try:
+        from Cauldron import ktl
+    except ImportError as e:
+        pass
+    else:
+        pytest.fail("Shouldn't be able to import ktl now!")
     
     import threading, time
     if threading.active_count() > 1:
@@ -140,7 +148,11 @@ def teardown_cauldron(request):
 @pytest.fixture(params=available_backends)
 def backend(request):
     """The backend name."""
+    global ROUTER
     from Cauldron.api import use, teardown, CAULDRON_SETUP
+    if request.param == 'zmq' and ROUTER is None:
+        from Cauldron.zmq.router import ZMQRouter
+        ROUTER = ZMQRouter.daemon()
     use(request.param)
     request.addfinalizer(fail_if_not_teardown)
     return request.param

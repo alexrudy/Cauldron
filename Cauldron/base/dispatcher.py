@@ -11,6 +11,8 @@ import six
 import weakref
 import logging
 import warnings
+import collections
+import time
 from ..compat import WeakOrderedSet
 from .core import _BaseKeyword
 from ..config import read_configuration
@@ -93,7 +95,7 @@ class Keyword(_BaseKeyword):
             raise ValueError("keyword named '%s' already exists." % name)
         self._acting = False
         self._callbacks = Callbacks()
-        self._history = list()
+        self._history = collections.deque(maxlen=100)
         self.writeonly = False
         self.readonly = False
         self._period = None
@@ -168,7 +170,7 @@ class Keyword(_BaseKeyword):
         
         self.check(value)
         
-        self._history.append(value)
+        self._history.append((value, time.time()))
         self.value = value
         
         if value != None:
@@ -339,10 +341,28 @@ class Service(object):
         self.status_keyword = keyword
         return True
     
-    @api_override
     def setupOrphans(self):
         """Set up orphaned keywords, that is keywords which aren't attached to a specific keyword class."""
-        pass
+        for name, keyword in self._keywords.items():
+            if keyword is None:
+                self._setupOrphan(name)
+    
+    def _setupOrphan(self, name):
+        """Set up a single orphan."""
+        from Cauldron import DFW
+        try:
+            xml = self.xml[name]
+            ktl_type = ktlxml.getValue(xml, 'type')
+            cls = DFW.Keyword.types[ktl_type]
+        except Exception as e:
+            if STRICT_KTL_XML:
+                raise
+            cls = DFW.Keyword.Keyword
+        
+        try:
+            cls(name, service=self)
+        except WrongDispatcher:
+            pass
     
     @api_override
     def _prepare(self):
@@ -401,7 +421,8 @@ class Service(object):
         
         if name not in self._keywords:
             if not STRICT_KTL_XML:
-                warnings.warn(CauldronXMLWarning("service '{0}' does not have a keyword '{1}' in XML".format(self.name, name)))
+                if self.xml is not None:
+                    warnings.warn(CauldronXMLWarning("service '{0}' does not have a keyword '{1}' in XML".format(self.name, name)))
             else:
                 raise KeyError("service '%s' does not have a keyword '%s'" % (self.name, name))
             

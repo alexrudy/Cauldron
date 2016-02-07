@@ -8,28 +8,35 @@ from ...utils.callbacks import Callbacks
 
 __all__ = ['_DescriptorEvent', '_KeywordEvent', '_KeywordListener']
 
+
 class _DescriptorEvent(object):
     """Manage events attached to a keyword descriptor."""
-    def __init__(self, name):
+    def __init__(self, name, replace_method=False):
         super(_DescriptorEvent, self).__init__()
         self.name = name
+        self.replace_method = replace_method
         self.callbacks = Callbacks()
         
     def listen(self, func):
         """Listen to a function."""
         self.callbacks.add(func)
+        if self.replace_method and len(self.callbacks) > 1:
+            raise ValueError("There is more than one replacement for '{0}'".format(self.name))
         
     def __repr__(self):
         return "<{0} name={1}>".format(self.__class__.__name__, self.name)
     
     def propagate(self, instance, keyword, *args, **kwargs):
         """Propagate a listener event through to the keyword."""
+        returned = None
         for callback in self.callbacks:
             try:
-                callback(keyword, *args, **kwargs)
-            except TypeError:
-                callback.bound(instance)(keyword, *args, **kwargs)
-            
+                returned = callback(keyword, *args, **kwargs)
+            except (TypeError, weakref.ReferenceError):
+                returned = callback.bound(instance)(keyword, *args, **kwargs)
+        
+        return returned
+        
     def __call__(self, func):
         """Use the event as a descriptor."""
         self.listen(func)
@@ -39,6 +46,7 @@ class _KeywordEvent(object):
     """Instrumentation to apply an event to a keyword."""
     
     name = ""
+    replace_method = False
     
     def __new__(cls, keyword, instance, event):
         """Construct or intercept the construction of a keyword event."""
@@ -48,6 +56,13 @@ class _KeywordEvent(object):
     
     def __init__(self, keyword, instance, event):
         super(_KeywordEvent, self).__init__()
+        
+        # Important implementation note here: this object behaves like a singleton
+        # due to the override in __new__ above, this method will be called on both
+        # new objects and already existing objects which are re-bound to a particular
+        # function. The re-binding allows us to add additional listeners to this
+        # object on an as-needed basis. However, everything done in this method
+        # should be ok with multiple invocations.
         
         func = getattr(keyword, event.name)
         if func is not self:
@@ -59,8 +74,18 @@ class _KeywordEvent(object):
         listener = _KeywordListener(keyword, instance, event)
         if listener not in self.listeners:
             self.listeners.append(listener)
+        if event.replace_method and self.nlisteners > 1:
+            raise ValueError("There is more than one method replacement for '{0}'"
+                 " on keyword '{1}'".format(event.name, keyword.name))
+        
+        self.replace_method |= event.replace_method
         self.name = event.name
         self.keyword = weakref.ref(keyword)
+        
+    @property
+    def nlisteners(self):
+        """Number of listening callbacks."""
+        return sum(len(listener.event.callbacks) for listener in self.listeners)
         
     def __repr__(self):
         return "<{0} name={1} at {2}>".format(self.__class__.__name__, self.name, hex(id(self)))
@@ -68,12 +93,14 @@ class _KeywordEvent(object):
     def __call__(self, *args, **kwargs):
         """This is used to call the underlying method, and to notify listeners."""
         _remove = []
-        for listener in self.listeners:
+        returned = None
+        for callback in self.listeners:
             try:
-                listener(*args, **kwargs)
+                returned = callback(*args, **kwargs)
             except weakref.ReferenceError:
-                _remove.append(listener)
-        
+                _remove.append(callback)
+                continue
+            
         for listener in _remove:
             self.listeners.remove(listener)
         
@@ -82,7 +109,10 @@ class _KeywordEvent(object):
         if not len(self.listeners) and keyword is not None:
             setattr(keyword, self.name, self.func)
         
-        return self.func(*args, **kwargs)
+        if self.replace_method and self.nlisteners:
+            return returned
+        else:
+            return self.func(*args, **kwargs)
         
 class _KeywordListener(object):
     """A listener to help fire events on a keyword object."""
@@ -114,4 +144,4 @@ class _KeywordListener(object):
     
     def __call__(self, *args, **kwargs):
         """Ensure that the dispatcher fires before the keyword's own implementation."""
-        self.event.propagate(self.instance, self.keyword, *args, **kwargs)
+        return self.event.propagate(self.instance, self.keyword, *args, **kwargs)

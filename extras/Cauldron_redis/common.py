@@ -140,7 +140,7 @@ class REDISPubsubBase(object):
     def _stop_thread(self):
         """Stop the underlying thread."""
         try:
-            if self._thread is not None:
+            if self._thread is not None and self._thread.is_alive():
                 self.log.debug("Stopping monitor thread for '{0}'".format(self.name))
                 self._thread.stop()
         except weakref.ReferenceError:
@@ -167,24 +167,35 @@ class REDISKeywordBase(object):
         log = self.service.log
         redis = self.service.redis
         initial_status = initial_status or redis.get(redis_status_key(self))
+        log.log(5, "Waiting for '{0}' to become '{1}' from '{2}'".format(self.name, status, initial_status))
         
         def _handle_status(recieved_status):
             """What to do when the status changes."""
-            if status == recieved_status:
+            if event.is_set():
+                pass
+            elif status == recieved_status:
                 event.set()
+                log.log(5, "Received a '{0}' notification for '{1}', triggered event.".format(recieved_status, self.name))
+                
                 if callback is not None:
                     callback()
             elif initial_status != recieved_status:
                 _handle_status._error = redis.get(redis_key_name(self)+":error")
-                log.debug("Recieved an '{0}' notification for '{1}': {2}".format(recieved_status, self.name, _handle_status._error))
+                redis.delete(redis_key_name(self)+":error")
+                log.log(5, "Received a '{0}' notification for '{1}': {2}".format(recieved_status, self.name, _handle_status._error))
                 event.set()
+            else:
+                log.log(5, "Received a '{0}' notification for '{1}', ignored.".format(recieved_status, self.name))
+                
+            if event.is_set():
+                with self.service.pubsub() as pubsub:
+                    pubsub.punsubscribe("__keyspace@*__:"+redis_status_key(self))
         
         def _message_responder(message):
             if message is None:
                 return # pragma: no cover
             if message['channel'].endswith(redis_status_key(self)) and message['data'] == "set":
                 recieved_status = redis.get(redis_status_key(self))
-                log.debug("{1} got status = {0}".format(recieved_status, self.name))
                 _handle_status(recieved_status)
                 
         with self.service.pubsub() as pubsub:
@@ -198,6 +209,7 @@ class REDISKeywordBase(object):
                 self.name, "for {0:d}s".format(timeout) if timeout else 'indefinitely', status,
                 redis.get(redis_status_key(self))
             ))
+            _handle_status(redis.get(redis_status_key(self)))
             event.wait(timeout)
         
         # Handle the case where the system actually timed out.
@@ -211,13 +223,16 @@ class REDISKeywordBase(object):
                 self.name, "for {0:d}s".format(timeout) if timeout else 'indefinitely', status,
                 redis.get(redis_status_key(self))
             ))
+            
+        log.log(5, "Unsubscribing '{0}'".format(self.name))
         with self.service.pubsub() as pubsub:
             pubsub.punsubscribe("__keyspace@*__:"+redis_status_key(self))
         
-        # We set this back here to ensure that we are consistent when this function ends.
-        redis.set(redis_status_key(self), status)
         
         if getattr(_handle_status, '_error', None) is not None:
+            # We set this back here to ensure that we are consistent when this function ends.
+            redis.set(redis_status_key(self), status)
+            log.log(5, "Raising an error from '{0}': {1}".format(self.name, _handle_status._error))
             raise DispatcherError(_handle_status._error)
             
         return event.isSet()
@@ -231,15 +246,16 @@ class REDISKeywordBase(object):
             if message['channel'].endswith(redis_status_key(self)) and message['data'] == "set":
                 _status = self.service.redis.get(redis_status_key(self))
                 if _status == status:
-                    with self.service.pubsub() as pubsub:
-                        pubsub.unsubscribe("__keyspace@*__:"+redis_status_key(self))
                     triggered.set()
                     if callback is not None:
                         callback()
                 if _status == "error":
                     error = self.service.redis.get(redis_key_name(self)+":error")
                     self.service.log.error(str(DispatcherError(error)))
-                    self.service.redis.set(redis_status_key(self), status)
+                if _status in ["error", status]:
+                    with self.service.pubsub() as pubsub:
+                        pubsub.unsubscribe("__keyspace@*__:"+redis_status_key(self))
+        
         with self.service.pubsub() as pubsub:
             pubsub.subscribe(**{"__keyspace@*__:"+redis_status_key(self):_message_responder})
         self.service._run_thread()

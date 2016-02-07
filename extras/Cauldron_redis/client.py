@@ -84,7 +84,6 @@ class Keyword(ClientKeyword, REDISKeywordBase):
         except (TypeError, ValueError):
             pass
         
-        self.service.redis.set(redis_key_name(self) + ":status", "modify")
         self.service.redis.publish(redis_key_name(self), value)
         if wait or timeout is not None:
             self._wait_for_status('ready', timeout, initial_status="modify")
@@ -102,6 +101,14 @@ class Service(REDISPubsubBase, ClientService):
         self.redis = redis.StrictRedis(connection_pool=connection_pool)
         self._pubsub = redis.StrictRedis(connection_pool=connection_pool).pubsub()
         super(Service, self).__init__(name, populate)
+        
+    def _ktl_type(self, key):
+        """Get the KTL type of a keyword."""
+        if self.redis.exists(redis_key_name(self.name, key)+':type'):
+            return self.redis.get(redis_key_name(self.name, key)+':type')
+        else:
+            return 'basic'
+        
     
     def has_keyword(self, name):
         """Check for the existence of a keyword."""

@@ -70,17 +70,22 @@ def use(name):
     
     Cauldron = sys.modules[BASENAME]
     # Install the client side libraries.
-    from . import _ktl
-    from ._ktl.Service import Service
-    from ._ktl import Keyword
+    from Cauldron import _ktl
+    _ktl = sys.modules.setdefault('Cauldron._ktl', _ktl)
+    reload(_ktl)
+    
+    from Cauldron._ktl.Service import Service
+    from Cauldron._ktl import Keyword
     _ktl.Service = Service
     _ktl.Keyword = Keyword
     Cauldron.ktl = sys.modules[BASENAME + ".ktl"] = _ktl
     
     # Install the dispatcher side libraries.
-    from . import _DFW
-    from ._DFW.Service import Service
-    from ._DFW import Keyword
+    from Cauldron import _DFW
+    _DFW = sys.modules.setdefault('Cauldron._DFW', _DFW)
+    reload(_DFW)
+    from Cauldron._DFW.Service import Service
+    from Cauldron._DFW import Keyword
     _DFW.Service = Service
     _DFW.Keyword = Keyword
     Cauldron.DFW = sys.modules[BASENAME + ".DFW"] = _DFW
@@ -122,7 +127,10 @@ def teardown():
         It is likely that if you call this method with instances of Keyword or Service still active in your application,
         those instances will become unusable.
     """
-    name = registry.client.backend
+    if registry.client.backend is not None:
+        name = registry.client.backend
+    else:
+        name = "unknown"
     registry.teardown()
     try:
         Cauldron = sys.modules[BASENAME]
