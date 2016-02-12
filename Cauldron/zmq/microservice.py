@@ -9,11 +9,144 @@ import threading
 import six
 import binascii
 import atexit
+import collections
+import uuid
 
 from ..exc import DispatcherError
 
-FRAMEBLANK = "\x01"
-FRAMEFAIL = "\x02"
+FRAMEBLANK = six.binary_type("\x01")
+FRAMEFAIL = six.binary_type("\x02")
+FRAMEDELIMITER = six.binary_type("")
+
+class MessageType(object):
+    """A message direction object"""
+    def __init__(self, origin, responder):
+        super(MessageType, self).__init__()
+        self._origin = origin
+        self._responder = responder
+        
+    def __contains__(self, key):
+        """Does the direction contain a key?"""
+        return key in self.codes
+        
+    @property
+    def codes(self):
+        """The set of all passable codes."""
+        return set([self.forward, self.reply, self.error, self.broadcast])
+        
+    @property
+    def origin(self):
+        """Return the origin point."""
+        return self.ENDPOINT[self._origin]
+    
+    @property
+    def responder(self):
+        """Return the responding point."""
+        return self.ENDPOINT[self._responder]
+        
+    @property
+    def forward(self):
+        """Forward code."""
+        return "{0}{1}{2}".format(self._origin, self._responder, "Q")
+        
+    @property
+    def reply(self):
+        """Reply code."""
+        return "{0}{1}{2}".format(self._origin, self._responder, "P")
+        
+    @property
+    def error(self):
+        """Error code"""
+        return "{0}{1}{2}".format(self._origin, self._responder, "E")
+        
+    @property
+    def broadcast(self):
+        """Broadcast code."""
+        return "{0}{1}{2}".format(self._origin, self._responder, "B")
+        
+    def path(self, code):
+        """Path for a given code."""
+        kind = self.KIND[code]
+        if code in "QB":
+            return (self.origin, self.responder, kind)
+        elif code in "PE":
+            return (self.responder, self.origin, kind)
+    
+    KIND = {"Q" : "Query", "P": "Reply", "E": "Error", "B": "Broadcast"}
+    ENDPOINT = {"C" : "Client", "S": "Service", "D":"Dispatcher", "B":"Broker"}
+        
+
+class Directions(collections.Mapping):
+    """A collection of directions."""
+    def __init__(self, *args):
+        super(Directions, self).__init__()
+        self._data = list(*args)
+        
+    def __getitem__(self, key):
+        """Get a direction."""
+        for direction in self._data:
+            if key in direction:
+                return direction
+        else:
+            raise KeyError("No message direction {0}".format(key))
+        
+    def __contains__(self, key):
+        """Contains a direction?"""
+        for direction in self._data:
+            if key in direction:
+                return True
+        else:
+            return False
+            
+    def __iter__(self):
+        """Iterate"""
+        return iter(self._data)
+        
+    def __len__(self):
+        """Length of the data."""
+        return len(self._data)
+        
+    @property
+    def codes(self):
+        """Valid message codes"""
+        return set([ code for tp in self for code in tp.codes ]) 
+    
+    def path(self, key):
+        """Decode a message option into a path (from, to, kind)."""
+
+        if key[2] == "Q":
+            return (endpoints[key[0]], endpoints[key[1]], kinds[key[2]])
+        else:
+            return (endpoints[key[1]], endpoints[key[0]], kinds[key[2]])
+    
+    def iserror(self, code):
+        """Determine if a code is an error."""
+        return code[2] == "E"
+        
+    def isreply(self, code):
+        """Determine if a code is a reply."""
+        return code[2] == "P"
+    
+    def error(self, key):
+        """Get the error code."""
+        return self[key].error
+        
+    def reply(self, key):
+        """Get the reply code."""
+        if key[2] in "QB":
+            return self[key].reply
+        else:
+            return self[key].forward
+
+# This is a set of named tuples.
+DIRECTIONS = Directions([
+    MessageType("C", "D"),
+    MessageType("D", "B"),
+    MessageType("C", "B"),
+    MessageType("C", "S"),
+    MessageType("S", "D"),
+])
+
 
 def _exit_handler(thread_ref):
     """Exit handler"""
@@ -40,40 +173,72 @@ class ZMQCauldronParserError(ZMQCauldronErrorResponse):
     @classmethod
     def with_message(cls, message):
         """Add a message to a Cauldron Parser error."""
-        response = ZMQCauldronMessage(command="parser", payload=message, direction="ERR")
+        response = ZMQCauldronMessage(command="parser", payload=message, direction="CDE")
         return cls(message, response)
 
 class ZMQCauldronMessage(object):
     """A message object."""
     
-    RESPONSES = {
-        "REQ" : "REP",
-        "BRQ" : "BRP",
-        "BRI" : "BRR",
-        "FAN" : "COL",
-        "ERC" : "ERR",
-        "PUB" : "PUB",
-    }
-    DIRECTIONS = RESPONSES.keys() + RESPONSES.values()
-    CLIENT_DIRECTIONS = RESPONSES.keys()
-    CLIENT_DIRECTIONS.remove("BRQ")
-    SERVICE_DIRECTIONS = RESPONSES.values() + ["BRQ"]
-    SERVICE_DIRECTIONS.remove("BRP")
-    SERVICE_DIRECTIONS.remove("BRR")
-    BROKER_DIRECTIONS = ["BRP", "BRR", "ERR"]
+    NPARTS = 7
     
     def __init__(self, command=FRAMEBLANK, service=FRAMEBLANK, dispatcher=FRAMEBLANK, 
-        keyword=FRAMEBLANK, payload=FRAMEBLANK, direction="REQ", prefix=None):
+        keyword=FRAMEBLANK, payload=FRAMEBLANK, direction="CDQ", prefix=None, identifier=None):
         super(ZMQCauldronMessage, self).__init__()
         self.command = six.text_type(command or FRAMEBLANK)
         self.service = six.text_type(service or FRAMEBLANK)
         self.dispatcher = six.text_type(dispatcher or FRAMEBLANK)
         self.keyword = six.text_type(keyword or FRAMEBLANK)
         self.payload = six.text_type(payload or FRAMEBLANK)
-        if direction not in self.DIRECTIONS:
+        if direction not in DIRECTIONS.codes:
             raise ValueError("Invalid choice of message direction: {0}".format(direction))
         self.direction = six.text_type(direction)
+        self.identifier =  six.binary_type(identifier) if identifier is not None else uuid.uuid4().bytes
         self.prefix = map(six.binary_type, prefix or [])
+        
+    def _parse_prefix(self):
+        """Handle the prefix."""
+        self._client_id = None
+        self._dispatcher_id = None
+        
+        _from, _to, _kind = DIRECTIONS[self.direction].path(self.direction[2])
+        
+        if _from in ("Client", "Service") and len(self.prefix) >= 2:
+            self._client_id = self.prefix[0]
+        elif _from == "Dispatcher" and len(self.prefix) >= 2:
+            self._dispatcher_id = self.prefix[0]
+        
+        if _to == "Dispatcher" and len(self.prefix) >= 2:
+            self._dispatcher_id = self.prefix[-2]
+        if _to in ("Client", "Service") and len(self.prefix) >= 2:
+            self._client_id = self.prefix[-2]
+        
+    @property
+    def iserror(self):
+        """Determine if this message is an error."""
+        return DIRECTIONS.iserror(self.direction)
+        
+    @property
+    def isvalid(self):
+        """Deterime if this message is not an error and has content."""
+        return (not self.iserror) and self.payload not in [FRAMEBLANK, FRAMEFAIL]
+        
+    @property
+    def client_id(self):
+        """Return the client ID if it is in the prefix."""
+        self._parse_prefix()
+        if self._client_id is not None:
+            return self._client_id
+        else:
+            raise ValueError("Prefix doesn't appear to contain the client ID.")
+        
+    @property
+    def dispatcher_id(self):
+        """Return the dispatcher ID if it is in the prefix."""
+        self._parse_prefix()
+        if self._dispatcher_id is not None:
+            return self._dispatcher_id
+        else:
+            raise ValueError("Prefix doesn't appear to contain the dispatcher ID.")
         
     def verify(self, service):
         """Given a service object, verify that it matches this message."""
@@ -98,7 +263,15 @@ class ZMQCauldronMessage(object):
     @property
     def data(self):
         """The full message data, to be sent over a ZMQ Socket.."""
-        return self.prefix + map(lambda s : s.encode('utf-8'), map(six.text_type, self._message_parts))
+        return self.prefix + map(lambda s : s.encode('utf-8'), map(six.text_type, self._message_parts)) + [self.identifier]
+        
+    def __iter__(self):
+        """Allow us to send messages directly."""
+        return iter(self.data)
+        
+    def __getitem__(self, key):
+        """Allow us to send messages directly."""
+        return self.data[key]
         
     def __getstate__(self):
         """Return the keyword arguments required to initialize a new copy of this object."""
@@ -109,6 +282,7 @@ class ZMQCauldronMessage(object):
             'keyword' : self.keyword,
             'payload' : self.payload,
             'direction' : self.direction,
+            'identifier' : self.identifier,
             'prefix': self.prefix,
         }
         
@@ -120,14 +294,14 @@ class ZMQCauldronMessage(object):
         """Compose a response."""
         kwargs = self.__getstate__()
         kwargs['payload'] = payload
-        kwargs['direction'] = self.RESPONSES[self.direction]
+        kwargs['direction'] = DIRECTIONS.reply(self.direction)
         return self.__class__(**kwargs)
             
     def error_response(self, payload):
         """Compose an error response message."""
         kwargs = self.__getstate__()
         kwargs['payload'] = payload
-        kwargs['direction'] = "ERR"
+        kwargs['direction'] = DIRECTIONS.error(self.direction)
         return self.__class__(**kwargs)
     
     def raise_error_response(self, payload):
@@ -156,14 +330,14 @@ class ZMQCauldronMessage(object):
     @classmethod
     def parse(cls, data):
         """Parse data. Errors are raised when appropriate."""
-        if len(data) > 6:
-            prefix = data[:-6]
-            data = data[-6:]
+        
+        if len(data) > cls.NPARTS:
+            prefix = data[:-cls.NPARTS]
+            data = data[-cls.NPARTS:]
         else:
             prefix = None
-        data = [ d.decode('utf-8') for d in data ]
         try:
-            service, dispatcher, keyword, direction, command, payload = data
+            service, dispatcher, keyword, direction, command, payload, identifier = data
         except ValueError as e:
             raise ZMQCauldronParserError.with_message(
                 "Can't parse message '{0}' because {1}".format(data, str(e)))
@@ -175,7 +349,7 @@ class ZMQCauldronMessage(object):
             elif dispatcher != FRAMEBLANK:
                 raise ZMQCauldronParserError.with_message(
                     "Can't parser message '{0}' because message can't specify a dispatcher with no service.".format(data))
-        return cls(command, service, dispatcher, keyword, payload, direction, prefix)
+        return cls(command, service, dispatcher, keyword, payload, direction, prefix, identifier)
 
 class ZMQMicroservice(threading.Thread):
     """A ZMQ Responder tool."""
@@ -202,12 +376,15 @@ class ZMQMicroservice(threading.Thread):
                 message.raise_error_response("Bad command '{0:s}'!".format(message.command))
             response_payload = getattr(self, method_name)(message)
         except ZMQCauldronErrorResponse as e:
+            self.log.log(5, "{0!r}.send({1!r})".format(self, e.message))
             return e.message
         except Exception as e:
             self.log.error("Error handling '{0}': {1!r}".format(message.command, e))
             return message.error_response("{0!r}".format(e))
         else:
-            return message.response(response_payload)
+            response = message.response(response_payload)
+            self.log.log(5, "{0!r}.send({1!r})".format(self, response))
+            return response
             
     def connect(self):
         """Connect to the address and return a socket."""
@@ -252,7 +429,7 @@ class ZMQMicroservice(threading.Thread):
             while self.running.is_set():
                 if socket.poll(timeout=self.timeout):
                     response = self.handle(ZMQCauldronMessage.parse(socket.recv_multipart()))
-                    self.log.log(5, "Responds {0!s}".format(response))
+                    self.log.log(5, "Responds {0!s}".format( response))
                     socket.send_multipart(response.data)
                 
         except (zmq.ContextTerminated, weakref.ReferenceError, zmq.ZMQError) as e:

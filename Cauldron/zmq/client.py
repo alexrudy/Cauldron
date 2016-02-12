@@ -7,7 +7,7 @@ from __future__ import absolute_import
 
 import weakref
 from ..base import ClientService, ClientKeyword
-from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented, DispatcherError
+from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented, DispatcherError, TimeoutError
 from .common import zmq_dispatcher_address, zmq_broadcaster_address, check_zmq, teardown, zmq_address
 from .microservice import ZMQCauldronMessage, ZMQCauldronErrorResponse, FRAMEBLANK, FRAMEFAIL
 from .. import registry
@@ -87,6 +87,8 @@ class Service(ClientService):
         self._sockets = threading.local()
         self._config = cauldron_configuration
         self._thread = None
+        self._lock = threading.RLock()
+        self._type_ktl_cache = {}
         super(Service, self).__init__(name, populate)
         
     @property
@@ -111,16 +113,25 @@ class Service(ClientService):
         
     def _prepare(self):
         """Prepare step."""
-        address = self._synchronous_command("lookup", "subscribe", direction="BRI").payload
+        self._thread = _ZMQMonitorThread(self)
+        address = self._synchronous_command("lookup", "subscribe", direction="CBQ").payload
         self._thread.address = address
         self._thread.start()
         
     def _ktl_type(self, key):
         """Get the KTL type of a specific keyword."""
-        ktl_type = self._synchronous_command("identify", key, None).payload
-        if ktl_type == 'no':
-            raise KeyError("Keyword {0} does not exist.".format(key))
-        return ktl_type
+        name = key.upper()
+        with self._lock:
+            if name in self._type_ktl_cache:
+                return self._type_ktl_cache[name]
+            message = self._synchronous_command("identify", payload=name, keyword=name, direction="CSQ")
+            items = list(set(message.payload.split(":")))
+            if len(items) == 1 and (items[0] not in (FRAMEBLANK, FRAMEFAIL)):
+                ktl_type = items[0]
+            else:
+                raise KeyError("Keyword {0} does not exist.".format(key))
+            self._type_ktl_cache[name] = ktl_type
+            return ktl_type
         
     def shutdown(self):
         """When this client is shutdown, close the subscription thread."""
@@ -131,28 +142,34 @@ class Service(ClientService):
         """Check if a dispatcher has a keyword."""
         assert name.upper() != self.name.upper()
         name = name.upper()
-        message = self._synchronous_command("identify", name, name, direction="FAN")
-        items = set(message.payload.split(":"))
-        if len(items) == 1:
-            return items.pop() != FRAMEBLANK
+        try:
+            ktype = self._ktl_type(name)
+        except KeyError as e:
+            return False
+        else:
+            return True
         
     def keywords(self):
         """List all available keywords."""
-        message = self._synchronous_command("enumerate", FRAMEBLANK, direction="FAN")
+        message = self._synchronous_command("enumerate", FRAMEBLANK, direction="CSQ")
         return message.payload.split(":")
         
-    def _synchronous_command(self, command, payload, keyword=None, direction="REQ"):
+    def _synchronous_command(self, command, payload, keyword=None, direction="CDQ", timeout=None):
         """Execute a synchronous command."""
         request = ZMQCauldronMessage(command, direction=direction,
             service=self.name, dispatcher=FRAMEBLANK,
             keyword=keyword if keyword else FRAMEBLANK, 
             payload=payload if payload else FRAMEBLANK)
-        self.log.log(5, "Request {0!s}".format(request))
+        self.log.log(5, "{0!r}.send({1!s})".format(self, request))
         self.socket.send_multipart(request.data)
-        #TODO: Use polling here to support timeouts.
+        
+        if timeout:
+            if not self.socket.poll(timeout * 1e3):
+                raise TimeoutError("Dispatcher timed out.")
+        
         message = ZMQCauldronMessage.parse(self.socket.recv_multipart())
-        self.log.log(5, "Response {0!s}".format(message))
-        if message.direction == "ERR":
+        self.log.log(5, "{0!r}.recv({1!s})".format(self, message))
+        if message.iserror:
             raise DispatcherError("Dispatcher error on command: {0}".format(message.payload))
         message.verify(self)
         return message
@@ -173,9 +190,9 @@ class Keyword(ClientKeyword):
         """Is this keyword monitored."""
         return self.name in self.service._thread.monitored
         
-    def _synchronous_command(self, command, payload):
+    def _synchronous_command(self, command, payload, timeout=None):
         """Execute a synchronous command."""
-        return self.service._synchronous_command(command, payload, self.name)
+        return self.service._synchronous_command(command, payload, self.name, timeout=timeout)
         
     def wait(self, timeout=None, operator=None, value=None, sequence=None, reset=False, case=False):
         raise CauldronAPINotImplemented("Asynchronous operations are not supported for Cauldron.zmq")
@@ -197,7 +214,7 @@ class Keyword(ClientKeyword):
         if not wait or timeout is not None:
             warnings.warn("Cauldron.zmq doesn't support asynchronous reads.", CauldronAPINotImplementedWarning)
         
-        message = self._synchronous_command("update", "")
+        message = self._synchronous_command("update", "", timeout=timeout)
         self._update(message.payload)
         return self._current_value(binary=binary, both=both)
         
@@ -206,7 +223,7 @@ class Keyword(ClientKeyword):
         if not self['writes']:
             raise NotImplementedError("Keyword '{0}' does not support writes.".format(self.name))
         
-        if not wait or timeout is not None:
+        if not wait:
             warnings.warn("Cauldron.zmq doesn't support asynchronous writes.", CauldronAPINotImplementedWarning)
             
         # User-facing convenience to make writes smoother.
@@ -214,6 +231,6 @@ class Keyword(ClientKeyword):
             value = self.cast(value)
         except (TypeError, ValueError):
             pass
-        message = self._synchronous_command("modify", value)
+        message = self._synchronous_command("modify", value, timeout=timeout)
         
         
