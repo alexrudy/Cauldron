@@ -6,9 +6,10 @@ Dispatcher implementation for ZMQ
 
 from .common import zmq_dispatcher_address, zmq_broadcaster_address, zmq_address, check_zmq, teardown
 from .microservice import ZMQMicroservice, ZMQCauldronMessage, FRAMEFAIL, FRAMEBLANK
+from .broker import ZMQBroker
 from ..base import DispatcherService, DispatcherKeyword
 from .. import registry
-from ..exc import DispatcherError, WrongDispatcher
+from ..exc import DispatcherError, WrongDispatcher, TimeoutError
 
 import threading
 import logging
@@ -32,15 +33,33 @@ class _ZMQResponder(ZMQMicroservice):
         super(_ZMQResponder, self).__init__(address=address, use_broker=True,
             context=self.service.ctx, name="DFW.Service.{0:s}.Responder".format(self.service.name))
         
-    def greet_broker(self, socket):
-        """Send the appropriate greeting to the broker."""
-        welcome = ZMQCauldronMessage(command="welcome", service=self.service.name, dispatcher=self.service.dispatcher, direction="BRQ", prefix=[FRAMEBLANK, b""])
+    def check_broker(self, socket):
+        """Check for broker liveliness."""
+        welcome = ZMQCauldronMessage(command="welcome", service=self.service.name, dispatcher=self.service.dispatcher, direction="DBQ", prefix=[FRAMEBLANK, b""])
         socket.send_multipart(welcome.data)
         self.log.log(5, "Sent broker a welcome message: {0!s}.".format(welcome))
-        message = ZMQCauldronMessage.parse(socket.recv_multipart())
-        if message.payload != "confirmed":
-            raise DispatcherError("Message confirming welcome was malformed! {0!s}".format(message))
-        ready = ZMQCauldronMessage(command="ready", service=self.service.name, dispatcher=self.service.dispatcher, direction="BRQ", prefix=[FRAMEBLANK, b""])
+        
+        if socket.poll(self.timeout):
+            message = ZMQCauldronMessage.parse(socket.recv_multipart())
+            if message.payload != "confirmed":
+                raise DispatcherError("Message confirming welcome was malformed! {0!s}".format(message))
+            return True
+        else:
+            return False
+        
+        
+    def greet_broker(self, socket):
+        """Send the appropriate greeting to the broker."""
+        checks = 1
+        while checks:
+            if self.check_broker(socket):
+                break
+            b = ZMQBroker.daemon(config = self.service._configuration_location)
+            checks -= 1
+        else:
+            raise TimeoutError("Can't connect to broker.") 
+        
+        ready = ZMQCauldronMessage(command="ready", service=self.service.name, dispatcher=self.service.dispatcher, direction="DBQ", prefix=[FRAMEBLANK, b""])
         socket.send_multipart(ready.data)
         self.log.log(5, "Sent broker a ready message: {0!s}.".format(ready))
         
@@ -61,16 +80,18 @@ class _ZMQResponder(ZMQMicroservice):
     def handle_identify(self, message):
         """Handle an identify command."""
         message.verify(self.service)
-        if message.keyword not in self.service:
+        if message.payload not in self.service:
+            self.log.log(5, "Not identifying b/c not in service.")
             return FRAMEBLANK
         # This seems harsh, not using "CONTAINS", etc,
         # but it handles dispatchers correctly.
         try:
             kwd = self.service[message.payload]
         except WrongDispatcher:
+            self.log.log(5, "Not identifying b/c wrong dispatcher.")
             return FRAMEBLANK
         else:
-            return self.service.dispatcher
+            return kwd.KTL_TYPE
         
     def handle_enumerate(self, message):
         """Handle enumerate command."""
@@ -80,11 +101,17 @@ class _ZMQResponder(ZMQMicroservice):
     def handle_broadcast(self, message):
         """Handle the broadcast command."""
         message.verify(self.service)
-        message = ZMQCauldronMessage(command="broadcast", service=self.service.name, dispatcher=self.service.dispatcher, keyword=message.keyword, payload=message.payload, direction="PUB")
+        message = ZMQCauldronMessage(command="broadcast", service=self.service.name, dispatcher=self.service.dispatcher, keyword=message.keyword, payload=message.payload, direction="CDB")
         socket = self._get_broadcaster()
         self.log.log(5, "Broadcast {0!s}".format(message))
         socket.send_multipart(message.data)
         return "success"
+        
+    def handle_heartbeat(self, message):
+        """Heartbeat command does pretty much nothing."""
+        self.log.log(5, "Heartbeat {0!s}".format(message))
+        return "{0:.1f}".format(time.time())
+        
         
     def connect(self):
         """Connect, and add a broadcaster."""
@@ -167,10 +194,10 @@ class Service(DispatcherService):
             self._thread.stop()
         self.ctx.destroy()
         
-    def _synchronous_command(self, command, payload, keyword=None):
+    def _synchronous_command(self, command, payload, keyword=None, timeout=None):
         """Execute a synchronous command."""
         message = ZMQCauldronMessage(command, service=self.name, dispatcher=self.dispatcher,
-            keyword=keyword.name if keyword else FRAMEBLANK, payload=payload, direction="REQ")
+            keyword=keyword.name if keyword else FRAMEBLANK, payload=payload, direction="CDQ")
         if not self._thread.running.is_set():
             self.log.log(5, "Queue {0!s}".format(message))
             return self._message_queue.append(message)
@@ -180,6 +207,9 @@ class Service(DispatcherService):
         else:
             self.log.log(5, "Request {0!s}".format(message))
             self.socket.send_multipart(message.data)
+            if timeout:
+                if not self.socket.poll(timeout * 1e3):
+                    raise TimeoutError("Dispatcher timed out.")
             response = ZMQCauldronMessage.parse(self.socket.recv_multipart())
         response.verify(self)
         return response
