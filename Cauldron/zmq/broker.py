@@ -16,6 +16,12 @@ from .microservice import ZMQCauldronMessage, ZMQCauldronErrorResponse, FRAMEBLA
 from .common import zmq_address
 from ..exc import DispatcherError
 
+__all__ = ['ZMQBroker', 'NoResponseNecessary', 'NoDispatcherAvailable', 'MultipleDispatchersFound']
+
+def logger_getChild(logger, child):
+    """Get a child logger of a parent."""
+    name = "{0}.{1}".format(logger.name, child)
+    return logging.getLogger(name)
 
 class NoResponseNecessary(Exception):
     """NoResponseNecessary"""
@@ -156,7 +162,7 @@ class Client(Lifetime):
         super(Client, self).__init__(service)
         self.id = client_id
         self.name = binascii.hexlify(self.id)
-        self.log = service.log.getChild("Client.{0}".format(binascii.hexlify(self.id)))
+        self.log = logger_getChild(service.log, "Client.{0}".format(binascii.hexlify(self.id)))
     
     def send(self, message, socket):
         """Send a message to this client."""
@@ -173,7 +179,7 @@ class Dispatcher(Lifetime):
         self.id = dispatcher_id
         self.name = name
         self.service = weakref.proxy(service)
-        self.log = self.service.log.getChild(self.name)
+        self.log = logger_getChild(self.service.log,self.name)
         self.message = None
         self.keywords = dict()
         
@@ -206,7 +212,7 @@ class Service(object):
         self.dispatchers = {}
         self.clients = {}
         self.broker = weakref.proxy(broker)
-        self.log = self.broker.log.getChild("Service.{0}".format(self.name))
+        self.log = logger_getChild(self.broker.log, "Service.{0}".format(self.name))
         self._fans = {}
         
     def __repr__(self):
