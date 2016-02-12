@@ -151,6 +151,7 @@ def backend(request):
     if request.param == 'zmq':
         from Cauldron.zmq.broker import ZMQBroker
         b = ZMQBroker.thread()
+        b.running.wait()
         request.addfinalizer(b.stop)
     use(request.param)
     request.addfinalizer(fail_if_not_teardown)
