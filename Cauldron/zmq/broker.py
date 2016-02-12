@@ -175,6 +175,7 @@ class Dispatcher(Lifetime):
         self.service = weakref.proxy(service)
         self.log = self.service.log.getChild(self.name)
         self.message = None
+        self.keywords = dict()
         
     def send(self, message, socket):
         """Send a message to this dispatcher."""
@@ -244,7 +245,9 @@ class Service(object):
             if message.isvalid:
                 # If this message can identify the disptacher, save it for later.
                 self.keywords[message.keyword.upper()] = message.dispatcher
-        #TODO: Scrape off of message identify commands.
+            if message.command == "identify" and message.isvalid:
+                self.dispatchers[message.dispatcher].keywords[message.keyword.upper()] = message.payload
+            
     
     def paste(self, message):
         """Opposite of scrape, paste the dispatcher back into the message."""
@@ -282,8 +285,6 @@ class Service(object):
         
     def beat(self, socket):
         """Start heartbeat messages where necssary."""
-        self.log.debug("{0!r} beating".format(self))
-        
         for name in self.dispatchers.keys():
             dispatcher = self.dispatchers[name]
             if not dispatcher.shouldbeat:
@@ -303,7 +304,7 @@ class Service(object):
         
     @handler("DBE")
     def handle_dispatcher_broker_error(self, message, socket):
-        """This is an unusal case which can happen during cleanup."""
+        """This is an unusual case which can happen during cleanup."""
         self.log.warning("Discarding {0!r}".format(message))
         
     @handler("DBQ")
@@ -344,13 +345,25 @@ class Service(object):
         client = self.get_client(message)
         client.activate(message)
         
-        fmessage = FanMessage(self, client, message)
-        self.log.log(5, "{0!r}.start({1!r})".format(fmessage, message))
+        try:
+            if message.command == "identify":
+                dispatcher_name = self.keywords[message.keyword.upper()]
+                dispatcher = self.dispatchers[dispatcher_name]
+                ktl_type = dispatcher.keywords[message.keyword.upper()]
+            else:
+                raise KeyError
+        except KeyError:
+            fmessage = FanMessage(self, client, message)
+            self.log.log(5, "{0!r}.start({1!r})".format(fmessage, message))
         
-        self._fans[fmessage.id] = fmessage
+            self._fans[fmessage.id] = fmessage
         
-        for dispatcher in self.dispatchers.values():
-            dispatcher.send(fmessage.generate_message(dispatcher), socket)
+            for dispatcher in self.dispatchers.values():
+                dispatcher.send(fmessage.generate_message(dispatcher), socket)
+        else:
+            response = message.response(ktl_type)
+            response.dispatcher = dispatcher_name
+            client.send(response, socket)
         
     @handler("CDE")
     @handler("CDP")
@@ -431,19 +444,19 @@ class ZMQBroker(threading.Thread):
         return obj
         
     @classmethod
-    def daemon(cls, config=None):
+    def daemon(cls, config=None, daemon=True):
         """Serve in a process."""
         import multiprocessing as mp
         proc = mp.Process(target=cls.serve, args=(config,), name="ZMQBroker")
-        proc.daemon = True
+        proc.daemon = daemon
         proc.start()
         return proc
     
     @classmethod
-    def thread(cls, config=None):
+    def thread(cls, config=None, daemon=True):
         """Serve in a thread."""
         obj = cls.from_config(config)
-        obj.daemon = True
+        obj.daemon = daemon
         obj.start()
         return obj
     
@@ -484,16 +497,31 @@ class ZMQBroker(threading.Thread):
         socket = self._local.socket = self.connect(self._address)
         xpub = self._local.xpub = self.connect(self._pub_address, 'XPUB')
         xsub = self._local.xsub = self.connect(self._sub_address, 'XSUB')
+        signal = self._local.signal = self.connect("inproc://{0}".format(hex(id(self))), "PAIR")
         self._local.poller = zmq.Poller()
         self._local.poller.register(socket, zmq.POLLIN)
         self._local.poller.register(xsub, zmq.POLLIN)
         self._local.poller.register(xpub, zmq.POLLIN)
+        self._local.poller.register(signal, zmq.POLLIN)
     
     def close(self):
         """Close thread-local sockets."""
+        import zmq
+        if not hasattr(self._local, 'socket'):
+            return
+        
         self._local.socket.close(linger=0)
         self._local.xpub.close(linger=0)
         self._local.xsub.close(linger=0)
+        
+        signal = self._local.signal
+        if signal.closed:
+            pass
+        elif signal.poll(timeout=1):
+            signal.recv()
+        signal.close(linger=0)
+        del self._local.socket, self._local.xpub, self._local.xsub, self._local.signal
+        
     
     def respond(self):
         """Respond to a single message on each socket."""
@@ -502,10 +530,15 @@ class ZMQBroker(threading.Thread):
         socket = self._local.socket
         xpub = self._local.xpub
         xsub = self._local.xsub
+        signal = self._local.signal
         
         try:
-            sockets = dict(poller.poll(timeout=self.timeout * 1e-3))
-        
+            sockets = dict(poller.poll(timeout=self.timeout * 1e3))
+            
+            if sockets.get(signal) == zmq.POLLIN:
+                self.running.clear()
+                return
+            
             if sockets.get(socket) == zmq.POLLIN:
                 request = socket.recv_multipart()
                 if len(request) > 3:
@@ -523,14 +556,28 @@ class ZMQBroker(threading.Thread):
             if sockets.get(xpub) == zmq.POLLIN:
                 request = xpub.recv_multipart()
                 xsub.send_multipart(request)
+            
+        
         except zmq.ZMQError as e:
             self.running.clear()
         
     
     def stop(self):
         """Stop the responder."""
-        self.running.clear()
+        import zmq
         
+        if not self.context.closed:
+            signal = self.context.socket(zmq.PAIR)
+        
+            signal.connect("inproc://{0:s}".format(hex(id(self))))
+            self.running.clear()
+            signal.send("")
+            signal.close(linger=0)
+        else:
+            self.running.clear()
+        self.join()
+        self.close()
+
     def run(self):
         """Run method for threads."""
         self.prepare()
@@ -567,6 +614,6 @@ def main():
     try:
         ZMQBroker.serve(read_configuration(opt.config))
     except KeyboardInterrupt:
-        pass
+        raise
     print("\nShutting down.")
     return 0
