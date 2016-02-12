@@ -473,7 +473,7 @@ class ZMQMicroservice(threading.Thread):
         if not self.running.is_set():
             msg = "The dispatcher responder thread is not alive."
             if self._error is not None:
-                msg += " Thread Error: {0}".format(repr(self._thread._error))
+                msg += " Thread Error: {0}".format(repr(self._error))
             else:
                 msg += " No error was reported."
             raise DispatcherError(msg)

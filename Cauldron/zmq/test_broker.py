@@ -4,8 +4,11 @@
 import pytest
 from .broker import ZMQBroker
 from .microservice import ZMQCauldronMessage
-import zmq
+from ..conftest import fail_if_not_teardown, available_backends
+
 import time
+
+pytestmark = pytest.mark.skipif("zmq" not in available_backends, reason="requires zmq")
 
 @pytest.fixture
 def timeout():
@@ -55,6 +58,7 @@ def broker_quick_expire(request, address, pub_address, sub_address, timeout):
     
 def socket(address, identity):
     """docstring for socket"""
+    import zmq
     ctx = zmq.Context.instance()
     socket = ctx.socket(zmq.REQ)
     socket.IDENTITY = identity
