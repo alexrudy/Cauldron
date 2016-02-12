@@ -10,7 +10,7 @@ import threading
 def service(request, dispatcher):
     """A service dispatch tool."""
     mykw = dispatcher['KEYWORD']
-    request.addfinalizer(lambda : dispatcher.shutdown())
+    request.addfinalizer(dispatcher.shutdown)
     return dispatcher
 
 def test_read_write(service, client):
