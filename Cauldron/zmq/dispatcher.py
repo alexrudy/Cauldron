@@ -33,13 +33,20 @@ class _ZMQResponder(ZMQMicroservice):
         super(_ZMQResponder, self).__init__(address=address, use_broker=True,
             context=self.service.ctx, name="DFW.Service.{0:s}.Responder".format(self.service.name))
         
-    def check_broker(self, socket):
+    def check_broker(self, socket, signal):
         """Check for broker liveliness."""
+        import zmq
+        
         welcome = ZMQCauldronMessage(command="welcome", service=self.service.name, dispatcher=self.service.dispatcher, direction="DBQ", prefix=[FRAMEBLANK, b""])
         socket.send_multipart(welcome.data)
         self.log.log(5, "Sent broker a welcome message: {0!s}.".format(welcome))
         
-        if socket.poll(self.timeout):
+        poller = zmq.Poller()
+        poller.register(socket, zmq.POLLIN)
+        poller.register(signal, zmq.POLLIN)
+        
+        ready = dict(poller.poll(self.timeout * 1e3))
+        if ready.get(socket) == zmq.POLLIN:
             message = ZMQCauldronMessage.parse(socket.recv_multipart())
             if message.payload != "confirmed":
                 raise DispatcherError("Message confirming welcome was malformed! {0!s}".format(message))
@@ -48,16 +55,18 @@ class _ZMQResponder(ZMQMicroservice):
             return False
         
         
-    def greet_broker(self, socket):
+    def greet_broker(self, socket, signal):
         """Send the appropriate greeting to the broker."""
         checks = 1
+        attempts = 1
         while checks:
-            if self.check_broker(socket):
+            if self.check_broker(socket, signal):
                 break
-            b = ZMQBroker.daemon(config = self.service._configuration_location)
+            self._b = ZMQBroker.daemon(config = self.service._configuration_location)
             checks -= 1
+            attempts += 1
         else:
-            raise TimeoutError("Can't connect to broker.") 
+            raise TimeoutError("Can't connect to broker after {0:d} attempts.".format(checks)) 
         
         ready = ZMQCauldronMessage(command="ready", service=self.service.name, dispatcher=self.service.dispatcher, direction="DBQ", prefix=[FRAMEBLANK, b""])
         socket.send_multipart(ready.data)
@@ -192,7 +201,6 @@ class Service(DispatcherService):
         zmq = check_zmq()
         if hasattr(self, '_thread') and self._thread.is_alive():
             self._thread.stop()
-        self.ctx.destroy()
         
     def _synchronous_command(self, command, payload, keyword=None, timeout=None):
         """Execute a synchronous command."""
