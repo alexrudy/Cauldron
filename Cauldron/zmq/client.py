@@ -129,7 +129,7 @@ class Service(ClientService):
             if len(items) == 1 and (items[0] not in (FRAMEBLANK, FRAMEFAIL)):
                 ktl_type = items[0]
             else:
-                raise KeyError("Keyword {0} does not exist.".format(key))
+                raise KeyError("Keyword '{0}' does not exist.".format(name))
             self._type_ktl_cache[name] = ktl_type
             return ktl_type
         
