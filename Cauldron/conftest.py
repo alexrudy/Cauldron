@@ -47,12 +47,6 @@ else:
     PYTEST_HEADER_MODULES['zmq'] = 'zmq'
     if "zmq" in registry.keys():
         available_backends.append("zmq")
-<<<<<<< febd7285a9d0064ef5bd66b66336a3d66f4e1d95
-    ROUTER = None
-
-=======
-    
->>>>>>> Initial implementaion of a message broker.
 
 import pkg_resources
 import os
@@ -153,11 +147,11 @@ def teardown_cauldron(request):
 @pytest.fixture(params=available_backends)
 def backend(request):
     """The backend name."""
-    global ROUTER
     from Cauldron.api import use, teardown, CAULDRON_SETUP
-    if request.param == 'zmq' and ROUTER is None:
-        from Cauldron.zmq.router import ZMQRouter
-        ROUTER = ZMQRouter.daemon()
+    if request.param == 'zmq':
+        from Cauldron.zmq.broker import ZMQBroker
+        b = ZMQBroker.thread()
+        request.addfinalizer(b.stop)
     use(request.param)
     request.addfinalizer(fail_if_not_teardown)
     return request.param
