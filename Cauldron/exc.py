@@ -48,6 +48,10 @@ class DispatcherError(CauldronException):
     """Raised when something went wrong with the dispatcher."""
     pass
     
+class TimeoutError(CauldronException):
+    """Raised when an operation times out."""
+    pass
+    
 class ConfigurationMissing(CauldronWarning):
     """An exception raised when a configuration item is missing."""
     pass
