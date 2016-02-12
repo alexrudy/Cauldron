@@ -356,7 +356,7 @@ class ZMQMicroservice(threading.Thread):
     
     _error = None
     
-    def __init__(self, context, address, name="microservice", use_broker=False, timeout=10):
+    def __init__(self, context, address, name="microservice", use_broker=False, timeout=5):
         super(ZMQMicroservice, self).__init__(name=six.text_type(name))
         import zmq
         self.ctx = weakref.proxy(context or zmq.Context.instance())
@@ -370,7 +370,6 @@ class ZMQMicroservice(threading.Thread):
     def handle(self, message):
         """Handle a message, raising an error if appropriate."""
         try:
-            self.log.log(5, "Handling {0!s}".format(message))
             method_name = "handle_{0:s}".format(message.command)
             if not hasattr(self, method_name):
                 message.raise_error_response("Bad command '{0:s}'!".format(message.command))
@@ -394,6 +393,8 @@ class ZMQMicroservice(threading.Thread):
         else:
             socket = self.ctx.socket(zmq.REP)
         
+        signal = self.ctx.socket(zmq.PAIR)
+        signal.bind("inproc://{0:s}".format(hex(id(self))))
         try:
             if self.use_broker:
                 socket.connect(self.address)
@@ -408,10 +409,10 @@ class ZMQMicroservice(threading.Thread):
             
         if self.use_broker:
             # Ready sentinel for broker.
-            self.greet_broker(socket)
-        return socket
+            self.greet_broker(socket, signal)
+        return socket, signal
         
-    def greet_broker(self, socket):
+    def greet_broker(self, socket, signal):
         """Send the appropriate greeting to the broker."""
         socket.send_multipart([FRAMEBLANK] + ZMQCauldronMessage(command="ready").data)
         self.log.log(5, "Sent broker a welcome message.")
@@ -422,24 +423,35 @@ class ZMQMicroservice(threading.Thread):
         try:
             # This is a local variable to ensure that the socket doesn't leak
             # into another thread, because ZMQ sockets aren't thread-safe.
-            socket = self.connect()
+            socket, signal = self.connect()
+            poller = zmq.Poller()
+            poller.register(socket, zmq.POLLIN)
+            poller.register(signal, zmq.POLLIN)
             
             self.running.set()
             self.log.log(5, "Starting responder loop.")
             while self.running.is_set():
-                if socket.poll(timeout=self.timeout):
+                ready = dict(poller.poll(timeout=self.timeout*1e3))
+                if ready.get(socket) == zmq.POLLIN:
                     response = self.handle(ZMQCauldronMessage.parse(socket.recv_multipart()))
-                    self.log.log(5, "Responds {0!s}".format( response))
+                    self.log.log(5, "Responds {0!r}".format(response))
                     socket.send_multipart(response.data)
                 
         except (zmq.ContextTerminated, weakref.ReferenceError, zmq.ZMQError) as e:
             self.log.log(5, "Service shutdown because '{0!r}'.".format(e))
             self._error = e
+        except Exception as e:
+            self._error = e
+            self.log.log(5, "Service shutdown because '{0!r}'.".format(e))
+            raise
         else:
             self.log.log(5, "Shutting down the responder cleanly.")
             try:
-                socket.setsockopt(zmq.LINGER, 0)
-                socket.close()
+                ready = dict(poller.poll(timeout=self.timeout*1e3))
+                if ready.get(signal) == zmq.POLLIN:
+                    signal.recv()
+                signal.close(linger=0)
+                socket.close(linger=0)
             except:
                 pass
         finally:
@@ -468,5 +480,13 @@ class ZMQMicroservice(threading.Thread):
         
     def stop(self):
         """Stop the responder thread."""
+        import zmq
+        if not self.ctx.closed:
+            signal = self.ctx.socket(zmq.PAIR)
+            signal.connect("inproc://{0:s}".format(hex(id(self))))
+            signal.send("")
+            signal.close(linger=-1)
+        
         self.running.clear()
+        self.join()
         
