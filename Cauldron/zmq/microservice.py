@@ -481,12 +481,17 @@ class ZMQMicroservice(threading.Thread):
     def stop(self):
         """Stop the responder thread."""
         import zmq
-        if not self.ctx.closed:
+        if not self.isAlive():
+            return
+        
+        if self.running.is_set() and (not self.ctx.closed):
+            self.running.clear()
             signal = self.ctx.socket(zmq.PAIR)
             signal.connect("inproc://{0:s}".format(hex(id(self))))
-            signal.send("")
-            signal.close(linger=-1)
-        
+            signal.send("", flags=zmq.NOBLOCK)
+            signal.close(linger=0)
         self.running.clear()
         self.join()
+        self.log.debug("Joined microservice {0}".format(self.name))
+        
         

@@ -453,7 +453,7 @@ class ZMQBroker(threading.Thread):
         self._sub_address = sub_address
         self.timeout = float(timeout)
         self._local = threading.local()
-        
+        self._error = None
         self.services = dict()
         
     @classmethod
@@ -548,7 +548,7 @@ class ZMQBroker(threading.Thread):
         if signal.closed:
             pass
         elif signal.poll(timeout=1):
-            signal.recv()
+            signal.recv(flags=zmq.DONTWAIT)
         signal.close(linger=0)
         del self._local.socket, self._local.xpub, self._local.xsub, self._local.signal
         
@@ -637,6 +637,7 @@ def main():
     parser = argparse.ArgumentParser(description="A broker to connect ZMQ clients to services.")
     parser.add_argument("-c", "--config", type=six.text_type, help="set the Cauldron-zmq configuration filename", default=None)
     parser.add_argument("-v", "--verbose", action="count", help="use verbose messaging.")
+    parser.add_argument("-D", dest='debug', action='store_true', help="Debug - print keyboard interrupts.")
     opt = parser.parse_args()
     if opt.verbose:
         _setup_logging(opt.verbose)
@@ -644,6 +645,7 @@ def main():
     try:
         ZMQBroker.serve(read_configuration(opt.config))
     except KeyboardInterrupt:
-        raise
+        if opt.debug:
+            raise
     print("\nShutting down.")
     return 0
