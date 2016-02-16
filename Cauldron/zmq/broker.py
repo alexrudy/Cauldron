@@ -295,7 +295,6 @@ class Service(object):
             dispatcher = self.dispatchers[name]
             if not dispatcher.shouldbeat:
                 continue
-            self.log.log(5, "{0} < {1} ({2})".format(dispatcher._expiration, time.time(), self.broker.timeout))
             if dispatcher.message is not None:
                 msg = dispatcher.message.response("beat")
                 msg.command = "heartbeat"
@@ -303,15 +302,21 @@ class Service(object):
         
     def handle(self, message, socket):
         """Handle"""
-        method = getattr(self, handlers[message.direction])
-        self.log.log(5, "{0!r}.handle({1!r})".format(self, message))
-        method(message, socket)
-        self.finish_fan_messages(socket)
+        try:
+            method = getattr(self, handlers[message.direction])
+            # self.log.log(5, "{0!r}.handle({1!r})".format(self, message))
+            method(message, socket)
+        except Exception as e:
+            self.log.exception("Handling exception {0}".format(e))
+            socket.send_multipart(message.error_response(repr(e)))
+        else:
+            self.finish_fan_messages(socket)
+            
         
     @handler("DBE")
     def handle_dispatcher_broker_error(self, message, socket):
         """This is an unusual case which can happen during cleanup."""
-        self.log.warning("Discarding {0!r}".format(message))
+        self.log.log(5, "Discarding {0!r}".format(message))
         
     @handler("DBQ")
     def handle_dispatcher_broker_query(self, message, socket):
@@ -394,9 +399,11 @@ class Service(object):
         """
         client = self.get_client(message)
         client.activate(message)
-        
-        dispatcher = self.paste(message)
-        dispatcher.send(message, socket)
+        try:
+            dispatcher = self.paste(message)
+            dispatcher.send(message, socket)
+        except DispatcherError as e:
+            client.send(message.error_response(e), socket)
         
     @handler("CBQ")
     def handle_client_broker_query(self, message, socket):
