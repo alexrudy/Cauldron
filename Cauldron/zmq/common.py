@@ -60,10 +60,5 @@ def zmq_broadcaster_address(config, bind=False):
 
 def teardown():
     """Destroy the ZMQ context."""
-    try:
-        import zmq
-    except ImportError:
-        pass
-    else:
-        zmq.Context.instance().destroy()
+    pass
     

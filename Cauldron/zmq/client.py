@@ -25,12 +25,20 @@ registry.client.teardown_for('zmq')(teardown)
 class _ZMQMonitorThread(threading.Thread):
     """A monitoring thread for ZMQ-powered Services which listens for broadcasts."""
     def __init__(self, service):
-        super(_ZMQMonitorThread, self).__init__()
+        super(_ZMQMonitorThread, self).__init__(name="ktl.Service.{0}.Broadcasts".format(service.name))
         self.service = weakref.proxy(service)
         self.shutdown = threading.Event()
-        self.log = logging.getLogger("ktl.Service.{0}.Broadcasts".format(service.name))
+        self.log = logging.getLogger(self.name)
         self.monitored = set()
         self.daemon = True
+        
+    def stop(self):
+        """Stop this thread."""
+        self.shutdown.set()
+        if not self.isAlive():
+            return
+        self.log.debug("Joining {0}".format(self.name))
+        self.join()
         
     def run(self):
         """Run the monitoring thread."""
@@ -49,7 +57,7 @@ class _ZMQMonitorThread(threading.Thread):
             socket.setsockopt_string(zmq.SUBSCRIBE, six.text_type(self.service.name))
             self.log.log(5, "Started Monitor Thread for {0}".format(address))
             while not self.shutdown.isSet():
-                if socket.poll(timeout=0.1):
+                if socket.poll(timeout=1):
                     try:
                         message = ZMQCauldronMessage.parse(socket.recv_multipart())
                         message.verify(self.service)
@@ -66,7 +74,7 @@ class _ZMQMonitorThread(threading.Thread):
                     except Exception as e:
                         self.log.error("Broadcast Error: {0!r}".format(e))
         except (zmq.ContextTerminated, zmq.ZMQError) as e:
-            self.log.info("Service shutdown and context terminated, closing broadcast thread.")
+            self.log.log(6, "Service shutdown and context terminated, closing broadcast thread. {0}".format(repr(e)))
         else:
             try:
                 socket.setsockopt(zmq.LINGER, 0)
@@ -74,7 +82,7 @@ class _ZMQMonitorThread(threading.Thread):
             except:
                 pass
         finally:
-            self.log.log(5, "Stopping Monitor Thread")
+            self.log.debug("Stopped Monitor Thread")
             
 
 @registry.client.service_for("zmq")
@@ -133,10 +141,15 @@ class Service(ClientService):
             self._type_ktl_cache[name] = ktl_type
             return ktl_type
         
+    def __del__(self):
+        """On delete, try to shutdown."""
+        self.shutdown()
+        
     def shutdown(self):
         """When this client is shutdown, close the subscription thread."""
         if hasattr(self, '_thread'):
-            self._thread.shutdown.set()
+            self._thread.stop()
+            self.log.debug("Joined monitor thread.")
         
     def has_keyword(self, name):
         """Check if a dispatcher has a keyword."""
