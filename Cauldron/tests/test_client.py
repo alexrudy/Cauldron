@@ -10,8 +10,13 @@ import threading
 def service(request, dispatcher):
     """A service dispatch tool."""
     mykw = dispatcher['KEYWORD']
-    request.addfinalizer(dispatcher.shutdown)
     return dispatcher
+    
+def test_create_and_destroy_client(service):
+    """Make a client object."""
+    from Cauldron import ktl
+    svc = ktl.Service(service.name)
+    del svc
 
 def test_read_write(service, client):
     """Test a write method."""

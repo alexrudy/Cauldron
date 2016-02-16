@@ -5,8 +5,6 @@ Test dispatcher.
 import pytest
 import threading
 
-pytestmark = pytest.mark.usefixtures("teardown_cauldron")
-
 @pytest.fixture
 def waittime():
     """Event waiting time."""

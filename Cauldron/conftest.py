@@ -89,9 +89,13 @@ def servicename():
     return "testsvc"
     
 @pytest.fixture
-def config():
+def config(tmpdir):
     """DFW configuration."""
-    return None
+    from .config import cauldron_configuration
+    cauldron_configuration.set("zmq", "address", "inproc://broker")
+    cauldron_configuration.set("zmq", "pub-address", "inproc://publish")
+    cauldron_configuration.set("zmq", "sub-address", "inproc://subscribe")
+    return cauldron_configuration
     
 @pytest.fixture
 def check_teardown(request):
@@ -102,29 +106,30 @@ SEEN_THREADS = WeakSet()
 def fail_if_not_teardown():
     """Fail if teardown has not happedned properly."""
     from Cauldron.api import teardown, CAULDRON_SETUP
+    print("Teardown...")
     teardown()
     failures = ["DFW", "ktl", "_DFW", "_ktl"]
     if CAULDRON_SETUP:
-        pytest.fail("Cauldron is marked as 'setup'.")
+        raise ValueError("Cauldron is marked as 'setup'.")
     for module in sys.modules:
         for failure in failures:
             if failure in module.split("."):
                 mod = sys.modules[module]
                 if mod is not None:
-                    pytest.fail("Module {0}/{1} not properly torn down.".format(module, sys.modules[module]))
+                    raise ValueError("Module {0}/{1} not properly torn down.".format(module, sys.modules[module]))
     try:
         from Cauldron import DFW
     except ImportError as e:
         pass
     else:
-        pytest.fail("Shouldn't be able to import DFW now!")
+        raise ValueError("Shouldn't be able to import DFW now!")
     
     try:
         from Cauldron import ktl
     except ImportError as e:
         pass
     else:
-        pytest.fail("Shouldn't be able to import ktl now!")
+        raise ValueError("Shouldn't be able to import ktl now!")
     
     import threading, time
     if threading.active_count() > 1:
@@ -135,25 +140,32 @@ def fail_if_not_teardown():
             count += 1
             SEEN_THREADS.add(thread)
     if count > 1:
-        pytest.fail("{0:d} non-deamon thread{1:s} left alive!\n{2!s}".format(count-1, "s" if (count-1)>1 else "",
+        raise ValueError("{0:d} non-deamon thread{1:s} left alive!\n{2!s}".format(count-1, "s" if (count-1)>1 else "",
             "\n".join([repr(thread) for thread in threading.enumerate()])))
     
 @pytest.fixture(scope='function')
 def teardown_cauldron(request):
-    """docstring for teardown_cauldron"""
+    """A specific fixture to force cauldron teardown."""
     request.addfinalizer(fail_if_not_teardown)
     return None
 
-@pytest.fixture(params=available_backends)
-def backend(request):
+@pytest.fixture(params=available_backends, scope='function')
+def backend(request, config):
     """The backend name."""
     from Cauldron.api import use, teardown, CAULDRON_SETUP
+    use(request.param)
+    
     if request.param == 'zmq':
         from Cauldron.zmq.broker import ZMQBroker
-        b = ZMQBroker.thread()
-        b.running.wait()
-        request.addfinalizer(b.stop)
-    use(request.param)
+        if not ZMQBroker.check(timeout=0.01):
+            b = ZMQBroker.thread()
+            b.running.wait(timeout=2.0)
+            if not b.running.is_set():
+                msg = "Couldn't start ZMQ broker."
+                if b._error is not None:
+                    msg += " Error: " + repr(b._error)
+                raise RuntimeError(msg)
+            request.addfinalizer(b.stop)
     request.addfinalizer(fail_if_not_teardown)
     return request.param
 

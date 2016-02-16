@@ -4,4 +4,3 @@ This packages contains affiliated package tests.
 """
 
 import pytest
-pytestmark = [pytest.mark.usefixtures("teardown_cauldron")]
