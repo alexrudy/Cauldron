@@ -490,7 +490,30 @@ class ZMQBroker(threading.Thread):
         obj.start()
         return obj
     
+    @classmethod
+    def check(cls, config=None, timeout=2.0, ctx=None, address=None):
+        """Check for the existence of a router at the configured address."""
+        import zmq
+        ctx = ctx or zmq.Context.instance()
+        if address is not None and config is not None:
+            raise ValueError("Can't specify both config= and address=.")
         
+        if address is None:
+            config = read_configuration(config)
+            address = zmq_address(config, "broker", bind=False)
+        
+        message = ZMQCauldronMessage(command="check", direction="UBQ")
+        
+        socket = ctx.socket(zmq.REQ)
+        socket.connect(address)        
+        socket.send_multipart(message.data)
+        if socket.poll(timeout):
+            response = ZMQCauldronMessage.parse(socket.recv_multipart())
+            print(response)
+            if response.payload == "Broker Alive":
+                return True
+        return False
+    
     def connect(self, address, mode="ROUTER"):
         """Connect the frontend and backend sockets."""
         import zmq
@@ -513,7 +536,15 @@ class ZMQBroker(threading.Thread):
             service_object = self.services[service.upper()] = Service(service, self)
             self.log.debug("Registered new service '{0}'".format(service))
         return service_object
-            
+        
+    
+    def respond_inquiry(self, message, socket):
+        """Respond to an inquiry."""
+        try:
+            socket.send_multipart(message.response("Broker Alive").data)
+        except Exception as e:
+            socket.send_multipart(message.error_response(repr(e)).data)
+    
     def cleanup(self, socket):
         """docstring for cleanup"""
         for service in self.services.values():
@@ -573,8 +604,11 @@ class ZMQBroker(threading.Thread):
                 request = socket.recv_multipart()
                 if len(request) > 3:
                     message = ZMQCauldronMessage.parse(request)
-                    service = self.get_service(message.service)
-                    service.handle(message, socket)
+                    if message.direction[0:2] == "UB":
+                        self.respond_inquiry(message, socket)
+                    else:
+                        service = self.get_service(message.service)
+                        service.handle(message, socket)
                 else:
                     self.log.log(5, "Malofrmed request: |{0}|".format("|".join(map(binascii.hexlify,request))))
         
@@ -589,36 +623,50 @@ class ZMQBroker(threading.Thread):
             
         
         except zmq.ZMQError as e:
+            self.log.log(6, "Ending .respond(). {0!r}".format(e))
             self.running.clear()
+            
         
     
     def stop(self):
         """Stop the responder."""
         import zmq
         
-        if not self.context.closed:
+        if not self.isAlive():
+            return
+        
+        if self.running.is_set() and not self.context.closed:
             signal = self.context.socket(zmq.PAIR)
         
             signal.connect("inproc://{0:s}".format(hex(id(self))))
             self.running.clear()
-            signal.send("")
+            signal.send("", flags=zmq.NOBLOCK)
             signal.close(linger=0)
         else:
             self.running.clear()
+        
         self.join()
-        self.close()
+        self.log.debug("Joined Broker")
+        
+        if self._error is not None:
+            raise RuntimeError(self._error)
 
     def run(self):
         """Run method for threads."""
-        self.prepare()
+        try:
+            self.prepare()
         
-        self.running.set()
-        self.log.debug("Broker running. Timeout={0}".format(self.timeout))
-        while self.running.is_set():
-            self.respond()
+            self.running.set()
+            self.log.debug("Broker running. Timeout={0}".format(self.timeout))
+            while self.running.is_set():
+                self.respond()
             
-        self.close()
-        self.log.debug("Broker done.")
+            self.close()
+        except Exception as e:
+            self._error = e
+            raise
+        else:
+            self.log.debug("Broker done. running={0}".format(self.running.is_set()))
         
     
 

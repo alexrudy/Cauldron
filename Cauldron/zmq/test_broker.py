@@ -126,6 +126,23 @@ def test_broker_register_two_dispatchers(broker, dsocket, dasocket, servicename,
     dispatcher(broker, dasocket, servicename, dispatcher_alt_name, message, timeout)
     assert len(broker.services[servicename.upper()].dispatchers) == 2
     
+def test_broker_check(address, pub_address, sub_address):
+    """Test broker check."""
+    assert not ZMQBroker.check(address=address)
+    broker = ZMQBroker("Test-Broker", address, pub_address, sub_address)
+    broker.start()
+    broker.running.wait()
+    try:
+        assert broker.check(address=address), "Broker wasn't alive!"
+    finally:
+        broker.stop()
+        
+def test_broker_run_and_stop(address, pub_address, sub_address):
+    """Test broker run and stop."""
+    broker = ZMQBroker("Test-Broker", address, pub_address, sub_address)
+    broker.start()
+    broker.running.wait()
+    broker.stop()
     
 def test_broker_register_unknown_command(broker, dsocket, message, timeout, dispatcher_name):
     """Send a bogus command."""
@@ -349,6 +366,70 @@ def test_client_identify_single_error(broker, csocket, dsocket, dasocket, dispat
     assert cmessage.direction == "CSP"
     assert cmessage.command == "test"
     assert set(cmessage.payload.split(":")) == set(["reply"])
+    
+def test_no_dispatcher_available(broker, csocket, dispatcher_name, servicename, message, timeout):
+    """Test for when no dispatcher is available"""
+    message = message.copy()
+    message.direction = "CDQ"
+    message.command = "test"
+    message.payload = "data"
+    message.dispatcher = dispatcher_name
+    message.service = servicename
+    
+    csocket.send_multipart(message.data)
+    broker.respond()
+    assert csocket.poll(timeout) != 0, "No client messages were ready"
+    cmessage = ZMQCauldronMessage.parse(csocket.recv_multipart())
+    assert cmessage.direction == "CDE"
+    assert cmessage.command == "test"
+    assert cmessage.payload == "No dispatcher is available for '{0}'".format(servicename)
+    
+def test_no_dispatcher_available(broker, csocket, dispatcher_name, servicename, message, timeout):
+    """Test for when no dispatcher is available"""
+    message = message.copy()
+    message.direction = "CDQ"
+    message.command = "test"
+    message.payload = "data"
+    message.dispatcher = dispatcher_name
+    message.service = servicename
+    
+    csocket.send_multipart(message.data)
+    broker.respond()
+    assert csocket.poll(timeout) != 0, "No client messages were ready"
+    cmessage = ZMQCauldronMessage.parse(csocket.recv_multipart())
+    assert cmessage.direction == "CDE"
+    assert cmessage.command == "test"
+    assert cmessage.payload == "Dispatcher '{0}' is not available for '{1}'".format(dispatcher_name, servicename)
+    
+def test_no_dispatcher_available_service_query(broker, csocket, dispatcher_name, servicename, message, timeout):
+    """Test for when no dispatcher is available"""
+    message = message.copy()
+    message.direction = "CSQ"
+    message.command = "test"
+    message.payload = "data"
+    
+    csocket.send_multipart(message.data)
+    broker.respond()
+    assert csocket.poll(timeout) != 0, "No client messages were ready"
+    cmessage = ZMQCauldronMessage.parse(csocket.recv_multipart())
+    assert cmessage.direction == "CSE"
+    assert cmessage.command == "test"
+    assert cmessage.payload == "No dispatchers for '{0}'".format(servicename)
+    
+def test_broker_alive_call(broker, csocket, dispatcher_name, servicename, message, timeout):
+    """Test for when no dispatcher is available"""
+    message = message.copy()
+    message.direction = "UBQ"
+    message.command = "check"
+    message.payload = "data"
+    
+    csocket.send_multipart(message.data)
+    broker.respond()
+    assert csocket.poll(timeout) != 0, "No client messages were ready"
+    cmessage = ZMQCauldronMessage.parse(csocket.recv_multipart())
+    assert cmessage.direction == "UBP"
+    assert cmessage.command == "check"
+    assert cmessage.payload == "Broker Alive"
     
 def test_dispatcher_expiration(broker_quick_expire, csocket, dsocket, servicename, dispatcher_name, message, timeout):
     """Test messages passed from client to dispatcher and back."""
