@@ -73,7 +73,7 @@ class MessageType(object):
             return (self.responder, self.origin, kind)
     
     KIND = {"Q" : "Query", "P": "Reply", "E": "Error", "B": "Broadcast"}
-    ENDPOINT = {"C" : "Client", "S": "Service", "D":"Dispatcher", "B":"Broker"}
+    ENDPOINT = {"C" : "Client", "S": "Service", "D":"Dispatcher", "B":"Broker", "U" : "Unidentified"}
         
 
 class Directions(collections.Mapping):
@@ -145,6 +145,7 @@ DIRECTIONS = Directions([
     MessageType("C", "B"),
     MessageType("C", "S"),
     MessageType("S", "D"),
+    MessageType("U", "B"),
 ])
 
 
