@@ -48,6 +48,8 @@ class FanMessage(object):
         # Store the results.
         self.pending = set()
         self.responses = dict()
+        self.valid = False # Did we message at least one dispatcher?
+        
         
     def __repr__(self):
         """A message representation."""
@@ -65,6 +67,7 @@ class FanMessage(object):
         message = self.message.copy()
         message.direction = "SDQ"
         self.pending.add(dispatcher.id)
+        self.valid = True
         message.prefix = [self.client.id, b""]
         return message
         
@@ -78,7 +81,10 @@ class FanMessage(object):
     def resolve(self):
         """Fan message responses."""
         self.client.log.log(5, "{0!r}.resolve()".format(self))
-        if len(self.responses) == 1:
+        if not self.valid:
+            response = self.message.error_response("No dispatchers for '{0}'".format(self.message.service))
+            return response
+        elif len(self.responses) == 1:
             response = self.message.response(self.responses.values()[0])
             response.dispatcher = self.responses.keys()[0]
             return response
@@ -152,6 +158,9 @@ class Lifetime(object):
         while len(self._message_pool):
             yield self._message_pool.pop(self._message_pool.keys()[0])
             
+    def clear(self):
+        """Clear the message pool"""
+        self._message_pool.clear()
     
     def __repr__(self):
         return "<{0} name='{1}' lifetime={2:.0f} open={3:d}>".format(self.__class__.__name__, self.name, self.lifetime, self.active)
@@ -223,7 +232,10 @@ class Service(object):
         """Get a dispatcher object from a message."""
         try:
             dispatcher_object = self.dispatchers[message.dispatcher]
-            dispatcher_object.id = message.dispatcher_id
+            if dispatcher_object.id != message.dispatcher_id:
+                dispatcher_object.clear()
+                dispatcher_object.id = message.dispatcher_id
+                
         except KeyError:
             try:
                 dispatcher_object = self.dispatchers[message.dispatcher] = Dispatcher(message.dispatcher, message.dispatcher_id, self)
@@ -268,7 +280,12 @@ class Service(object):
                 message.dispatcher = dispatcher.name
             else:
                 raise DispatcherError("Ambiguous dispatcher specification in message {0!s}".format(message))
-        return self.dispatchers[message.dispatcher]
+                
+        try:
+            return self.dispatchers[message.dispatcher]
+        except KeyError:
+            raise NoDispatcherAvailable("Dispatcher '{0}' is not available for '{1}'".format(message.dispatcher, message.service))
+        
     
     def finish_fan_messages(self, socket):
         """Finish a fan message"""
