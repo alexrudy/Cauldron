@@ -379,7 +379,7 @@ class ZMQMicroservice(threading.Thread):
             self.log.log(5, "{0!r}.send({1!r})".format(self, e.message))
             return e.message
         except Exception as e:
-            self.log.error("Error handling '{0}': {1!r}".format(message.command, e))
+            self.log.exception("Error handling '{0}': {1!r}".format(message.command, e))
             return message.error_response("{0!r}".format(e))
         else:
             response = message.response(response_payload)
