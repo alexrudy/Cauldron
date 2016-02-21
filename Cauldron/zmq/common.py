@@ -23,40 +23,38 @@ def check_zmq():
         return zmq
     raise RuntimeError("Must have 'zmq' installed to use the zmq backend.")
 
-def zmq_router_address(config, bind=False):
-    """Return the ZMQ router host address."""
-    return "{0}://{1}:{2}".format(config.get("zmq-router", "protocol"), 
-        "*" if bind else zmq_router_host(config), 
-        config.get("zmq-router", "port"))
+def zmq_get_bind(config, name, group='zmq'):
+    """Get a bind address from a configuration"""
+    import socket
+    url = config.get(group, name)
+    if url.startswith("tcp://"):
+        parts = list(url.split(":"))
+        host = parts[1][2:]
+        if host != "*":
+            parts[1] = "//" + socket.gethostbyname(host)
+        url = ":".join(parts)
+    return url
 
-def zmq_router_host(config):
-    """Return the ZMQ router host."""
-    return config.get("zmq-router", "host")
-    
-
-def zmq_address(config, name, bind=False, sequence=0):
+def zmq_get_address(config, name, bind=False, group="zmq"):
     """Construct a ZMQ address."""
-    protocol = config.get("zmq", "protocol")
-    host = "*" if bind else config.get("zmq", "host")
-    port = int(config.get("zmq", name)) + int(sequence)
-    return "{0}://{1}:{2:d}".format(protocol, host, port)
-
-def zmq_dispatcher_host(config):
-    """docstring for zmq_dispatcher_host"""
-    return config.get("zmq", "host")
-    
-def zmq_dispatcher_address(config, bind=False):
-    """Return the full dispatcher address."""
-    return "{0}://{1}:{2}".format(config.get("zmq", "protocol"), 
-        "*" if bind else zmq_dispatcher_host(config), 
-        config.get("zmq", "dispatch-port"))
-    
-def zmq_broadcaster_address(config, bind=False):
-    """Return the full broadcaster address."""
-    return "{0}://{1}:{2}".format(config.get("zmq", "protocol"),
-         "*" if bind else zmq_dispatcher_host(config), 
-         config.get("zmq", "broadcast-port"))
-    
+    if bind:
+        return zmq_get_bind(config, name, group=group)
+    else:
+        return config.get(group, name)
+        
+def zmq_connect_socket(socket, config, name, group="zmq", log=None, label=None, address=None):
+    """Connect a ZMQ Cauldron socket."""
+    label = label or name
+    log = log or logging.getLogger(__name__)
+    try:
+        address = address or zmq_get_address(config, name, bind=False)
+        socket.connect(address)
+    except zmq.ZMQError as e:
+        log.exception("Service can't connect to {0} address '{1}' because {2}".format(label, address, e))
+        raise
+    else:
+        log.debug("Connected {0} to {1}".format(label, address))
+        return socket
 
 def teardown():
     """Destroy the ZMQ context."""

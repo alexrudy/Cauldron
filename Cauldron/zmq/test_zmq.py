@@ -17,20 +17,11 @@ def zmq(request):
     use("zmq")
     request.addfinalizer(fail_if_not_teardown)
     return "zmq"
-    
+
 @pytest.fixture
-def config_zmq(request):
-    """Get the configuration item."""
-    config = cauldron_configuration
-    config.set("zmq","publish", "7802")
-    config.set("zmq","broadcast","7801")
-    config.set("zmq","broker","7800")
-    return config
-    
-@pytest.fixture
-def broker(request, zmq, config_zmq):
+def broker(request, zmq, config):
     """A zmq broker"""
-    broker = ZMQBroker.thread(config_zmq)
+    broker = ZMQBroker.thread(config)
     request.addfinalizer(broker.stop)
     return broker
     
@@ -45,20 +36,20 @@ def test_zmq_available():
         check_zmq()
     ZMQ_AVAILABLE.value = orig
 
-def test_broker(broker, zmq, config_zmq):
+def test_broker(broker, zmq, config):
     """Test the router."""
     from Cauldron import DFW
-    svc = DFW.Service("test-router", config=config_zmq)
+    svc = DFW.Service("test-router", config=config)
     
     from Cauldron import ktl
     client = ktl.Service("test-router")
     
     svc.shutdown()
-    svc = DFW.Service("test-router", config=config_zmq)
+    svc = DFW.Service("test-router", config=config)
     svc.shutdown()
     
     
-def test_setup(broker, zmq, config_zmq):
+def test_setup(broker, zmq, config):
     """Test setup and broadcast functions"""
     from Cauldron import DFW
     
@@ -66,6 +57,6 @@ def test_setup(broker, zmq, config_zmq):
         """Setup function."""
         DFW.Keyword.Keyword("KEYWORD", service, initial="SOMEVALUE")
     
-    svc = DFW.Service("test-router", config=config_zmq, setup=setup)
+    svc = DFW.Service("test-router", config=config, setup=setup)
     svc["KEYWORD"]
     

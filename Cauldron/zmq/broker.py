@@ -13,7 +13,7 @@ import weakref
 
 from ..config import read_configuration
 from .microservice import ZMQCauldronMessage, ZMQCauldronErrorResponse, FRAMEBLANK, FRAMEFAIL, DIRECTIONS
-from .common import zmq_address
+from .common import zmq_get_address, check_zmq, teardown, zmq_connect_socket
 from ..exc import DispatcherError
 
 __all__ = ['ZMQBroker', 'NoResponseNecessary', 'NoDispatcherAvailable', 'MultipleDispatchersFound']
@@ -460,10 +460,10 @@ class ZMQBroker(threading.Thread):
     def from_config(cls, config, name="ConfiguredBroker"):
         """Make a new item from a configuration."""
         config = read_configuration(config)
-        address = zmq_address(config, "broker", bind=True)
-        sub_address = zmq_address(config, "publish", bind=True)
-        pub_address = zmq_address(config, "broadcast", bind=True)
-        timeout = config.get("zmq", "timeout")
+        address = zmq_get_address(config, "broker", bind=True)
+        sub_address = zmq_get_address(config, "publish", bind=True)
+        pub_address = zmq_get_address(config, "subscribe", bind=True)
+        timeout = config.getfloat("zmq", "timeout")
         return cls(name, address, pub_address, sub_address, timeout=timeout)
         
     @classmethod
@@ -495,17 +495,12 @@ class ZMQBroker(threading.Thread):
         """Check for the existence of a router at the configured address."""
         import zmq
         ctx = ctx or zmq.Context.instance()
-        if address is not None and config is not None:
-            raise ValueError("Can't specify both config= and address=.")
-        
-        if address is None:
-            config = read_configuration(config)
-            address = zmq_address(config, "broker", bind=False)
-        
-        message = ZMQCauldronMessage(command="check", direction="UBQ")
+        log = logging.getLogger(__name__ + "Broker.check")
         
         socket = ctx.socket(zmq.REQ)
-        socket.connect(address)        
+        zmq_connect_socket(socket, read_configuration(config), "broker", log=log, label="broker-check", address=address)
+        
+        message = ZMQCauldronMessage(command="check", direction="UBQ")
         socket.send_multipart(message.data)
         if socket.poll(timeout):
             response = ZMQCauldronMessage.parse(socket.recv_multipart())
@@ -594,7 +589,7 @@ class ZMQBroker(threading.Thread):
         signal = self._local.signal
         
         try:
-            sockets = dict(poller.poll(timeout=self.timeout * 1e3))
+            sockets = dict(poller.poll(timeout=self.timeout))
             
             if sockets.get(signal) == zmq.POLLIN:
                 self.running.clear()
@@ -604,6 +599,7 @@ class ZMQBroker(threading.Thread):
                 request = socket.recv_multipart()
                 if len(request) > 3:
                     message = ZMQCauldronMessage.parse(request)
+                    self.log.log(5, "Request: |{0!r}|".format(message))
                     if message.direction[0:2] == "UB":
                         self.respond_inquiry(message, socket)
                     else:
