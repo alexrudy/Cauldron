@@ -8,7 +8,7 @@ from __future__ import absolute_import
 import weakref
 from ..base import ClientService, ClientKeyword
 from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented, DispatcherError, TimeoutError
-from .common import zmq_dispatcher_address, zmq_broadcaster_address, check_zmq, teardown, zmq_address
+from .common import zmq_get_address, check_zmq, teardown, zmq_connect_socket
 from .microservice import ZMQCauldronMessage, ZMQCauldronErrorResponse, FRAMEBLANK, FRAMEFAIL
 from .. import registry
 from ..config import cauldron_configuration
@@ -31,6 +31,7 @@ class _ZMQMonitorThread(threading.Thread):
         self.log = logging.getLogger(self.name)
         self.monitored = set()
         self.daemon = True
+        self.address = None
         
     def stop(self):
         """Stop this thread."""
@@ -50,12 +51,10 @@ class _ZMQMonitorThread(threading.Thread):
             return
         socket = ctx.socket(zmq.SUB)
         try:
-            address = zmq_address(self.service._config, "broadcast", bind=False)
-            socket.connect(address)
-        
+            zmq_connect_socket(socket, self.service._config, "subscribe", log=self.log, label='client-monitor', address=self.address)
             # Accept everything belonging to this service.
             socket.setsockopt_string(zmq.SUBSCRIBE, six.text_type(self.service.name))
-            self.log.log(5, "Started Monitor Thread for {0}".format(address))
+            
             while not self.shutdown.isSet():
                 if socket.poll(timeout=1):
                     try:
@@ -108,15 +107,8 @@ class Service(ClientService):
         
         zmq = check_zmq()
         socket = self.ctx.socket(zmq.REQ)
-        try:
-            address = zmq_address(self._config, "broker")
-            socket.connect(address)
-        except zmq.ZMQError as e:
-            self.log.error("Service can't connect to responder address '{0}' because {1}".format(address, e))
-            raise
-        else:
-            self.log.debug("Connected client to {0}".format(address))
-            self._sockets.socket = socket
+        zmq_connect_socket(socket, self._config, "broker", log=self.log, label='client')
+        self._sockets.socket = socket
         return socket
         
     def _prepare(self):

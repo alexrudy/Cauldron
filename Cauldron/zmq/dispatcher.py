@@ -4,7 +4,7 @@ Dispatcher implementation for ZMQ
 
 """
 
-from .common import zmq_dispatcher_address, zmq_broadcaster_address, zmq_address, check_zmq, teardown
+from .common import zmq_get_address, check_zmq, teardown, zmq_connect_socket
 from .microservice import ZMQMicroservice, ZMQCauldronMessage, FRAMEFAIL, FRAMEBLANK
 from .broker import ZMQBroker
 from ..base import DispatcherService, DispatcherKeyword
@@ -29,15 +29,15 @@ class _ZMQResponder(ZMQMicroservice):
     
     def __init__(self, service):
         self.service = weakref.proxy(service)
-        address = zmq_address(self.service._config, "broker", bind=False)
+        address = zmq_get_address(self.service._config, "broker", bind=False)
         super(_ZMQResponder, self).__init__(address=address, use_broker=True,
             context=self.service.ctx, name="DFW.Service.{0:s}.Responder".format(self.service.name))
         
     def check_broker(self, socket, signal):
         """Check for broker liveliness."""
-        import zmq
+        zmq = check_zmq()
         
-        welcome = ZMQCauldronMessage(command="welcome", service=self.service.name, dispatcher=self.service.dispatcher, direction="DBQ", prefix=[FRAMEBLANK, b""])
+        welcome = ZMQCauldronMessage(command="welcome", service=self.service.name, dispatcher=self.service.dispatcher, direction="DBQ")
         socket.send_multipart(welcome.data)
         self.log.log(5, "Sent broker a welcome message: {0!s}.".format(welcome))
         
@@ -45,30 +45,31 @@ class _ZMQResponder(ZMQMicroservice):
         poller.register(socket, zmq.POLLIN)
         poller.register(signal, zmq.POLLIN)
         
-        ready = dict(poller.poll(self.timeout * 1e3))
+        ready = dict(poller.poll(timeout=self.timeout * 1e3))
         if ready.get(socket) == zmq.POLLIN:
             message = ZMQCauldronMessage.parse(socket.recv_multipart())
             if message.payload != "confirmed":
                 raise DispatcherError("Message confirming welcome was malformed! {0!s}".format(message))
             return True
         else:
+            self.log.log(5, "No broker response was available.  ")
             return False
         
         
     def greet_broker(self, socket, signal):
         """Send the appropriate greeting to the broker."""
         checks = 1
-        attempts = 1
+        attempts = 0
         while checks:
+            attempts += 1
+            checks -= 1
             if self.check_broker(socket, signal):
                 break
-            self._b = ZMQBroker.daemon(config = self.service._configuration_location)
-            checks -= 1
-            attempts += 1
+            self._b = ZMQBroker.daemon(config = self.service._config)
         else:
-            raise TimeoutError("Can't connect to broker after {0:d} attempts.".format(checks)) 
+            raise TimeoutError("Can't connect to broker after {0:d} attempts.".format(attempts)) 
         
-        ready = ZMQCauldronMessage(command="ready", service=self.service.name, dispatcher=self.service.dispatcher, direction="DBQ", prefix=[FRAMEBLANK, b""])
+        ready = ZMQCauldronMessage(command="ready", service=self.service.name, dispatcher=self.service.dispatcher, direction="DBQ")
         socket.send_multipart(ready.data)
         self.log.log(5, "Sent broker a ready message: {0!s}.".format(ready))
         
@@ -134,14 +135,14 @@ class _ZMQResponder(ZMQMicroservice):
             return self._socket
         self._socket = self.ctx.socket(zmq.PUB)
         try:
-            address = zmq_address(self.service._config, "publish", bind=False)
+            address = zmq_get_address(self.service._config, "publish", bind=False)
             self._socket.connect(address)
         except zmq.ZMQError as e:
-            self.log.error("Service can't bind to broadcaster address '{0}' because {1}".format(address, e))
+            self.log.error("Service can't connect to broadcaster address '{0}' because {1}".format(address, e))
             self._error = e
             raise
         else:
-            self.log.log(5, "Broadcaster bound to {0}".format(address))
+            self.log.log(5, "Broadcaster connected to {0}".format(address))
             if wait:
                 time.sleep(0.2)
             return self._socket
@@ -153,7 +154,7 @@ class Service(DispatcherService):
     """A ZMQ-based service."""
     def __init__(self, name, config, setup=None, dispatcher=None):
         zmq = check_zmq()
-        self.ctx = zmq.Context()
+        self.ctx = zmq.Context.instance()
         self._sockets = threading.local()
         super(Service, self).__init__(name, config, setup, dispatcher)
         
@@ -166,15 +167,9 @@ class Service(DispatcherService):
         
         zmq = check_zmq()
         socket = self.ctx.socket(zmq.REQ)
-        try:
-            address = zmq_address(self._config, "broker")
-            socket.connect(address)
-        except zmq.ZMQError as e:
-            self.log.error("Service can't connect to responder address '{0}' because {1}".format(address, e))
-            raise
-        else:
-            self.log.debug("Connected dispatcher to {0}".format(address))
-            self._sockets.socket = socket
+        
+        zmq_connect_socket(socket, self._config, "broker", log=self.log, label='dispatcher')
+        self._sockets.socket = socket
         return socket
         
     def _prepare(self):

@@ -88,13 +88,13 @@ def servicename():
     """Get the service name."""
     return "testsvc"
     
-@pytest.fixture
+@pytest.fixture(scope='function')
 def config(tmpdir):
     """DFW configuration."""
     from .config import cauldron_configuration
-    cauldron_configuration.set("zmq", "address", "inproc://broker")
-    cauldron_configuration.set("zmq", "pub-address", "inproc://publish")
-    cauldron_configuration.set("zmq", "sub-address", "inproc://subscribe")
+    cauldron_configuration.set("zmq", "broker", "inproc://broker")
+    cauldron_configuration.set("zmq", "publish", "inproc://publish")
+    cauldron_configuration.set("zmq", "subscribe", "inproc://subscribe")
     return cauldron_configuration
     
 @pytest.fixture
@@ -154,11 +154,13 @@ def backend(request, config):
     """The backend name."""
     from Cauldron.api import use, teardown, CAULDRON_SETUP
     use(request.param)
+    request.addfinalizer(fail_if_not_teardown)
     
     if request.param == 'zmq':
+        print(config.items('zmq'))
         from Cauldron.zmq.broker import ZMQBroker
         if not ZMQBroker.check(timeout=0.01):
-            b = ZMQBroker.thread()
+            b = ZMQBroker.thread(config=config)
             b.running.wait(timeout=2.0)
             if not b.running.is_set():
                 msg = "Couldn't start ZMQ broker."
@@ -166,7 +168,6 @@ def backend(request, config):
                     msg += " Error: " + repr(b._error)
                 raise RuntimeError(msg)
             request.addfinalizer(b.stop)
-    request.addfinalizer(fail_if_not_teardown)
     return request.param
 
 @pytest.fixture
