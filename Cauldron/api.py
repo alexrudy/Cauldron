@@ -70,25 +70,21 @@ def use(name):
     
     Cauldron = sys.modules[BASENAME]
     # Install the client side libraries.
-    from Cauldron import _ktl
-    _ktl = sys.modules.setdefault('Cauldron._ktl', _ktl)
-    reload(_ktl)
+    from Cauldron import ktl
+    reload(ktl)
     
-    from Cauldron._ktl.Service import Service
-    from Cauldron._ktl import Keyword
-    _ktl.Service = Service
-    _ktl.Keyword = Keyword
-    Cauldron.ktl = sys.modules[BASENAME + ".ktl"] = _ktl
+    from Cauldron.ktl.Service import Service
+    from Cauldron.ktl import Keyword
+    ktl.Service = Service
+    ktl.Keyword = Keyword
     
     # Install the dispatcher side libraries.
-    from Cauldron import _DFW
-    _DFW = sys.modules.setdefault('Cauldron._DFW', _DFW)
-    reload(_DFW)
-    from Cauldron._DFW.Service import Service
-    from Cauldron._DFW import Keyword
-    _DFW.Service = Service
-    _DFW.Keyword = Keyword
-    Cauldron.DFW = sys.modules[BASENAME + ".DFW"] = _DFW
+    from Cauldron import DFW
+    reload(DFW)
+    from Cauldron.DFW.Service import Service
+    from Cauldron.DFW import Keyword
+    DFW.Service = Service
+    DFW.Keyword = Keyword
     
 def setup_ktl_backend(): # pragma: no cover
     """Set up the KTL backend."""
@@ -181,18 +177,18 @@ def guard_use(msg='doing this', error=RuntimeError):
 @registry.client.setup_for('all')
 def setup_client_service_module():
     """Set up the client Service module."""
-    from ._ktl import Service
+    from .ktl import Service
     Service.Service = registry.client.Service
     
 @registry.client.teardown_for("all")
 def teardown_client_service_module():
     """Remove the service from the client module."""
     try:
-        _ktls = sys.modules[BASENAME + "._ktl.Service"]
-        del _ktls.Service
-        _ktl = sys.modules[BASENAME + "._ktl"]
-        del _ktl.Service
-        del _ktl.Keyword
+        ktls = sys.modules[BASENAME + ".ktl.Service"]
+        del ktls.Service
+        ktl = sys.modules[BASENAME + ".ktl"]
+        del ktl.Service
+        del ktl.Keyword
     except KeyError as e:
         pass
     
@@ -201,11 +197,11 @@ def teardown_client_service_module():
 def teardown_dispatcher_service_module():
     """Remove the service from the dispatcher module."""
     try:
-        _DFWs = sys.modules[BASENAME + "._DFW.Service"]
-        del _DFWs.Service
-        _DFW = sys.modules[BASENAME + "._DFW"]
-        del _DFW.Service
-        del _DFW.Keyword
+        DFWs = sys.modules[BASENAME + ".DFW.Service"]
+        del DFWs.Service
+        DFW = sys.modules[BASENAME + ".DFW"]
+        del DFW.Service
+        del DFW.Keyword
     except KeyError as e:
         pass
     
@@ -213,6 +209,6 @@ def teardown_dispatcher_service_module():
 @registry.dispatcher.setup_for('all')
 def setup_dispatcher_service_module():
     """Set up the dispatcher Service module."""
-    from ._DFW import Service
+    from .DFW import Service
     Service.Service = registry.dispatcher.Service
 

@@ -48,7 +48,7 @@ def setup_client_keyword_module():
     """Generate the Keyword module"""
     guard_use("setting up the ktl.Keyword module")
     basecls = registry.client.Keyword
-    from ._ktl import Keyword
+    from .ktl import Keyword
     for kwcls in generate_keyword_subclasses(basecls, _client, module="ktl.Keyword"):
         setattr(Keyword, kwcls.__name__, kwcls)
         Keyword.__all__.append(kwcls.__name__)
@@ -62,7 +62,7 @@ def setup_dispatcher_keyword_module():
     """Set up the Keyword module"""
     guard_use("setting up the DFW.Keyword module")
     basecls = registry.dispatcher.Keyword
-    from ._DFW import Keyword
+    from .DFW import Keyword
     for kwcls in generate_keyword_subclasses(basecls, _dispatcher, module="DFW.Keyword"):
         setattr(Keyword, kwcls.__name__, kwcls)
         Keyword.__all__.append(kwcls.__name__)
