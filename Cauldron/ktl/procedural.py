@@ -12,7 +12,7 @@ def cached(service):
     try:
         return cache[service]
     except KeyError:
-        svc = cache[service] = Service(service, populate=False)
+        svc = cache[service] = Service.Service(service, populate=False)
     return svc
 
 def write(service, keyword, value, *args, **kwargs):
