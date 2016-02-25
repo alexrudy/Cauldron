@@ -16,6 +16,7 @@ import logging
 import weakref
 import six
 import time
+import sys, traceback
 
 __all__ = ["Service", "Keyword"]
 
@@ -67,7 +68,7 @@ class _ZMQResponder(ZMQMicroservice):
                 break
             self._b = ZMQBroker.daemon(config = self.service._config)
         else:
-            raise TimeoutError("Can't connect to broker after {0:d} attempts.".format(attempts)) 
+            raise TimeoutError("Can't connect to broker after {0:d} attempts.".format(attempts))
         
         ready = ZMQCauldronMessage(command="ready", service=self.service.name, dispatcher=self.service.dispatcher, direction="DBQ")
         socket.send_multipart(ready.data)

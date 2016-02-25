@@ -1,5 +1,4 @@
 astropy_helpers
 astropy
 six
-redis>=2.10.5
 pyzmq
