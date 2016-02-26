@@ -152,7 +152,7 @@ class KeywordDescriptor(object):
         self._name_attr = "_{0}_name_{1}".format(self.__class__.__name__, self.name)
         self._attr = "_{0}_{1}".format(self.__class__.__name__, self.name)
         self._initial = initial
-        self._attr_initial = initial
+        self._orig_initial = initial
         self._bound = False
         
     @property
@@ -206,7 +206,7 @@ class KeywordDescriptor(object):
         except ServiceNotBound:
             name = getattr(obj, self._name_attr, self.name)
             attr = "_{0}_{1}".format(self.__class__.__name__, name.upper())
-            return self.type(getattr(obj, attr, self._attr_initial))
+            return self.type(getattr(obj, attr, self._orig_initial))
         
     def __set__(self, obj, value):
         """Set the value."""
@@ -253,6 +253,8 @@ class KeywordDescriptor(object):
             delattr(obj, attr)
         except AttributeError:
             pass
+            
+        self._initial = None
         
         
     def bind(self, obj, service=None):
