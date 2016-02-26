@@ -52,9 +52,10 @@ def setup_client_keyword_module():
     for kwcls in generate_keyword_subclasses(basecls, _client, module="ktl.Keyword"):
         setattr(Keyword, kwcls.__name__, kwcls)
         Keyword.__all__.append(kwcls.__name__)
-        Keyword.types[kwcls.KTL_TYPE] = kwcls
-        for alias in kwcls.KTL_ALIASES:
-            Keyword.types[alias] = kwcls
+        if kwcls.KTL_TYPE is not None:
+            Keyword.types[kwcls.KTL_TYPE] = kwcls
+            for alias in kwcls.KTL_ALIASES:
+                Keyword.types[alias] = kwcls
     Keyword.__all__ = list(set(Keyword.__all__))
     
 @registry.dispatcher.setup_for('all')
@@ -66,9 +67,10 @@ def setup_dispatcher_keyword_module():
     for kwcls in generate_keyword_subclasses(basecls, _dispatcher, module="DFW.Keyword"):
         setattr(Keyword, kwcls.__name__, kwcls)
         Keyword.__all__.append(kwcls.__name__)
-        Keyword.types[kwcls.KTL_TYPE] = kwcls
-        for alias in kwcls.KTL_ALIASES:
-            Keyword.types[alias] = kwcls
+        if kwcls.KTL_TYPE is not None:
+            Keyword.types[kwcls.KTL_TYPE] = kwcls
+            for alias in kwcls.KTL_ALIASES:
+                Keyword.types[alias] = kwcls
     Keyword.__all__ = list(set(Keyword.__all__))
     
 
@@ -78,7 +80,7 @@ class KeywordType(object):
     
     The name of each type specialization is available as the :attr:`KTL_TYPE` class attribute.
     """
-    KTL_TYPE = 'basic'
+    KTL_TYPE = None
     KTL_ALIASES = ()
     
     def __init__(self, *args, **kwargs):
@@ -94,7 +96,8 @@ class _NotImplemented(KeywordType):
 @dispatcher_keyword
 class Basic(KeywordType):
     """The base class for KTL and DFW keywords."""
-    pass
+    KTL_TYPE = 'basic'
+    
 
 @dispatcher_keyword
 @client_keyword

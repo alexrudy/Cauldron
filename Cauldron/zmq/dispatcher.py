@@ -102,7 +102,10 @@ class _ZMQResponder(ZMQMicroservice):
             self.log.log(5, "Not identifying b/c wrong dispatcher.")
             return FRAMEBLANK
         else:
-            return kwd.KTL_TYPE
+            ktl_type = kwd.KTL_TYPE
+            if ktl_type is None:
+                ktl_type = "basic"
+            return ktl_type
         
     def handle_enumerate(self, message):
         """Handle enumerate command."""
