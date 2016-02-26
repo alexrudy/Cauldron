@@ -169,7 +169,23 @@ class KeywordDescriptor(object):
     
     def set_bound_name(self, obj, value):
         """Set a bound name."""
+        if self._bound:
+            raise ServiceAlreadyBound("Can't change the name of the keyword after the service has bound to it.")
+        
+        # Set the new name value.
         setattr(obj, self._name_attr, str(value).upper())
+        
+        # Compute the initial value.
+        try:
+            initial = str(self.type(getattr(obj, self._attr, self._initial)))
+        except TypeError:
+            # We catch this error in case it was caused because no initial value was set.
+            # If an initial value was set, then we want to raise this back to the user.
+            if not (self._initial is None and not hasattr(obj, self._attr)):
+                raise
+        
+        self._attr = "_{0}_{1}".format(self.__class__.__name__, str(value).upper())
+        setattr(obj, self._attr, initial)
     
     def __repr__(self):
         """Represent"""
