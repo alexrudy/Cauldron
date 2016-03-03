@@ -357,8 +357,12 @@ class Service(object):
         """
         dispatcher = self.get_dispatcher(message)
         client = self.get_client(message, recv=False)
-        self._fans[message.identifier].add(dispatcher, message)
-        
+        try:
+            self._fans[message.identifier].add(dispatcher, message)
+        except KeyError:
+            # Nothing to do, the message was probably disposed much earlier.
+            pass
+    
     @handler("CSQ")
     def handle_client_service_query(self, message, socket):
         """Handle the start of a fan message.
