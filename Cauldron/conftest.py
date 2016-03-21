@@ -109,6 +109,7 @@ def config(tmpdir):
     config = configparser.ConfigParser()
     config.add_section('local')
     config.set('local', 'cache', str(tmpdir))
+    config.add_section('zmq')
     config.set("zmq", "broker", "inproc://broker")
     config.set("zmq", "publish", "inproc://publish")
     config.set("zmq", "subscribe", "inproc://subscribe")
