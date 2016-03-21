@@ -140,8 +140,9 @@ def fail_if_not_teardown():
             count += 1
             SEEN_THREADS.add(thread)
     if count > 1:
-        raise ValueError("{0:d} non-deamon thread{1:s} left alive!\n{2!s}".format(count-1, "s" if (count-1)>1 else "",
-            "\n".join([repr(thread) for thread in threading.enumerate()])))
+        threads_str = "\n".join([repr(thread) for thread in threading.enumerate()])
+        raise ValueError("{0:d} non-deamon thread{1:s} left alive!\n{2!s}".format(
+            count-1, "s" if (count-1)>1 else "", threads_str))
     
 @pytest.fixture(scope='function')
 def teardown_cauldron(request):
