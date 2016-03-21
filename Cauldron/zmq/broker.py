@@ -73,14 +73,14 @@ class FanMessage(object):
         
     def add(self, dispatcher, message):
         """Add item to the fan message."""
-        self.client.log.log(5, "{0!r}.add({1!r})".format(self, message))
+        # self.client.log.log(5, "{0!r}.add({1!r})".format(self, message))
         if message.payload not in (FRAMEBLANK, FRAMEFAIL) and not DIRECTIONS.iserror(message.direction):
             self.responses[dispatcher.name] = message.payload
         self.pending.remove(dispatcher.id)
         
     def resolve(self):
         """Fan message responses."""
-        self.client.log.log(5, "{0!r}.resolve()".format(self))
+        # self.client.log.log(5, "{0!r}.resolve()".format(self))
         if not self.valid:
             response = self.message.error_response("No dispatchers for '{0}'".format(self.message.service))
             return response
@@ -242,7 +242,6 @@ class Service(object):
             except ValueError:
                 raise DispatcherError("No dispatcher available for {0}".format(message.dispatcher))
         if recv:
-            self.log.log(5, "{0!r}.recv({1!r})".format(dispatcher_object, message))
             dispatcher_object.deactivate(message)
         return dispatcher_object
         
@@ -252,8 +251,6 @@ class Service(object):
             client_object = self.clients[message.client_id]
         except KeyError:
             client_object = self.clients[message.client_id] = Client(message.client_id, self)
-        if recv:
-            self.log.log(5, "{0!r}.recv({1!r})".format(client_object, message))
         return client_object
         
     def scrape(self, message):
@@ -321,7 +318,6 @@ class Service(object):
         """Handle"""
         try:
             method = getattr(self, handlers[message.direction])
-            # self.log.log(5, "{0!r}.handle({1!r})".format(self, message))
             method(message, socket)
         except Exception as e:
             self.log.exception("Handling exception {0}".format(e))
@@ -346,7 +342,7 @@ class Service(object):
             dispatcher.message = message
             self.log.info("{0!r} is ready.".format(dispatcher))
         elif message.command == "heartbeat":
-            self.log.info("{0!r} is alive.".format(dispatcher))
+            pass
             
         else:
             dispatcher.send(message.error_response("unknown command"), socket)
@@ -361,8 +357,12 @@ class Service(object):
         """
         dispatcher = self.get_dispatcher(message)
         client = self.get_client(message, recv=False)
-        self._fans[message.identifier].add(dispatcher, message)
-        
+        try:
+            self._fans[message.identifier].add(dispatcher, message)
+        except KeyError:
+            # Nothing to do, the message was probably disposed much earlier.
+            pass
+    
     @handler("CSQ")
     def handle_client_service_query(self, message, socket):
         """Handle the start of a fan message.
@@ -381,9 +381,7 @@ class Service(object):
             else:
                 raise KeyError
         except KeyError:
-            fmessage = FanMessage(self, client, message)
-            self.log.log(5, "{0!r}.start({1!r})".format(fmessage, message))
-        
+            fmessage = FanMessage(self, client, message)        
             self._fans[fmessage.id] = fmessage
         
             for dispatcher in self.dispatchers.values():
@@ -599,7 +597,6 @@ class ZMQBroker(threading.Thread):
                 request = socket.recv_multipart()
                 if len(request) > 3:
                     message = ZMQCauldronMessage.parse(request)
-                    self.log.log(5, "Request: |{0!r}|".format(message))
                     if message.direction[0:2] == "UB":
                         self.respond_inquiry(message, socket)
                     else:
