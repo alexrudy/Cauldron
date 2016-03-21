@@ -50,6 +50,9 @@ def setup_client_keyword_module():
     basecls = registry.client.Keyword
     from .ktl import Keyword
     for kwcls in generate_keyword_subclasses(basecls, _client, module="ktl.Keyword"):
+        if hasattr(Keyword, kwcls.__name__):
+            # Don't replace already existing keywords.
+            continue
         setattr(Keyword, kwcls.__name__, kwcls)
         Keyword.__all__.append(kwcls.__name__)
         if kwcls.KTL_TYPE is not None:
@@ -65,6 +68,9 @@ def setup_dispatcher_keyword_module():
     basecls = registry.dispatcher.Keyword
     from .DFW import Keyword
     for kwcls in generate_keyword_subclasses(basecls, _dispatcher, module="DFW.Keyword"):
+        if hasattr(Keyword, kwcls.__name__):
+            # Don't replace already existing keywords.
+            continue
         setattr(Keyword, kwcls.__name__, kwcls)
         Keyword.__all__.append(kwcls.__name__)
         if kwcls.KTL_TYPE is not None:

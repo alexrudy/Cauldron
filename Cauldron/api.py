@@ -58,7 +58,7 @@ def use(name):
     
     # Set up the LROOT KTL installation differently
     if name in KTL_DEFAULT_NAMES: # pragma: no cover
-        return setup_ktl_backend()
+        setup_ktl_backend()
         
     if name not in registry.keys():
         raise ValueError("The Cauldron backend '{0}' is not registered. Available backends are {1!r}".format(
@@ -90,10 +90,13 @@ def setup_ktl_backend(): # pragma: no cover
     """Set up the KTL backend."""
     Cauldron = sys.modules[BASENAME]
     import ktl
-    sys.modules[BASENAME + ".ktl"] = Cauldron.ktl = ktl
+    registry.client.service_for("ktl", ktl.Service)
+    registry.client.keyword_for("ktl", ktl.Keyword.Keyword)
     
     import DFW
-    sys.modules[BASENAME + ".DFW"] = Cauldron.DFW = DFW
+    registry.dispatcher.service_for("ktl", DFW.Service)
+    registry.dispatcher.keyword_for("ktl", DFW.Keyword.Keyword)
+    
     
 def _expunge_module(module_name):
     """Given a module name, expunge it from sys.modules."""
@@ -158,14 +161,13 @@ def install():
     
     This method performs a runtime hack to try to make the Cauldron versions of ``ktl`` and ``DFW`` the ones which are
     accessed when a python module performs ``import ktl`` or ``import DFW``. If either module has already been imported
-    in python, then this function will send a RuntimeWarning to that effect and do nothing.
+    in python, then this function will send a RuntimeWarning to that effect.
     
     .. note:: It is preferable to use :ref:`cauldron-style`, of the form ``from Cauldron import ktl``, as this will properly ensure that the Cauldron backend is invoked and not the KTL backend.
     """
     guard_use("installing Cauldron", error=RuntimeError)
     if 'ktl' in sys.modules or "DFW" in sys.modules: # pragma: no cover
         warnings.warn("'ktl' or 'DFW' already in sys.modules. Skipping 'install()'")
-        return
     sys.modules['ktl'] = sys.modules[BASENAME + ".ktl"]
     sys.modules['DFW'] = sys.modules[BASENAME + ".DFW"]
 
