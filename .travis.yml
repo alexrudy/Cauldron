@@ -11,18 +11,23 @@ env:
         # The following versions are the 'default' for tests, unless
         # overidden underneath. They are defined here in order to save having
         # to repeat them for all configurations.
-        - NUMPY_VERSION=1.9
+        - NUMPY_VERSION=stable
         - ASTROPY_VERSION=stable
         - CONDA_INSTALL='conda install -c astropy-ci-extras --yes'
         - PIP_INSTALL='pip install'
         - CONDA_DEPENDENCIES='Cython jinja2 pyzmq six'
         - SETUP_CMD='test'
+        - MAIN_CMD='python setup.py'
         - PIP_DEPENDENCIES='pytest-catchlog pytest-xdist'
     matrix:
       - SETUP_CMD='egg_info'
       - SETUP_CMD='test'
 matrix:
     include:
+        
+        - python: 2.6
+          env:
+            - NUMPY_VERSION='1.4'
         
         # Do a coverage test in Python 2.
         - python: 2.7
