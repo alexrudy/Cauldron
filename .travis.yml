@@ -61,6 +61,7 @@ install:
     
 script:
    - $MAIN_CMD $SETUP_CMD
+   - cat Cauldron.egg-info/entry_points.txt
 
 after_success:
     # If coveralls.io is set up for this package, uncomment the line
