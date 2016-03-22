@@ -36,23 +36,25 @@ try:
 except NameError:   # Needed to support Astropy <= 1.0.0
     pass
 
-available_backends = ["local"]
-
-try:
-    import zmq
-except ImportError:
-    pass
-else:
-    from . import api
-    api.setup_entry_points()
-    from . import registry
-    PYTEST_HEADER_MODULES['zmq'] = 'zmq'
-    if "zmq" in registry.keys():
-        available_backends.append("zmq")
-
 import pkg_resources
 import os
 from .utils._weakrefset import WeakSet
+
+def setup_entry_points_api():
+    """Set up the entry points API if Cauldron isn't installed."""
+    from .zmq import setup_zmq_backend
+    setup_zmq_backend()
+    from .local import setup_local_backend
+    setup_local_backend()
+    from . import mock
+
+from . import registry
+setup_entry_points_api()
+available_backends = set(registry.keys())
+available_backends.discard("mock")
+
+if "zmq" in available_backends:
+    PYTEST_HEADER_MODULES['zmq'] = 'zmq'
 
 def _pytest_get_option(config, name, default):
     """Get pytest options in a version independent way, with allowed defaults."""

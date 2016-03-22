@@ -180,12 +180,11 @@ def guard_use(msg='doing this', error=RuntimeError):
         raise error("You must call Cauldron.use() before {0} in order to set the Cauldron backend.".format(msg))
         
     
-
 def setup_entry_points():
     """Set up entry point registration."""
     if CAULDRON_ENTRYPOINT_SETUP:
         return
-    for ep in pkg_resources.iter_entry_points('Cauldron_backends'):
+    for ep in pkg_resources.iter_entry_points('Cauldron.backends'):
         if six.PY2 and sys.version_info[1] < 7:
             obj = ep.resolve()
         else:
