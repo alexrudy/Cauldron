@@ -94,7 +94,7 @@ def setup_ktl_backend(): # pragma: no cover
     Cauldron = sys.modules[BASENAME]
     import ktl
     registry.client.service_for("ktl", ktl.Service)
-    registry.client.keyword_for("ktl", ktl.Keyword.Keyword)
+    registry.client.keyword_for("ktl", ktl.Keyword)
     
     import DFW
     registry.dispatcher.service_for("ktl", DFW.Service)
