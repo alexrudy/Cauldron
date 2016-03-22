@@ -13,10 +13,10 @@ Users need to only know a few things about the workings of :mod:`Cauldron`:
 Selecting a backend
 ===================
 
-Selecting a backend is fairly easy. Currently, there are three availalbe backends:
+Selecting a backend is fairly easy. Currently, there are three available backends:
 
 - ``local``, which uses in-process methods to communicate between clients and dispatchers. This is the appropraite backend for testing environments, but has no ability to do any inter-process communication.
-- ``redis``, which uses a REDIS_ service to provide the keyword communication. This is a good backend to use if you are testing multiple components or inter-process communication.
+- ``zmq``, which uses zmq_ sockets to provide the keyword communication. This is a good backend to use if you are testing multiple components or inter-process communication.
 - ``ktl`` or ``DFW``, which uses the real KTL API in the Lick or Keck software environment. This is the backend to use with production code.
 
 Your backend should be something that you chose once per python invocation. It is not easy, nor recommended, to switch backends within a given process. New backends are relatively easy to implement in a minimal form (simple, synchronous reads and writes), and you can learn about this in :ref:`backends`.
@@ -71,7 +71,7 @@ If you wish to use :mod:`Cauldron` with a test suite, it can be desirable to sel
     teardown()
     use("redis") # +DOCTEST: SKIP
 
-.. _REDIS: http://redis.io
+.. _zmq: http://zeromq.org
 
 API Reference
 =============
