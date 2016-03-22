@@ -60,10 +60,9 @@ def use(name):
     setup_entry_points()
     
     if name not in registry.keys():
-        for ep in pkg_resources.iter_entry_points('Cauldron.backends'):
-            log.debug("Entry point {0!r} in backend.".format(ep))
-        raise ValueError("The Cauldron backend '{0}' is not registered. Available backends are {1!r}".format(
-            name, list(registry.keys())))
+        eps = map(repr,pkg_resources.iter_entry_points('Cauldron.backends'))
+        raise ValueError("The Cauldron backend '{0}' is not registered. Available backends are {1:s}. Entry points were {2:s}".format(
+            name, ",".join(registry.keys()), ",".join(eps)))
     
     # Allow imports of backend modules now.
     CAULDRON_SETUP.on()
