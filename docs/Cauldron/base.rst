@@ -18,13 +18,13 @@ A brief summary of major KTL API features is provided in the table below. API fe
 Feature                  Status
 ======================== ===================
 Synchronous read/write   Implemented
-Asynchronous read/write  Not Implemented
+Asynchronous read/write  *Planned*
 Heartbeats               *Planned*
 Callbacks                Implemented
 Polling                  Not Implemented
 Scheduling               Not Implemented
 Expressions              Not Implemented
-XML Keyword Validation   *Planned*
+XML Keyword Validation   Implemented
 Operator Overloading     Not Implemented
 ======================== ===================
 
