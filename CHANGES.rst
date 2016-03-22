@@ -1,6 +1,13 @@
 Changes to Cauldron
 -------------------
 
+0.5.0
+=====
+- Consistent backend registration API, which uses the ``Cauldron.backends`` entry point.
+- ZMQ uses a broker instead of a router to handle multiple dispatchers.
+- Improvements to the keyword type handling system in preparation for use with real KTL
+
+
 0.4.0
 =====
 - Removed REDIS backend. It was causing too many deadlock problems, and isn't a fundamentally good communication protocol for KTL.
