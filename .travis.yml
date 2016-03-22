@@ -13,7 +13,8 @@ env:
         - ASTROPY_VERSION=stable
         - CONDA_INSTALL='conda install -c astropy-ci-extras --yes'
         - PIP_INSTALL='pip install'
-        - CONDA_DEPENDENCIES='Cython jinja2 pyzmq six'
+        - CONDA_DEPENDENCIES='$CONDA_REQ_DEPENDENCIES pyzmq'
+        - CONDA_REQ_DEPENDENCIES='Cython jinja2 six setuptools'
         - SETUP_CMD='test'
         - MAIN_CMD='python setup.py'
         - PIP_DEPENDENCIES='pytest-catchlog pytest-xdist'
@@ -39,7 +40,7 @@ matrix:
         # Try without some optional deps
         - python: 2.7
           env: 
-            - CONDA_DEPENDENCIES='Cython jinja2 six'
+            - CONDA_DEPENDENCIES="$CONDA_REQ_DEPENDENCIES"
           
 
 # Setting sudo to false opts in to Travis-CI container-based builds.
