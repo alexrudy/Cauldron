@@ -9,10 +9,6 @@ env:
         # The following versions are the 'default' for tests, unless
         # overidden underneath. They are defined here in order to save having
         # to repeat them for all configurations.
-        - NUMPY_VERSION=stable
-        - ASTROPY_VERSION=stable
-        - CONDA_INSTALL='conda install -c astropy-ci-extras --yes'
-        - PIP_INSTALL='pip install'
         - CONDA_REQ_DEPENDENCIES='Cython jinja2 six setuptools'
         - CONDA_DEPENDENCIES='Cython jinja2 six setuptools pyzmq'
         - SETUP_CMD='test'
@@ -23,9 +19,6 @@ env:
       - SETUP_CMD='test'
 matrix:
     include:
-        
-        - python: 2.6
-          env: NUMPY_VERSION='1.4'
         
         # Do a coverage test in Python 2.
         - python: 2.7
@@ -60,7 +53,6 @@ install:
     
 script:
    - $MAIN_CMD $SETUP_CMD
-   - cat Cauldron.egg-info/entry_points.txt
 
 after_success:
     # If coveralls.io is set up for this package, uncomment the line
