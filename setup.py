@@ -75,7 +75,7 @@ package_info['package_data'].setdefault(PACKAGENAME, [])
 # package_info['package_data'][PACKAGENAME].append('data/*')
 
 # Define entry points for command-line scripts
-entry_points = {'console_scripts': [], 'Cauldron.backends' : []}
+entry_points = {'console_scripts': [], 'Cauldron_backends' : []}
 
 entry_point_list = conf.items('entry_points')
 for entry_point in entry_point_list:
