@@ -3,7 +3,7 @@
 Cauldron Internals
 ==================
 
-This section documents a few internal features of the Cauldron API. The :ref:`types` explains how Cauldron provides type-spcific Keyword classes in a backend-independent way. The :ref:`registry` provides a collection of setup and teardown functions, as well as backend-specific implementations of Keyword and Service classes. :ref:`utilities` are small pieces of code which are not specific to Cauldron, but which are widely used. Of particular note is :class:`~Cauldron.utils.callbacks.Callbacks` which provides a way to maintain weak-references to callback functions, and a quick way to call a set of callback functions with identical arguments.
+This section documents a few internal features of the Cauldron API. The :ref:`types` explains how Cauldron provides type-spcific Keyword classes in a backend-independent way. The :ref:`registry` provides a collection of setup and teardown functions, as well as backend-specific implementations of Keyword and Service classes. :ref:`entrypoints` describes the correct way to enable new or third-party backends with Cauldron. :ref:`utilities` are small pieces of code which are not specific to Cauldron, but which are widely used. Of particular note is :class:`~Cauldron.utils.callbacks.Callbacks` which provides a way to maintain weak-references to callback functions, and a quick way to call a set of callback functions with identical arguments.
 
 
 .. _types:
@@ -35,6 +35,19 @@ Cauldron backends are registered to make themselves known to the system. :mod:`~
 
 .. automodapi:: Cauldron.registry
     :headings: *^
+    
+
+.. _entrypoints:
+
+API Entry Points
+----------------
+
+Cauldron uses `setuptools Entry Points`_ to seamlessly connect backends to the central Cauldron API. Each entry point is a python object which should either be a module or a function. The modules or functions are resolved at runtime and called to register a new backend with Cauldron. Cauldron backends are registered in the ``Cauldron.backend`` entry point. The built-in backends are registered using this method. For example, the local backend entry point is specified as::
+    
+    local = Cauldron.local:setup_local_backend
+    
+
+.. _setuptools Entry Points: http://setuptools.readthedocs.org/en/latest/pkg_resources.html#entrypoint-objects
 
 .. _utilities:
 
