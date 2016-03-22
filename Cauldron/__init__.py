@@ -16,14 +16,12 @@ from ._astropy_init import *
 def _init_log():
     """Set up some default logging options."""
     import logging
+    from .utils.loggingcompat import NullHandler
     logging.addLevelName(5, "MSG")
-    if hasattr(logging, 'NullHandler'):
-        logging.getLogger("DFW").addHandler(logging.NullHandler())
-        logging.getLogger("ktl").addHandler(logging.NullHandler())
-        logging.getLogger("Cauldron").addHandler(logging.NullHandler())
-        
+    logging.getLogger("DFW").addHandler(NullHandler())
+    logging.getLogger("ktl").addHandler(NullHandler())
+    logging.getLogger("Cauldron").addHandler(NullHandler())
     del logging
-
 
 # For egg_info test builds to pass, put package imports here.
 if not _ASTROPY_SETUP_:
