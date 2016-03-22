@@ -185,7 +185,7 @@ def setup_entry_points():
     """Set up entry point registration."""
     if CAULDRON_ENTRYPOINT_SETUP:
         return
-    for ep in pkg_resources.iter_entry_points('Cauldron.backends'):
+    for ep in pkg_resources.iter_entry_points('Cauldron_backends'):
         if six.PY2 and sys.version_info[1] < 7:
             obj = ep.resolve()
         else:

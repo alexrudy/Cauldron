@@ -84,7 +84,7 @@ for entry_point in entry_point_list:
 
 entry_point_list = conf.items('backends')
 for entry_point in entry_point_list:
-    entry_points['Cauldron.backends'].append('{0} = {1}'.format(entry_point[0],
+    entry_points['Cauldron_backends'].append('{0} = {1}'.format(entry_point[0],
                                                               entry_point[1]))
     
 
