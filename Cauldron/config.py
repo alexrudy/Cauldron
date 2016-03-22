@@ -26,7 +26,7 @@ __all__ = ['default_configuration', 'read_configuration', 'cauldron_configuratio
 def default_configuration():
     """Get the default configuration object."""
     config = configparser.ConfigParser()
-    with pkg_resources.resource_stream(__name__, 'data/defaults.cfg') as fp:
+    with open(pkg_resources.resource_filename(__name__, 'data/defaults.cfg')) as fp:
         config.readfp(fp)
     return config
 
