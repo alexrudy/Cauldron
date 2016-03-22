@@ -13,11 +13,11 @@ env:
         - ASTROPY_VERSION=stable
         - CONDA_INSTALL='conda install -c astropy-ci-extras --yes'
         - PIP_INSTALL='pip install'
-        - CONDA_DEPENDENCIES='$CONDA_REQ_DEPENDENCIES pyzmq'
         - CONDA_REQ_DEPENDENCIES='Cython jinja2 six setuptools'
+        - CONDA_DEPENDENCIES='Cython jinja2 six setuptools pyzmq'
         - SETUP_CMD='test'
         - MAIN_CMD='python setup.py'
-        - PIP_DEPENDENCIES='pytest-catchlog pytest-xdist'
+        - PIP_DEPENDENCIES='pytest-catchlog'
     matrix:
       - SETUP_CMD='egg_info'
       - SETUP_CMD='test'
@@ -25,8 +25,7 @@ matrix:
     include:
         
         - python: 2.6
-          env:
-            - NUMPY_VERSION='1.4'
+          env: NUMPY_VERSION='1.4'
         
         # Do a coverage test in Python 2.
         - python: 2.7
@@ -39,8 +38,7 @@ matrix:
           
         # Try without some optional deps
         - python: 2.7
-          env: 
-            - CONDA_DEPENDENCIES="$CONDA_REQ_DEPENDENCIES"
+          env: CONDA_DEPENDENCIES=$CONDA_REQ_DEPENDENCIES
           
 
 # Setting sudo to false opts in to Travis-CI container-based builds.
