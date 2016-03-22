@@ -9,6 +9,8 @@ env:
         # The following versions are the 'default' for tests, unless
         # overidden underneath. They are defined here in order to save having
         # to repeat them for all configurations.
+        - ASTROPY_VERSION=stable
+        - NUMPY_VERSION=stable
         - CONDA_REQ_DEPENDENCIES='Cython jinja2 six setuptools'
         - CONDA_DEPENDENCIES='Cython jinja2 six setuptools pyzmq'
         - SETUP_CMD='test'
