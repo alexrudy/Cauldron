@@ -28,9 +28,6 @@ def _init_log():
 # For egg_info test builds to pass, put package imports here.
 if not _ASTROPY_SETUP_:
     from .api import use, install
-    from . import local
-    from . import mock
-    from . import zmq
     from . import types
     _init_log()
 

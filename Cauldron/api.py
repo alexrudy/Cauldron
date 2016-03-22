@@ -5,10 +5,12 @@ This module handles the API for the system, registering backends and using them.
 
 from __future__ import absolute_import
 
+import six
 import types
 import sys
 import warnings
 import logging
+import pkg_resources
 
 from . import registry
 from .utils.helpers import _Setting
@@ -18,6 +20,7 @@ __all__ = ['install', 'use', 'teardown', 'use_strict_xml', 'STRICT_KTL_XML', 'AP
 log = logging.getLogger("Cauldron.api")
 
 CAULDRON_SETUP = _Setting("CAULDRON_SETUP", False)
+CAULDRON_ENTRYPOINT_SETUP = _Setting("CAULDRON_ENTRYPOINT_SETUP", False)
 
 class APISetting(_Setting):
     """A setting which locks with the API use() calls."""
@@ -56,10 +59,9 @@ def use(name):
     # Allow imports of backend modules now.
     CAULDRON_SETUP.on()
     
-    # Set up the LROOT KTL installation differently
-    if name in KTL_DEFAULT_NAMES: # pragma: no cover
-        setup_ktl_backend()
-        
+    # Entry point registration.
+    setup_entry_points()
+    
     if name not in registry.keys():
         raise ValueError("The Cauldron backend '{0}' is not registered. Available backends are {1!r}".format(
             name, list(registry.keys())))
@@ -176,6 +178,22 @@ def guard_use(msg='doing this', error=RuntimeError):
     if not CAULDRON_SETUP:
         raise error("You must call Cauldron.use() before {0} in order to set the Cauldron backend.".format(msg))
         
+    
+
+def setup_entry_points():
+    """Set up entry point registration."""
+    if CAULDRON_ENTRYPOINT_SETUP:
+        return
+    for ep in pkg_resources.iter_entry_points('Cauldron.backends'):
+        if six.PY2 and sys.version_info[1] < 7:
+            obj = ep.resolve()
+        else:
+            obj = ep.load(require=False)
+        if six.callable(obj):
+            obj()
+    CAULDRON_ENTRYPOINT_SETUP.on()
+    return
+
 @registry.client.setup_for('all')
 def setup_client_service_module():
     """Set up the client Service module."""

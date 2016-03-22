@@ -43,6 +43,8 @@ try:
 except ImportError:
     pass
 else:
+    from . import api
+    api.setup_entry_points()
     from . import registry
     PYTEST_HEADER_MODULES['zmq'] = 'zmq'
     if "zmq" in registry.keys():
