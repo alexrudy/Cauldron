@@ -56,15 +56,15 @@ def use(name):
     if CAULDRON_SETUP:
         raise RuntimeError("You may only call Cauldron.use() once! It is an error to activate again.")
     
-    # Allow imports of backend modules now.
-    CAULDRON_SETUP.on()
-    
     # Entry point registration.
     setup_entry_points()
     
     if name not in registry.keys():
         raise ValueError("The Cauldron backend '{0}' is not registered. Available backends are {1!r}".format(
             name, list(registry.keys())))
+    
+    # Allow imports of backend modules now.
+    CAULDRON_SETUP.on()
     
     log.info("Cauldron initialized using backend '{0}'".format(name))
     registry.client.use(name)
