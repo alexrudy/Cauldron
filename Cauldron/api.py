@@ -5,10 +5,12 @@ This module handles the API for the system, registering backends and using them.
 
 from __future__ import absolute_import
 
+import six
 import types
 import sys
 import warnings
 import logging
+import pkg_resources
 
 from . import registry
 from .utils.helpers import _Setting
@@ -18,6 +20,7 @@ __all__ = ['install', 'use', 'teardown', 'use_strict_xml', 'STRICT_KTL_XML', 'AP
 log = logging.getLogger("Cauldron.api")
 
 CAULDRON_SETUP = _Setting("CAULDRON_SETUP", False)
+CAULDRON_ENTRYPOINT_SETUP = _Setting("CAULDRON_ENTRYPOINT_SETUP", False)
 
 class APISetting(_Setting):
     """A setting which locks with the API use() calls."""
@@ -53,16 +56,16 @@ def use(name):
     if CAULDRON_SETUP:
         raise RuntimeError("You may only call Cauldron.use() once! It is an error to activate again.")
     
+    # Entry point registration.
+    setup_entry_points()
+    
+    if name not in registry.keys():
+        eps = map(repr,pkg_resources.iter_entry_points('Cauldron.backends'))
+        raise ValueError("The Cauldron backend '{0}' is not registered. Available backends are {1:s}. Entry points were {2:s}".format(
+            name, ",".join(registry.keys()), ",".join(eps)))
+    
     # Allow imports of backend modules now.
     CAULDRON_SETUP.on()
-    
-    # Set up the LROOT KTL installation differently
-    if name in KTL_DEFAULT_NAMES: # pragma: no cover
-        return setup_ktl_backend()
-        
-    if name not in registry.keys():
-        raise ValueError("The Cauldron backend '{0}' is not registered. Available backends are {1!r}".format(
-            name, list(registry.keys())))
     
     log.info("Cauldron initialized using backend '{0}'".format(name))
     registry.client.use(name)
@@ -70,29 +73,33 @@ def use(name):
     
     Cauldron = sys.modules[BASENAME]
     # Install the client side libraries.
-    from . import _ktl
-    from ._ktl.Service import Service
-    from ._ktl import Keyword
-    _ktl.Service = Service
-    _ktl.Keyword = Keyword
-    Cauldron.ktl = sys.modules[BASENAME + ".ktl"] = _ktl
+    from Cauldron import ktl
+    reload(ktl)
+    
+    from Cauldron.ktl.Service import Service
+    from Cauldron.ktl import Keyword
+    ktl.Service = Service
+    ktl.Keyword = Keyword
     
     # Install the dispatcher side libraries.
-    from . import _DFW
-    from ._DFW.Service import Service
-    from ._DFW import Keyword
-    _DFW.Service = Service
-    _DFW.Keyword = Keyword
-    Cauldron.DFW = sys.modules[BASENAME + ".DFW"] = _DFW
+    from Cauldron import DFW
+    reload(DFW)
+    from Cauldron.DFW.Service import Service
+    from Cauldron.DFW import Keyword
+    DFW.Service = Service
+    DFW.Keyword = Keyword
     
 def setup_ktl_backend(): # pragma: no cover
     """Set up the KTL backend."""
     Cauldron = sys.modules[BASENAME]
     import ktl
-    sys.modules[BASENAME + ".ktl"] = Cauldron.ktl = ktl
+    registry.client.service_for("ktl", ktl.Service)
+    registry.client.keyword_for("ktl", ktl.Keyword.Keyword)
     
     import DFW
-    sys.modules[BASENAME + ".DFW"] = Cauldron.DFW = DFW
+    registry.dispatcher.service_for("ktl", DFW.Service)
+    registry.dispatcher.keyword_for("ktl", DFW.Keyword.Keyword)
+    
     
 def _expunge_module(module_name):
     """Given a module name, expunge it from sys.modules."""
@@ -157,14 +164,13 @@ def install():
     
     This method performs a runtime hack to try to make the Cauldron versions of ``ktl`` and ``DFW`` the ones which are
     accessed when a python module performs ``import ktl`` or ``import DFW``. If either module has already been imported
-    in python, then this function will send a RuntimeWarning to that effect and do nothing.
+    in python, then this function will send a RuntimeWarning to that effect.
     
     .. note:: It is preferable to use :ref:`cauldron-style`, of the form ``from Cauldron import ktl``, as this will properly ensure that the Cauldron backend is invoked and not the KTL backend.
     """
     guard_use("installing Cauldron", error=RuntimeError)
     if 'ktl' in sys.modules or "DFW" in sys.modules: # pragma: no cover
         warnings.warn("'ktl' or 'DFW' already in sys.modules. Skipping 'install()'")
-        return
     sys.modules['ktl'] = sys.modules[BASENAME + ".ktl"]
     sys.modules['DFW'] = sys.modules[BASENAME + ".DFW"]
 
@@ -173,21 +179,36 @@ def guard_use(msg='doing this', error=RuntimeError):
     if not CAULDRON_SETUP:
         raise error("You must call Cauldron.use() before {0} in order to set the Cauldron backend.".format(msg))
         
+    
+def setup_entry_points():
+    """Set up entry point registration."""
+    if CAULDRON_ENTRYPOINT_SETUP:
+        return
+    for ep in pkg_resources.iter_entry_points('Cauldron.backends'):
+        if six.PY2 and sys.version_info[1] < 7:
+            obj = ep.resolve()
+        else:
+            obj = ep.load(require=False)
+        if six.callable(obj):
+            obj()
+    CAULDRON_ENTRYPOINT_SETUP.on()
+    return
+
 @registry.client.setup_for('all')
 def setup_client_service_module():
     """Set up the client Service module."""
-    from ._ktl import Service
+    from .ktl import Service
     Service.Service = registry.client.Service
     
 @registry.client.teardown_for("all")
 def teardown_client_service_module():
     """Remove the service from the client module."""
     try:
-        _ktls = sys.modules[BASENAME + "._ktl.Service"]
-        del _ktls.Service
-        _ktl = sys.modules[BASENAME + "._ktl"]
-        del _ktl.Service
-        del _ktl.Keyword
+        ktls = sys.modules[BASENAME + ".ktl.Service"]
+        del ktls.Service
+        ktl = sys.modules[BASENAME + ".ktl"]
+        del ktl.Service
+        del ktl.Keyword
     except KeyError as e:
         pass
     
@@ -196,11 +217,11 @@ def teardown_client_service_module():
 def teardown_dispatcher_service_module():
     """Remove the service from the dispatcher module."""
     try:
-        _DFWs = sys.modules[BASENAME + "._DFW.Service"]
-        del _DFWs.Service
-        _DFW = sys.modules[BASENAME + "._DFW"]
-        del _DFW.Service
-        del _DFW.Keyword
+        DFWs = sys.modules[BASENAME + ".DFW.Service"]
+        del DFWs.Service
+        DFW = sys.modules[BASENAME + ".DFW"]
+        del DFW.Service
+        del DFW.Keyword
     except KeyError as e:
         pass
     
@@ -208,6 +229,6 @@ def teardown_dispatcher_service_module():
 @registry.dispatcher.setup_for('all')
 def setup_dispatcher_service_module():
     """Set up the dispatcher Service module."""
-    from ._DFW import Service
+    from .DFW import Service
     Service.Service = registry.dispatcher.Service
 

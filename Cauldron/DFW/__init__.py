@@ -4,7 +4,7 @@ from __future__ import absolute_import
 # Initial setup functions for this module.
 # We make sure that the namespace stays very clean!
 from ..api import guard_use
-guard_use(msg='importing the ._DFW module', error=ImportError)
+guard_use(msg='importing the .DFW module', error=ImportError)
 del guard_use
 
 from ..registry import dispatcher

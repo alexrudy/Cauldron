@@ -7,7 +7,7 @@ import time
 from lumberjack import setup_logging, setup_warnings_logger
 from logging import getLogger
 
-setup_logging(mode='stream', level=10)
+setup_logging(mode='stream', level=5)
 setup_warnings_logger("")
 log = getLogger("example.zmq")
 
@@ -24,17 +24,20 @@ def setup(service):
 
 disp = DFW.Service("testsvc", setup = setup, config=None)
 dtest = disp["TEST"]
-log.info(dtest)
+log.info("Dispatcher Keyword {0!r}".format(dtest))
 
 VALUE = "SOMEVALUE"
-
+time.sleep(1.0)
+log.info("Starting KTL client...")
 from Cauldron import ktl
 svc = ktl.Service("testsvc")
+log.info("Getting KTL keyword object...")
 test = svc["TEST"]
 log.info("Writing '{0}'".format(VALUE))
 test.write(VALUE)
 log.info("'{0}' =? '{1}'".format(VALUE, test.read()))
 log.info("Done!")
+svc
 disp.shutdown()
 log.info("Shutdown complete.")
 import zmq

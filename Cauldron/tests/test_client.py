@@ -10,8 +10,13 @@ import threading
 def service(request, dispatcher):
     """A service dispatch tool."""
     mykw = dispatcher['KEYWORD']
-    request.addfinalizer(lambda : dispatcher.shutdown())
     return dispatcher
+    
+def test_create_and_destroy_client(service):
+    """Make a client object."""
+    from Cauldron import ktl
+    svc = ktl.Service(service.name)
+    del svc
 
 def test_read_write(service, client):
     """Test a write method."""
@@ -119,6 +124,7 @@ def test_monitor(service, client, waittime):
     
     def monitor(keyword):
         """Monitor"""
+        keyword.service.log.log(5, "monitor callback received.")
         monitor.monitored.set()
     
     monitor.monitored = threading.Event()
@@ -157,8 +163,8 @@ def test_subscribe(service, client, waittime):
     
     def monitor(keyword):
         """Monitor"""
+        keyword.service.log.log(5, "monitor callback received.")
         monitor.monitored.set()
-        print("Monitored!")
     
     monitor.monitored = threading.Event()
     

@@ -9,7 +9,7 @@ from __future__ import absolute_import
 # Initial setup functions for this module.
 # We make sure that the namespace stays very clean!
 from ..api import guard_use
-guard_use(msg='importing the ._ktl module', error=ImportError)
+guard_use(msg='importing the .ktl module', error=ImportError)
 del guard_use
 # Done with initial setup.
 __all__ = ['Service', 'Keyword']

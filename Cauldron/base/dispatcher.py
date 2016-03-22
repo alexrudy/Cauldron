@@ -11,6 +11,8 @@ import six
 import weakref
 import logging
 import warnings
+import collections
+import time
 from ..compat import WeakOrderedSet
 from .core import _BaseKeyword
 from ..config import read_configuration
@@ -93,7 +95,7 @@ class Keyword(_BaseKeyword):
             raise ValueError("keyword named '%s' already exists." % name)
         self._acting = False
         self._callbacks = Callbacks()
-        self._history = list()
+        self._history = collections.deque(maxlen=100)
         self.writeonly = False
         self.readonly = False
         self._period = None
@@ -168,7 +170,7 @@ class Keyword(_BaseKeyword):
         
         self.check(value)
         
-        self._history.append(value)
+        self._history.append((value, time.time()))
         self.value = value
         
         if value != None:
@@ -284,7 +286,7 @@ class Service(object):
         
         self._config = read_configuration(config)
         self._configuration_location = config if isinstance(config, six.string_types) else "???"
-        self.dispatcher = dispatcher
+        self.dispatcher = dispatcher if dispatcher else "DEFAULT"
         self.name = name.lower()
         self.log = logging.getLogger("DFW.Service.{0}".format(self.name))
         self.log.info("Starting Service '{0}' using backend '{1}'".format(self.name, registry.dispatcher.backend))
@@ -419,7 +421,8 @@ class Service(object):
         
         if name not in self._keywords:
             if not STRICT_KTL_XML:
-                warnings.warn(CauldronXMLWarning("service '{0}' does not have a keyword '{1}' in XML".format(self.name, name)))
+                if self.xml is not None:
+                    warnings.warn(CauldronXMLWarning("service '{0}' does not have a keyword '{1}' in XML".format(self.name, name)))
             else:
                 raise KeyError("service '%s' does not have a keyword '%s'" % (self.name, name))
             

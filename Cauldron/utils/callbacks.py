@@ -12,8 +12,8 @@ __all__ = ['WeakMethod', 'Callbacks']
 class WeakMethod(object):
     """A weak reference to a method."""
     
-    _instance = lambda : None
-    _func = lambda : None
+    _instance = lambda self : None
+    _func = lambda self : None
     method = False
     callback = None
     _valid = False
@@ -52,6 +52,28 @@ class WeakMethod(object):
             return False
         return (self._func == other._func) and (not self.method or (self._instance == other._instance))
         
+    def __repr__(self):
+        """A representation of this weak method."""
+        if not self.valid:
+            return "<{0} invalid at {1}>".format(self.__class__.__name__, hex(id(self)))
+        try:
+            name = self.func.__name__
+            instance = repr(self.instance)
+            if self.method and self.instance is not None:
+                return "<{0} to '{1}' bound to '{2}' at {3}>".format(
+                    self.__class__.__name__, name, instance, hex(id(self))
+                )
+            elif self.method and self.instance is None:
+                return "<{0} to '{1}' unbound at {2}>".format(
+                    self.__class__.__name__, name, hex(id(self))
+                )
+            else:
+                return "<{0} to '{1}' at {2}>".format(
+                    self.__class__.__name__, name, hex(id(self))
+                )
+        except weakref.ReferenceError:
+            return "<{0} broken at {1}>".format(self.__class__.__name__, hex(id(self)))
+        
     def copy(self):
         return self.__class__(self.get())
     
@@ -89,6 +111,11 @@ class WeakMethod(object):
     @instance.setter
     def instance(self, value):
         """Set the instance."""
+        if value is None:
+            self._instance = lambda : None
+            self.method = False
+            return
+        
         def remove(wr, weakself=weakref.ref(self)):
             self = weakself()
             if self is not None:

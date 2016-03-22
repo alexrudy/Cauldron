@@ -6,14 +6,11 @@ Tests specific to the local backend.
 import pytest
 pytestmark = pytest.mark.usefixtures("teardown_cauldron")
 
-from ..conftest import fail_if_not_teardown
-
 @pytest.fixture
 def uselocal(request):
     """Use the local backend."""
     from Cauldron.api import use
     use('local')
-    request.addfinalizer(fail_if_not_teardown)
 
 @pytest.fixture
 def local_service(uselocal, servicename, config):
@@ -115,7 +112,8 @@ def test_write_async(local_service, local_client, recwarn):
     local_client["KEYWORD"].write("10", wait=False)
     w = recwarn.pop()
     assert w.category == CauldronAPINotImplementedWarning
-    
+
+@pytest.mark.xfail
 def test_read_async(local_client, recwarn):
     """Test local asynchronous read."""
     from Cauldron.exc import CauldronAPINotImplementedWarning

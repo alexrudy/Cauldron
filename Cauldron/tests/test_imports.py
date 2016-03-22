@@ -44,14 +44,15 @@ def test_dangling_imports():
 
 def test_import_duplicates():
     """Test importing Cauldron modules in different ways."""
-    from Cauldron.base.client import Keyword
     from Cauldron.api import use
     use("local")
     from Cauldron import ktl, DFW
-    from Cauldron import _ktl, _DFW
-    assert dir(ktl) == dir(_ktl)
-    assert dir(DFW) == dir(_DFW)
+    
+    from Cauldron.base.client import Keyword
     assert issubclass(ktl.Keyword.Keyword, Keyword)
+    
+    from Cauldron.base.dispatcher import Keyword
+    assert issubclass(DFW.Keyword.Keyword, Keyword)
     
 def test_teardown():
     """Test that imports are guarded after calling .teardown()"""
@@ -72,6 +73,31 @@ def test_teardown():
     
     assert "DFW" not in sys.modules
     assert "ktl" not in sys.modules
+
+def test_double_teardown():
+    """Test teardown twice"""
+    from Cauldron.api import use, install, teardown
+    use("local")
+    from Cauldron import ktl
+    del ktl
+    
+    from Cauldron import DFW
+    del DFW
+    
+    install()
+    teardown()
+    teardown()
+    
+    with pytest.raises(ImportError):
+        from Cauldron import ktl
+    with pytest.raises(ImportError):
+        from Cauldron import DFW
+    
+    assert "DFW" not in sys.modules
+    assert "ktl" not in sys.modules
+    
+    use('local')
+    from Cauldron import ktl, DFW
 
 def test_install():
     """Test the install feature."""
