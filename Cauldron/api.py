@@ -94,7 +94,7 @@ def setup_ktl_backend(): # pragma: no cover
     Cauldron = sys.modules[BASENAME]
     import ktl
     registry.client.service_for("ktl", ktl.Service)
-    registry.client.keyword_for("ktl", ktl.Keyword.Keyword)
+    registry.client.keyword_for("ktl", ktl.Keyword)
     
     import DFW
     registry.dispatcher.service_for("ktl", DFW.Service)
@@ -186,9 +186,9 @@ def setup_entry_points():
         return
     for ep in pkg_resources.iter_entry_points('Cauldron.backends'):
         if six.PY2 and sys.version_info[1] < 7:
-            obj = ep.resolve()
-        else:
             obj = ep.load(require=False)
+        else:
+            obj = ep.resolve()
         if six.callable(obj):
             obj()
     CAULDRON_ENTRYPOINT_SETUP.on()
