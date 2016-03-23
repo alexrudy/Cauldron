@@ -67,6 +67,8 @@ rst_epilog += """
 """
 
 graphviz_output_format = "png"
+automodsumm_inherited_members = True
+
 # -- Project information ------------------------------------------------------
 
 # This does not *have* to match the package name, but typically does
