@@ -74,8 +74,6 @@ def use(name):
     Cauldron = sys.modules[BASENAME]
     # Install the client side libraries.
     from Cauldron import ktl
-    reload(ktl)
-    
     from Cauldron.ktl.Service import Service
     from Cauldron.ktl import Keyword
     ktl.Service = Service
@@ -83,7 +81,6 @@ def use(name):
     
     # Install the dispatcher side libraries.
     from Cauldron import DFW
-    reload(DFW)
     from Cauldron.DFW.Service import Service
     from Cauldron.DFW import Keyword
     DFW.Service = Service
@@ -92,13 +89,16 @@ def use(name):
 def setup_ktl_backend(): # pragma: no cover
     """Set up the KTL backend."""
     Cauldron = sys.modules[BASENAME]
-    import ktl
-    registry.client.service_for("ktl", ktl.Service)
-    registry.client.keyword_for("ktl", ktl.Keyword)
-    
-    import DFW
-    registry.dispatcher.service_for("ktl", DFW.Service)
-    registry.dispatcher.keyword_for("ktl", DFW.Keyword.Keyword)
+    try:
+        import ktl
+        import DFW
+    except ImportError:
+        pass
+    else:
+        registry.client.service_for("ktl", ktl.Service)
+        registry.client.keyword_for("ktl", ktl.Keyword)
+        registry.dispatcher.service_for("ktl", DFW.Service)
+        registry.dispatcher.keyword_for("ktl", DFW.Keyword.Keyword)
     
     
 def _expunge_module(module_name):
@@ -176,9 +176,7 @@ def install():
 
 def guard_use(msg='doing this', error=RuntimeError):
     """Guard against using a Cauldron module when we haven't yet specified the backend."""
-    if not CAULDRON_SETUP:
-        raise error("You must call Cauldron.use() before {0} in order to set the Cauldron backend.".format(msg))
-        
+    registry.client.guard(msg, error)
     
 def setup_entry_points():
     """Set up entry point registration."""
