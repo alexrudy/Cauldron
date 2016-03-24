@@ -52,6 +52,21 @@ def read_configuration(configuration_location = None):
         warnings.warn("Can't locate configuration file '{0:s}'.".format(configuration_location), ConfigurationMissing)
     return cauldron_configuration
     
+def get_configuration():
+    """Return the active configuration object."""
+    Cauldron = sys.modules[BASENAME]
+    return Cauldron.configuration
+    
+def get_timeout(timeout):
+    """Get the configured default timeout."""
+    if timeout is None:
+        config = get_configuration()
+        try:
+            timeout = config.getfloat('core', 'timeout')
+        except configparser.NoOptionError:
+            pass
+    return timeout
+    
 @registry.dispatcher.setup_for('all')
 @registry.client.setup_for('all')
 def setup_configuration():
