@@ -11,6 +11,7 @@ import weakref
 import contextlib
 import threading
 
+from ..config import get_timeout
 from ..utils.callbacks import WeakMethod
 
 from astropy.utils.misc import InheritDocstrings

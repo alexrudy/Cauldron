@@ -193,6 +193,26 @@ def test_service_setitem(dispatcher):
     with pytest.raises(TypeError):
         dispatcher['OKEYWORD'] = 10
 
+def test_async_read(dispatcher, servicename):
+    """Aysnchronous writer"""
+    dkwd = dispatcher["KEYWORD"]
+    dkwd.modify('1')
+    from Cauldron import ktl
+    client = ktl.Service(servicename)
+    task = client["KEYWORD"].read(wait=False)
+    assert task.get(timeout=0.1) == '1'
+    
+def test_async_write(dispatcher, servicename):
+    """Aysnchronous writer"""
+    dkwd = dispatcher["KEYWORD"]
+    dkwd.modify('1')
+    
+    from Cauldron import ktl
+    client = ktl.Service(servicename)
+    task = client["KEYWORD"].write('2', wait=False)
+    task.get(timeout=0.1)
+    assert dkwd.value == '2'
+
 def test_broadcast(dispatcher):
     """Check that broadcast works."""
     keyword = dispatcher['KEYWORD']
