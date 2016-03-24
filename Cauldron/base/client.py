@@ -17,7 +17,7 @@ import weakref
 import datetime
 import logging
 import warnings
-from .core import _BaseKeyword
+from .core import _BaseKeyword, _BaseService
 from ..exc import CauldronWarning
 from ..utils.callbacks import Callbacks
 from ..utils.helpers import api_not_required, api_not_implemented, api_required, api_override
@@ -116,14 +116,14 @@ class Keyword(_BaseKeyword):
     
     @api_not_implemented
     def isAlive(self):
-        """Check that the heartbeats associated with this keyword are themselves alive; if they are, return True, otherwise return False. If no heartbeats are associated with this Keyword instance, a NoHeartbeatsError exception will be raised.
-        """
+        """Check that the heartbeats associated with this keyword are themselves alive; if they are, return True, otherwise return False. If no heartbeats are associated with this Keyword instance, a NoHeartbeatsError exception will be raised."""
         pass # pragma: no cover
         
     @api_required
     def monitor(self, start=True, prime=True, wait=True):
-        """
-        Subscribe to broadcasts for this KTL keyword. If start is set to False, the subscription will be shut down. If prime is set to False, there will be no priming read of the keyword value; the default behavior is to perform a priming read. If wait is set to False, the priming read (if requested) will not block while waiting for the priming read to complete.
+        """Subscribe to broadcasts for this KTL keyword.
+        
+        If `start` is set to False, the subscription will be shut down. If `prime` is set to False, there will be no priming read of the keyword value; the default behavior is to perform a priming read. If `wait` is set to False, the priming read (if requested) will not block while waiting for the priming read to complete.
         """
         pass # pragma: no cover
         
@@ -131,19 +131,20 @@ class Keyword(_BaseKeyword):
     def poll(self, period=1, start=True):
         """Poll a keyword for updates.
         
-In circumstances when a KTL keyword cannot (or will not) reliably broadcast updates, polling can be established. If *start* is True, a non-blocking call to :func:`Keyword.read` will be invoked every *period* seconds; if *start* is False, polling for this keyword will be discontinued.
-
-.. warning::
-    
-    Polling keywords is inefficient, as it requires a discrete ktl_read() operation for each polling event for each keyword polled. Using :func:`monitor` is a far better choice if supported by the service's KTL client library.
-
-"""
+        In circumstances when a KTL keyword cannot (or will not) reliably broadcast updates, polling can be established. If `start` is True, a non-blocking call to :func:`Keyword.read` will be invoked every `period`. seconds; if `start` is False, polling for this keyword will be discontinued.
+        
+        .. warning::
+            
+            Polling keywords is inefficient, as it requires a discrete ktl_read() operation for each polling event for each keyword polled. Using :func:`monitor` is a far better choice if supported by the service's KTL client library.
+        
+        """
         pass # pragma: no cover
         
     
     def callback(self, function, remove=False, preferred=False):
-        """Request that a callback *function* be invoked whenever a KTL broadcast is received for this keyword.
-        The callback function should accept as its sole argument a Keyword instance. If *remove* is set to False, the designated *function* will be removed from the set of active callbacks. If *preferred* is set to True, this callback will be remembered as a *preferred* callback, which gets invoked before all other non-preferred callbacks.
+        """Request that a callback `function` be invoked whenever a KTL broadcast is received for this keyword.
+        
+        The callback `function` should accept as its sole argument a Keyword instance. If `remove` is set to False, the designated `function` will be removed from the set of active callbacks. If `preferred` is set to True, this callback will be remembered as a `preferred` callback, which gets invoked before all other non-preferred callbacks.
 
         :func:`callback` is typically used in conjunction with :func:`monitor`, or :func:`poll` if the specific KTL keyword does not support broadcasts.
         """
@@ -157,7 +158,9 @@ In circumstances when a KTL keyword cannot (or will not) reliably broadcast upda
     
     
     def propagate(self):
-        """Invoke any/all callbacks registered via :meth:`callback`. This is an internal function, invoked after a Keyword instance successfully completes a :meth:`read` call, or a KTL broadcast event occurs.
+        """Invoke any/all callbacks registered via :meth:`callback`. 
+        
+        This is an internal function, invoked after a Keyword instance successfully completes a :meth:`read` call, or a KTL broadcast event occurs.
         """
         try:
             self._acting = True
@@ -168,30 +171,37 @@ In circumstances when a KTL keyword cannot (or will not) reliably broadcast upda
         
     @api_required
     def read(self, binary=False, both=False, wait=True, timeout=None):
-        """Perform a ktl_read() operation for this keyword. The default behavior is to do a blocking read and return the ascii representation of the keyword value. If binary is set to True, only the binary representation will be returned; If both is set to True, both representations will be returned in a (binary, ascii) tuple. If wait is set to False, the KTL read operation will be performed in a background thread, and any resulting updates would trigger any callbacks registered via :meth:`callback`. If a timeout is specified (in seconds), and wait is set to True, :meth:`read` will raise a TimeoutException if the timeout expires before a response is received.
+        """Perform a ktl_read() operation for this keyword. 
+        
+        The default behavior is to do a blocking read and return the ascii representation of the keyword value. If `binary` is set to True, only the binary representation will be returned; If `both` is set to True, both representations will be returned in a (binary, ascii) tuple. If `wait` is set to False, the KTL read operation will be performed in a background thread, and any resulting updates would trigger any callbacks registered via :meth:`callback`. If a `timeout` is specified (in seconds), and wait is set to True, :meth:`read` will raise a TimeoutException if the timeout expires before a response is received.
         """
         pass # pragma: no cover
         
     def subscribe(self, start=True, prime=True, wait=True):
-        """Subscribe to broadcasts for this KTL keyword. If start is set to False, the subscription will be shut down. If prime is set to False, there will be no priming read of the keyword value; the default behavior is to perform a priming read. If wait is set to False, the priming read (if requested) will not block while waiting for the priming read to complete.
+        """Subscribe to broadcasts for this KTL keyword. 
+        
+        If `start` is set to False, the subscription will be shut down. If `prime` is set to False, there will be no priming read of the keyword value; the default behavior is to perform a priming read. If `wait` is set to False, the priming read (if requested) will not block while waiting for the priming read to complete.
         """
         return self.monitor(start=start, prime=prime, wait=wait)
         
     @api_not_implemented
     def waitfor(self, expression, timeout=None, case=False):
-        """Wait for a particular expression to be true.
-        """
+        """Wait for a particular expression to be true."""
         pass # pragma: no cover
         
     @api_required
     def wait(self, timeout=None, operator=None, value=None, sequence=None, reset=False, case=False):
-        """Wait for the Keyword to receive a new value, or if sequence is set, wait for the designated write operation to complete. If value is set, with or without operator being set, :meth:`wait` effectively acts as a wrapper to :meth:`waitFor`. If reset is set to True, the notification flag will be cleared before waiting against it– this is dangerous, as this introduces a race condition between the arrival of the event itself, and the invocation of :meth:`wait`. If the event occurs first, the caller may wind up waiting indefinitely. If timeout (in whole or partial seconds) is set, :meth:`wait` will return False if no update occurs before the timeout expires. Otherwise, :meth:`wait` returns True to indicate that the wait completed successfully.
+        """Wait for the Keyword to receive a new value, or if sequence is set, wait for the designated write operation to complete.
+        
+        If `value` is set, with or without operator being set, :meth:`wait` effectively acts as a wrapper to :meth:`waitFor`. If `reset` is set to True, the notification flag will be cleared before waiting against it- this is dangerous, as this introduces a race condition between the arrival of the event itself, and the invocation of :meth:`wait`. If the event occurs first, the caller may wind up waiting indefinitely. If `timeout` (in whole or partial seconds) is set, :meth:`wait` will return False if no update occurs before the timeout expires. Otherwise, :meth:`wait` returns True to indicate that the wait completed successfully.
         """
         pass # pragma: no cover
         
     @api_required
     def write(self, value, wait=True, binary=False, timeout=None):
-        """Perform a KTL write for this keyword. value is the new value to write to the keyword. If binary is set to True, value will be interpreted as a binary representation; the default behavior is to interpret value as an ascii representation. The behavior of timeout is the same as for :meth:`read`.
+        """Perform a KTL write for this keyword. 
+        
+        `value` is the new value to write to the keyword. If `binary` is set to True, value will be interpreted as a binary representation; the default behavior is to interpret value as an ascii representation. The behavior of timeout is the same as for :meth:`read`.
         """
         pass # pragma: no cover
     
@@ -205,7 +215,7 @@ In circumstances when a KTL keyword cannot (or will not) reliably broadcast upda
 
 
 @six.add_metaclass(abc.ABCMeta)
-class Service(object):
+class Service(_BaseService):
     """A Cauldron-based service.
     
     :param name: The KTL service name.
@@ -221,9 +231,8 @@ class Service(object):
     
     """
     def __init__(self, name, populate=False):
-        super(Service, self).__init__()
+        super(Service, self).__init__(name=name)
         self._keywords = {}
-        self.name = name.lower()
         self.log = logging.getLogger("ktl.Service.{0}".format(self.name))
         self._prepare()
         if populate:

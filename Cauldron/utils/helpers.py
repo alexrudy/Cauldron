@@ -1,20 +1,43 @@
 # -*- coding: utf-8 -*-
 
-import functools
 import abc
 import textwrap
+import re
 from ..exc import CauldronAPINotImplemented, CauldronAPINotImplementedWarning
 
+try:
+    from astropy.utils.decorators import wraps
+except ImportError:
+    from functools import wraps
+
 __all__ = ['api_not_implemented', 'api_not_required', 'api_required']
+
+def _append_to_docstring(docstring, text):
+    """Append `text` to `docstring` preserving indentation rules."""
+    
+    lines = docstring.expandtabs().splitlines()
+    if len(lines) > 1:
+        matches = [ re.search('(\S)', line) for line in lines[1:] ]
+        try:
+            left_indent = min(match.start() for match in matches if match)
+        except ValueError:
+            raise ValueError("Malformed docstring '{0:s}'".format(docstring))
+    else:
+        left_indent = 0
+    newlines = [''] + text.splitlines()
+    newlines = [ (' ' * left_indent) + newline for newline in newlines ]
+    docstring += "\n" + "\n".join(newlines)
+    return docstring
+    
 
 def api_not_implemented(func):
     """A decorator to correctly set the API not implemented."""
     
-    func.__doc__ += "\n\n" + textwrap.dedent("""
-    .. warning:: {0} is not implemented in the Cauldron version of the KTL API.
-    """.format(func.__name__))
+    func.__doc__ = _append_to_docstring(func.__doc__, textwrap.dedent("""
+    .. warning:: `{0}` is not implemented in the Cauldron version of the KTL API.
+    """.format(func.__name__)))
     
-    @functools.wraps(func)
+    @wraps(func)
     def api_not_implemented(*args, **kwargs):
         """Sub-function to handle API not implmeneted."""
         raise CauldronAPINotImplemented("The Cauldron API does not support '{0}'.".format(func.__name__))
@@ -24,13 +47,13 @@ def api_not_implemented(func):
 def api_not_required(func):
     """A decorator to mark a function as implementing a not-required API"""
     
-    func.__doc__ += textwrap.dedent("""
+    func.__doc__ = _append_to_docstring(func.__doc__, textwrap.dedent("""
     
     .. note:: Cauldron backends are not required to implement this function. If the do not, it will raise an :exc:`CauldronAPINotImplemented` error.
     
-    """)
+    """))
     
-    @functools.wraps(func)
+    @wraps(func)
     def api_not_required(*args, **kwargs):
         """Sub-function to handle API not implmeneted."""
         raise CauldronAPINotImplemented("The Cauldron API does require support of '{0}'.".format(func.__name__))
@@ -40,21 +63,21 @@ def api_not_required(func):
 def api_required(func):
     """A decorator to mark a function as abstract and requiring a backend implementation."""
     
-    func.__doc__ += textwrap.dedent("""
+    func.__doc__ = _append_to_docstring(func.__doc__, textwrap.dedent("""
     
     *This is an abstract method. Backends must implement this method*
     
-    """)
+    """))
     
     return abc.abstractmethod(func)
     
 def api_override(func):
     """A decorator to mark a function as something subclasses can override."""
-    func.__doc__ += textwrap.dedent("""
+    func.__doc__ = _append_to_docstring(func.__doc__, textwrap.dedent("""
     
     *This method can be overridden to provide specific behavior in user subclasses.*
     
-    """)
+    """))
     
     return func
     

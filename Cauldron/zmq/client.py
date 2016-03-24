@@ -138,13 +138,11 @@ class Service(ClientService):
         self.shutdown()
         
     def shutdown(self):
-        """When this client is shutdown, close the subscription thread."""
         if hasattr(self, '_thread'):
             self._thread.stop()
             self.log.debug("Joined monitor thread.")
         
     def has_keyword(self, name):
-        """Check if a dispatcher has a keyword."""
         assert name.upper() != self.name.upper()
         name = name.upper()
         try:
@@ -155,7 +153,6 @@ class Service(ClientService):
             return True
         
     def keywords(self):
-        """List all available keywords."""
         message = self._synchronous_command("enumerate", FRAMEBLANK, direction="CSQ")
         return message.payload.split(":")
         
@@ -211,8 +208,6 @@ class Keyword(ClientKeyword):
             self.service._thread.monitored.remove(self.name)
     
     def read(self, binary=False, both=False, wait=True, timeout=None):
-        """Read a value, synchronously, always."""
-        
         if not self['reads']:
             raise NotImplementedError("Keyword '{0}' does not support reads.".format(self.name))
         
@@ -224,7 +219,6 @@ class Keyword(ClientKeyword):
         return self._current_value(binary=binary, both=both)
         
     def write(self, value, wait=True, binary=False, timeout=None):
-        """Write a value"""
         if not self['writes']:
             raise NotImplementedError("Keyword '{0}' does not support writes.".format(self.name))
         

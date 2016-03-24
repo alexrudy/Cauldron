@@ -20,6 +20,7 @@ import logging
 from .exc import CauldronAPINotImplementedWarning, CauldronXMLWarning
 from .api import guard_use, STRICT_KTL_XML
 from .bundled import ktlxml
+from .base.core import _CauldronBaseMeta
 from . import registry
 
 __all__ = ['KeywordType', 'Basic', 'Keyword', 'Boolean', 'Double', 'Float', 'Integer', 'Enumerated', 'Mask', 'String', 'IntegerArray', 'FloatArray', 'DoubleArray', 'dispatcher_keyword', 'client_keyword']
@@ -80,7 +81,7 @@ def setup_dispatcher_keyword_module():
     Keyword.__all__ = list(set(Keyword.__all__))
     
 
-@six.add_metaclass(abc.ABCMeta)
+@six.add_metaclass(_CauldronBaseMeta)
 class KeywordType(object):
     """A base class for all subclasses of KTL Keyword which implement a type specialization.
     

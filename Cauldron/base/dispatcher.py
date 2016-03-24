@@ -14,7 +14,7 @@ import warnings
 import collections
 import time
 from ..compat import WeakOrderedSet
-from .core import _BaseKeyword
+from .core import _BaseKeyword, _BaseService
 from ..config import read_configuration
 from ..exc import CauldronAPINotImplemented, NoWriteNecessary, CauldronXMLWarning, WrongDispatcher
 from ..utils.helpers import api_not_required, api_not_implemented, api_required, api_override
@@ -275,19 +275,17 @@ class Keyword(_BaseKeyword):
         return value
 
 
-@six.add_metaclass(abc.ABCMeta)
-class Service(object):
+class Service(_BaseService):
     """A dispatcher is a KTL service server-side. It owns the values."""
     
     name = None
     
     def __init__(self, name, config, setup=None, dispatcher=None):
-        super(Service, self).__init__()
+        super(Service, self).__init__(name=name)
         
         self._config = read_configuration(config)
         self._configuration_location = config if isinstance(config, six.string_types) else "???"
         self.dispatcher = dispatcher if dispatcher else "DEFAULT"
-        self.name = name.lower()
         self.log = logging.getLogger("DFW.Service.{0}".format(self.name))
         self.log.info("Starting Service '{0}' using backend '{1}'".format(self.name, registry.dispatcher.backend))
         
@@ -317,10 +315,6 @@ class Service(object):
         self.setupOrphans()
         
         self.begin()
-    
-    def __repr__(self):
-        """Represent this object"""
-        return "<{0} name='{1}' at {2}>".format(self.__class__.__name__, self.name, hex(id(self)))
     
     @property
     def _Keyword_cls(self):

@@ -10,17 +10,36 @@ import time
 import weakref
 import contextlib
 
-@six.add_metaclass(abc.ABCMeta)
+from astropy.utils.misc import InheritDocstrings
+
+class _CauldronBaseMeta(abc.ABCMeta, InheritDocstrings):
+    """Combined MetaClass for Cauldron classes."""
+
+@six.add_metaclass(_CauldronBaseMeta)
+class _BaseService(object):
+    """Common service implementation details between the client and the dispatcher."""
+    def __init__(self, name):
+        super(_BaseService, self).__init__()
+        self.name = str(name).lower()
+        
+    def __repr__(self):
+        """Represent this object"""
+        return "<{0} name='{1}' at {2}>".format(self.__class__.__name__, self.name, hex(id(self)))
+
+@six.add_metaclass(_CauldronBaseMeta)
 class _BaseKeyword(object):
     """Some common keyword implementation details between the client and dispatcher"""
     
     _ALLOWED_KEYS = None
     
+    service = None
+    #: The parent :class:`Service` object for this keyword.
+    
     def __init__(self, service, name, type=None):
         super(_BaseKeyword, self).__init__()
         name = str(name).upper()
         self.service = weakref.proxy(service)
-        self.name = name
+        self._name = name
         self._last_value = None
         self._last_read = None
         self._reading = False
@@ -41,8 +60,13 @@ class _BaseKeyword(object):
         return repr_str + ">"
     
     @property
+    def name(self):
+        """Keyword name."""
+        return self._name
+    
+    @property
     def full_name(self):
-        """Full name"""
+        """Full name. Includes Keyword and Service name."""
         return "{0}.{1}".format(self.service.name, self.name)
         
     def __getitem__(self, key):
