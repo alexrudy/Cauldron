@@ -9,11 +9,50 @@ import abc
 import time
 import weakref
 import contextlib
+import threading
+
+from ..utils.callbacks import WeakMethod
 
 from astropy.utils.misc import InheritDocstrings
 
 class _CauldronBaseMeta(abc.ABCMeta, InheritDocstrings):
     """Combined MetaClass for Cauldron classes."""
+
+class Task(object):
+    """A task container for the task queue."""
+    
+    __slots__ = ('request', 'event', 'result', 'response', 'error', 'callback', 'timeout')
+    
+    def __init__(self, message, callback, timeout=None):
+        super(Task, self).__init__()
+        self.request = message
+        self.timeout = timeout
+        self.callback = WeakMethod(callback)
+        self.response = None
+        self.result = None
+        self.error = None
+        self.event = threading.Event()
+        
+    def __call__(self):
+        """Handle this message."""
+        try:
+            self.result = self.callback(self.request)
+        except Exception as e:
+            self.error = e
+        self.event.set()
+        
+    def wait(self, timeout=None):
+        """Wait for this task to be finished."""
+        self.event.wait(timeout=get_timeout(timeout))
+        return self.event.isSet()
+    
+    def get(self, timeout=None):
+        """Get the result."""
+        if not self.wait(timeout=timeout):
+            raise TimeoutError("Task timed out.")
+        elif self.error is not None:
+            raise self.error
+        return self.result
 
 @six.add_metaclass(_CauldronBaseMeta)
 class _BaseService(object):

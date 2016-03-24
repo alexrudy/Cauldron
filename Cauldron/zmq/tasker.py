@@ -11,22 +11,11 @@ from .microservice import ZMQCauldronMessage
 from ..utils.callbacks import WeakMethod
 from ..exc import TimeoutError
 from ..config import get_configuration, get_timeout
+from ..base.core import Task as _BaseTask
 
-class Task(object):
+class Task(_BaseTask):
     """A task container for the task queue."""
     
-    __slots__ = ('request', 'event', 'result', 'response', 'error', 'callback', 'timeout')
-    
-    def __init__(self, message, callback, timeout=None):
-        super(Task, self).__init__()
-        self.request = message
-        self.timeout = timeout
-        self.callback = WeakMethod(callback)
-        self.response = None
-        self.result = None
-        self.error = None
-        self.event = threading.Event()
-        
     def __call__(self, socket):
         """Handle this message."""
         socket.send_multipart(self.request.data)
@@ -42,18 +31,7 @@ class Task(object):
             self.error = e
         self.event.set()
         
-    def wait(self, timeout=None):
-        """Wait for this task to be finished."""
-        self.event.wait(timeout=get_timeout(timeout))
-        return self.event.isSet()
     
-    def get(self, timeout=None):
-        """Get the result."""
-        if not self.wait(timeout=timeout):
-            raise TimeoutError("Task timed out.")
-        elif self.error is not None:
-            raise self.error
-        return self.result
 
 class TaskQueue(threading.Thread):
     """A client task queue"""
