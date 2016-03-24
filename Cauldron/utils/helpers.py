@@ -114,9 +114,13 @@ class _Setting(object):
         """Represent this value"""
         return "<Setting {0}={1}>".format(self.name, self.value)
     
-    def __nonzero__(self):
+    def __bool__(self):
         """Cast this setting to it's own boolean value."""
         return bool(self.value)
+        
+    def __nonzero__(self):
+        """Cast setting to a boolean value (Python 2)"""
+        return self.__bool__()
         
     def on(self):
         """Turn this setting on."""
