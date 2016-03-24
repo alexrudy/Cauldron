@@ -129,7 +129,7 @@ class Service(ClientService):
                 return self._type_ktl_cache[name]
             message = self._synchronous_command("identify", payload=name, keyword=name, direction="CSQ")
             items = list(set(message.split(":")))
-            if len(items) == 1 and (items[0] not in (FRAMEBLANK, FRAMEFAIL)):
+            if len(items) == 1 and (items[0] not in (FRAMEBLANK.decode('utf-8'), FRAMEFAIL.decode('utf-8'))):
                 ktl_type = items[0]
             else:
                 raise KeyError("Keyword '{0}' does not exist.".format(name))

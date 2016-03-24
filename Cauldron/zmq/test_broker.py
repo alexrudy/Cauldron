@@ -2,6 +2,7 @@
 """Tests for the ZMQ Broker"""
 
 import pytest
+import six
 from .broker import ZMQBroker
 from .microservice import ZMQCauldronMessage
 from ..conftest import fail_if_not_teardown, available_backends
@@ -61,7 +62,7 @@ def socket(address, identity):
     import zmq
     ctx = zmq.Context.instance()
     socket = ctx.socket(zmq.REQ)
-    socket.IDENTITY = identity
+    socket.IDENTITY = six.text_type(identity).encode('utf-8')
     socket.connect(address)
     return socket
 

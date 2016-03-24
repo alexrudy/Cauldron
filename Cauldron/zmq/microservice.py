@@ -14,16 +14,16 @@ import uuid
 
 from ..exc import DispatcherError
 
-FRAMEBLANK = six.binary_type("\x01")
-FRAMEFAIL = six.binary_type("\x02")
-FRAMEDELIMITER = six.binary_type("")
+FRAMEBLANK = six.binary_type(b"\x01")
+FRAMEFAIL = six.binary_type(b"\x02")
+FRAMEDELIMITER = six.binary_type(b"")
 
 class MessageType(object):
     """A message direction object"""
     def __init__(self, origin, responder):
         super(MessageType, self).__init__()
-        self._origin = origin
-        self._responder = responder
+        self._origin = six.text_type(origin)
+        self._responder = six.text_type(responder)
         
     def __contains__(self, key):
         """Does the direction contain a key?"""
@@ -47,22 +47,22 @@ class MessageType(object):
     @property
     def forward(self):
         """Forward code."""
-        return "{0}{1}{2}".format(self._origin, self._responder, "Q")
+        return six.text_type("{0}{1}{2}".format(self._origin, self._responder, "Q"))
         
     @property
     def reply(self):
         """Reply code."""
-        return "{0}{1}{2}".format(self._origin, self._responder, "P")
+        return six.text_type("{0}{1}{2}".format(self._origin, self._responder, "P"))
         
     @property
     def error(self):
         """Error code"""
-        return "{0}{1}{2}".format(self._origin, self._responder, "E")
+        return six.text_type("{0}{1}{2}".format(self._origin, self._responder, "E"))
         
     @property
     def broadcast(self):
         """Broadcast code."""
-        return "{0}{1}{2}".format(self._origin, self._responder, "B")
+        return six.text_type("{0}{1}{2}".format(self._origin, self._responder, "B"))
         
     def path(self, code):
         """Path for a given code."""
@@ -177,6 +177,14 @@ class ZMQCauldronParserError(ZMQCauldronErrorResponse):
         response = ZMQCauldronMessage(command="parser", payload=message, direction="CDE")
         return cls(message, response)
 
+def decode(str_or_bytes):
+    """Decode"""
+    if isinstance(str_or_bytes, six.binary_type):
+        result = str_or_bytes.decode('utf-8')
+    else:
+        result = six.text_type(str_or_bytes)
+    return result
+
 class ZMQCauldronMessage(object):
     """A message object."""
     
@@ -185,16 +193,17 @@ class ZMQCauldronMessage(object):
     def __init__(self, command=FRAMEBLANK, service=FRAMEBLANK, dispatcher=FRAMEBLANK, 
         keyword=FRAMEBLANK, payload=FRAMEBLANK, direction="CDQ", prefix=None, identifier=None):
         super(ZMQCauldronMessage, self).__init__()
-        self.command = six.text_type(command or FRAMEBLANK)
-        self.service = six.text_type(service or FRAMEBLANK)
-        self.dispatcher = six.text_type(dispatcher or FRAMEBLANK)
-        self.keyword = six.text_type(keyword or FRAMEBLANK)
-        self.payload = six.text_type(payload or FRAMEBLANK)
+        self.command = decode(command or FRAMEBLANK)
+        self.service = decode(service or FRAMEBLANK)
+        self.dispatcher = decode(dispatcher or FRAMEBLANK)
+        self.keyword = decode(keyword or FRAMEBLANK)
+        self.payload = decode(payload or FRAMEBLANK)
+        direction = decode(direction)
         if direction not in DIRECTIONS.codes:
-            raise ValueError("Invalid choice of message direction: {0}".format(direction))
-        self.direction = six.text_type(direction)
+            raise ValueError("Invalid choice of message direction: {0} {1!r}".format(direction, DIRECTIONS.codes))
+        self.direction = decode(direction)
         self.identifier =  six.binary_type(identifier) if identifier is not None else uuid.uuid4().bytes
-        self.prefix = map(six.binary_type, prefix or [])
+        self.prefix = [six.binary_type(p) for p in (prefix or [])]
         
     def _parse_prefix(self):
         """Handle the prefix."""
@@ -243,13 +252,13 @@ class ZMQCauldronMessage(object):
         
     def verify(self, service):
         """Given a service object, verify that it matches this message."""
-        if self.service != FRAMEBLANK:
+        if self.service != FRAMEBLANK.decode('utf-8'):
             if self.service != service.name:
                 raise MessageVerifyError("Message was sent to the wrong service! Got {0} expected {1}".format(self.service, service.name))
         else:
             self.service = service.name
         
-        if self.dispatcher != FRAMEBLANK:
+        if self.dispatcher != FRAMEBLANK.decode('utf-8'):
             if hasattr(service, 'dispatcher') and self.dispatcher != service.dispatcher:
                 raise MessageVerifyError("Message was sent to the wrong dispatcher! Got {0} expected {1}".format(self.dispatcher, service.dispatcher))
         elif hasattr(service, 'dispatcher'):
@@ -264,7 +273,7 @@ class ZMQCauldronMessage(object):
     @property
     def data(self):
         """The full message data, to be sent over a ZMQ Socket.."""
-        return self.prefix + map(lambda s : s.encode('utf-8'), map(six.text_type, self._message_parts)) + [self.identifier]
+        return self.prefix + [ six.text_type(s).encode('utf-8') for s in self._message_parts] + [self.identifier]
         
     def __iter__(self):
         """Allow us to send messages directly."""
@@ -326,7 +335,7 @@ class ZMQCauldronMessage(object):
     def __repr__(self):
         """Represent the message, including prefix."""
         return "<{0} |{1}|{2}>".format(self.__class__.__name__,
-            "|".join(map(binascii.hexlify, self.prefix)), self.to_string())
+            "|".join([binascii.hexlify(p).decode('utf-8') for p in self.prefix]), self.to_string())
     
     @classmethod
     def parse(cls, data):
@@ -438,7 +447,7 @@ class ZMQMicroservice(threading.Thread):
                     self.log.log(5, "Responds {0!r}".format(response))
                     socket.send_multipart(response.data)
                 
-        except (zmq.ContextTerminated, weakref.ReferenceError, zmq.ZMQError) as e:
+        except (zmq.ContextTerminated, zmq.ZMQError) as e:
             self.log.log(5, "Service shutdown because '{0!r}'.".format(e))
             self._error = e
         except Exception as e:
@@ -489,7 +498,7 @@ class ZMQMicroservice(threading.Thread):
             self.running.clear()
             signal = self.ctx.socket(zmq.PAIR)
             signal.connect("inproc://{0:s}".format(hex(id(self))))
-            signal.send("", flags=zmq.NOBLOCK)
+            signal.send(b"", flags=zmq.NOBLOCK)
             signal.close(linger=0)
         self.running.clear()
         self.join()
