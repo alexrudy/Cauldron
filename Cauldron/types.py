@@ -88,7 +88,10 @@ class KeywordType(object):
     The name of each type specialization is available as the :attr:`KTL_TYPE` class attribute.
     """
     KTL_TYPE = None
+    """The KTL-API type name corresponding to this class."""
+    
     KTL_ALIASES = ()
+    """A list of additional KTL-API type names that can be used with this class."""
     
     def __init__(self, *args, **kwargs):
         super(KeywordType, self).__init__(*args, **kwargs)
