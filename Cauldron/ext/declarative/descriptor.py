@@ -7,6 +7,7 @@ from __future__ import absolute_import
 import weakref
 from .events import _DescriptorEvent, _KeywordEvent
 from .utils import descriptor__get__, hybridmethod
+from ...utils import ReferenceError
 from ...exc import CauldronException
 
 __all__ = ['KeywordDescriptor', 'DescriptorBase', 'ServiceNotBound', 'ServiceAlreadyBound', 'IntegrityError']
@@ -191,7 +192,7 @@ class KeywordDescriptor(object):
         """Represent"""
         try:
             repr_bind = " bound to {0}".format(self.service) if self.service is not None else ""
-        except weakref.ReferenceError:
+        except ReferenceError:
             repr_bind = ""
         
         return "<{0} name={1}{2}>".format(self.__class__.__name__, self.name, repr_bind)
@@ -323,7 +324,7 @@ class KeywordDescriptor(object):
         name = getattr(obj, self._name_attr, self.name)
         try:
             return self._service[name]
-        except (AttributeError, TypeError, weakref.ReferenceError):
+        except (AttributeError, TypeError, ReferenceError):
             raise ServiceNotBound("No service is bound to {0}".format(self))
         
 
