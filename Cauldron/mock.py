@@ -8,9 +8,12 @@ to respond to any client request.
 """
 from __future__ import absolute_import
 from .local.dispatcher import Service as LDService
+from .local.dispatcher import clear
 from . import registry
 
 __all__ = ['MDService', 'MCService']
+
+registry.dispatcher.teardown_for("mock")(clear)
 
 @registry.dispatcher.service_for("mock")
 class Service(LDService):
