@@ -116,7 +116,7 @@ setup(name=PACKAGENAME,
       long_description=LONG_DESCRIPTION,
       cmdclass=cmdclassd,
       zip_safe=False,
-      use_2to3=False,
+      use_2to3=True,
       entry_points=entry_points,
       include_package_data=True,
       **package_info
