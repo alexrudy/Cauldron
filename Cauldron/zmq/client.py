@@ -12,7 +12,7 @@ from .common import zmq_get_address, check_zmq, teardown, zmq_connect_socket
 from .microservice import ZMQCauldronMessage, ZMQCauldronErrorResponse, FRAMEBLANK, FRAMEFAIL
 from .tasker import Task, TaskQueue
 from .. import registry
-from ..config import cauldron_configuration
+from ..config import get_configuration, get_timeout
 
 import six
 import threading
@@ -52,7 +52,7 @@ class _ZMQMonitorThread(threading.Thread):
             return
         socket = ctx.socket(zmq.SUB)
         try:
-            zmq_connect_socket(socket, self.service._config, "subscribe", log=self.log, label='client-monitor', address=self.address)
+            zmq_connect_socket(socket, get_configuration(), "subscribe", log=self.log, label='client-monitor', address=self.address)
             # Accept everything belonging to this service.
             socket.setsockopt_string(zmq.SUBSCRIBE, six.text_type(self.service.name))
             
@@ -109,7 +109,7 @@ class Service(ClientService):
         
         zmq = check_zmq()
         socket = self.ctx.socket(zmq.REQ)
-        zmq_connect_socket(socket, self._config, "broker", log=self.log, label='client')
+        zmq_connect_socket(socket, get_configuration(), "broker", log=self.log, label='client')
         self._sockets.socket = socket
         return socket
         
