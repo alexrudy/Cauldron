@@ -115,7 +115,7 @@ class Service(ClientService):
     def _prepare(self):
         """Prepare step."""
         self._monitor = _ZMQMonitorThread(self)
-        self._tasker = TaskQueue(get_configuration(), ctx=self.ctx, log=self.log)
+        self._tasker = TaskQueue(self.name, ctx=self.ctx, log=self.log)
         self._tasker.start()
         address = self._synchronous_command("lookup", "subscribe", direction="CBQ")
         self._monitor.address = address

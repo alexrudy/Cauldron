@@ -57,11 +57,11 @@ class Task(object):
 
 class TaskQueue(threading.Thread):
     """A client task queue"""
-    def __init__(self, config, ctx=None, log=None):
-        super(TaskQueue, self).__init__(name="Task Queue")
+    def __init__(self, name, ctx=None, log=None):
+        super(TaskQueue, self).__init__(name="Task Queue for {0:s}".format(name))
         self.queue = queue.Queue()
         self.ctx = ctx or zmq.Context.instance()
-        self.log = log or logging.getLogger("ktl.zmq.TaskQueue")
+        self.log = log or logging.getLogger("ktl.zmq.TaskQueue.{0:s}".format(name))
         self.daemon = True
         self.shutdown = threading.Event()
         

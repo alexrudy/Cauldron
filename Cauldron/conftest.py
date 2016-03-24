@@ -99,7 +99,7 @@ def config(tmpdir):
     cauldron_configuration.set("zmq", "broker", "inproc://broker")
     cauldron_configuration.set("zmq", "publish", "inproc://publish")
     cauldron_configuration.set("zmq", "subscribe", "inproc://subscribe")
-    cauldron_configuration.set("core", "timeout", "10")
+    cauldron_configuration.set("core", "timeout", "2")
     return cauldron_configuration
     
 @pytest.fixture
@@ -111,7 +111,6 @@ SEEN_THREADS = WeakSet()
 def fail_if_not_teardown():
     """Fail if teardown has not happedned properly."""
     from Cauldron.api import teardown, CAULDRON_SETUP
-    print("Teardown...")
     teardown()
     failures = ["DFW", "ktl", "_DFW", "_ktl"]
     if CAULDRON_SETUP:
