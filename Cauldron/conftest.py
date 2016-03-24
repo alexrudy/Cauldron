@@ -99,6 +99,7 @@ def config(tmpdir):
     cauldron_configuration.set("zmq", "broker", "inproc://broker")
     cauldron_configuration.set("zmq", "publish", "inproc://publish")
     cauldron_configuration.set("zmq", "subscribe", "inproc://subscribe")
+    cauldron_configuration.set("core", "timeout", "10")
     return cauldron_configuration
     
 @pytest.fixture

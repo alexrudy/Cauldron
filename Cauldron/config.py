@@ -57,14 +57,19 @@ def get_configuration():
     Cauldron = sys.modules[BASENAME]
     return Cauldron.configuration
     
+_timeouts = {}
 def get_timeout(timeout):
     """Get the configured default timeout."""
     if timeout is None:
         config = get_configuration()
         try:
-            timeout = config.getfloat('core', 'timeout')
-        except configparser.NoOptionError:
-            pass
+            timeout = _timeouts[id(config)]
+        except KeyError:
+            try:
+                timeout = config.getfloat('core', 'timeout')
+            except configparser.NoOptionError:
+                pass
+            _timeouts[id(config)] = timeout
     return timeout
     
 @registry.dispatcher.setup_for('all')

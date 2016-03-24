@@ -93,7 +93,6 @@ class Service(ClientService):
         zmq = check_zmq()
         self.ctx = zmq.Context.instance()
         self._sockets = threading.local()
-        self._config = cauldron_configuration
         self._monitor = None
         self._tasker = None
         self._lock = threading.RLock()
@@ -116,7 +115,7 @@ class Service(ClientService):
     def _prepare(self):
         """Prepare step."""
         self._monitor = _ZMQMonitorThread(self)
-        self._tasker = TaskQueue(self._config, ctx=self.ctx, log=self.log)
+        self._tasker = TaskQueue(get_configuration(), ctx=self.ctx, log=self.log)
         self._tasker.start()
         address = self._synchronous_command("lookup", "subscribe", direction="CBQ")
         self._monitor.address = address
@@ -178,12 +177,13 @@ class Service(ClientService):
         
         callback = callback or self._handle_response
         
-        task = Task(request, callback, timeout)
+        task = Task(request, callback, get_timeout(timeout))
         self._tasker.queue.put(task)
         return task
         
     def _synchronous_command(self, command, payload, keyword=None, direction="CDQ", timeout=None, callback=None):
         """Execute a synchronous command."""
+        timeout = get_timeout(timeout)
         task = self._asynchronous_command(command, payload, keyword, direction, timeout, callback)
         return task.get(timeout=timeout)
         
@@ -223,7 +223,7 @@ class Keyword(ClientKeyword):
         
     def wait(self, timeout=None, operator=None, value=None, sequence=None, reset=False, case=False):
         if sequence is not None:
-            return sequence.wait(timeout=timeout)
+            return sequence.wait(timeout=get_timeout(timeout))
         raise CauldronAPINotImplemented("Asynchronous expression operations are not supported for Cauldron.zmq")
     
     def monitor(self, start=True, prime=True, wait=True):

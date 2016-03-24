@@ -9,6 +9,8 @@ import zmq
 from .common import zmq_connect_socket
 from .microservice import ZMQCauldronMessage
 from ..utils.callbacks import WeakMethod
+from ..exc import TimeoutError
+from ..config import get_configuration, get_timeout
 
 class Task(object):
     """A task container for the task queue."""
@@ -42,7 +44,7 @@ class Task(object):
         
     def wait(self, timeout=None):
         """Wait for this task to be finished."""
-        self.event.wait(timeout=timeout)
+        self.event.wait(timeout=get_timeout(timeout))
         return self.event.isSet()
     
     def get(self, timeout=None):
@@ -59,7 +61,6 @@ class TaskQueue(threading.Thread):
         super(TaskQueue, self).__init__(name="Task Queue")
         self.queue = queue.Queue()
         self.ctx = ctx or zmq.Context.instance()
-        self.config = config
         self.log = log or logging.getLogger("ktl.zmq.TaskQueue")
         self.daemon = True
         self.shutdown = threading.Event()
@@ -67,7 +68,7 @@ class TaskQueue(threading.Thread):
     def run(self):
         """Run the task queue thread."""
         socket = self.ctx.socket(zmq.REQ)
-        zmq_connect_socket(socket, self.config, "broker", log=self.log, label='client')
+        zmq_connect_socket(socket, get_configuration(), "broker", log=self.log, label='client')
         while not self.shutdown.isSet():
             try:
                 task = self.queue.get()
