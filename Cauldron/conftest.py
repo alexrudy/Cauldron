@@ -162,16 +162,9 @@ def backend(request, config):
     request.addfinalizer(fail_if_not_teardown)
     
     if request.param == 'zmq':
-        print(config.items('zmq'))
         from Cauldron.zmq.broker import ZMQBroker
-        if not ZMQBroker.check(timeout=0.01):
-            b = ZMQBroker.thread(config=config)
-            b.running.wait(timeout=2.0)
-            if not b.running.is_set():
-                msg = "Couldn't start ZMQ broker."
-                if b._error is not None:
-                    msg += " Error: " + repr(b._error)
-                raise RuntimeError(msg)
+        b = ZMQBroker.setup(config=config, timeout=0.01)
+        if b:
             request.addfinalizer(b.stop)
     return request.param
 

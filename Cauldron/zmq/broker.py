@@ -487,6 +487,21 @@ class ZMQBroker(threading.Thread):
         obj.daemon = daemon
         obj.start()
         return obj
+        
+    @classmethod
+    def setup(cls, config=None, timeout=2.0):
+        """Ensure a broker is set up to start."""
+        if not cls.check(timeout=timeout):
+            b = cls.thread(config=config)
+            b.running.wait(timeout=min([timeout, 2.0]))
+            if not b.running.is_set():
+                msg = "Couldn't start ZMQ broker."
+                if b._error is not None:
+                    msg += " Error: " + repr(b._error)
+                raise RuntimeError(msg)
+            return b
+        else:
+            return None
     
     @classmethod
     def check(cls, config=None, timeout=2.0, ctx=None, address=None):
