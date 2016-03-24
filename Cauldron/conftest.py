@@ -92,6 +92,26 @@ def servicename():
     """Get the service name."""
     return "testsvc"
     
+@pytest.fixture
+def servicename2():
+    """Get a second servicename"""
+    return "testaltsvc"
+    
+MAX_KEYWORD_NUBMER = 4
+def pytest_generate_tests(metafunc):
+    for fixture in metafunc.fixturenames:
+        if fixture.startswith("keyword_name_"):
+            postfix = fixture[len("keyword_name_"):]
+            metafunc.parametrize(fixture, ["KEYWORD_{:s}".format(postfix)])
+        elif fixture.startswith("keyword_name"):
+            number = int("0"+fixture[len("keyword_name"):])
+            if number > MAX_KEYWORD_NUBMER:
+                raise ValueError("Fixture {0} doesn't represent a known keyword.".format(fixture))
+            metafunc.parametrize(fixture, ["KEYWORD{:d}".format(number)])
+        if fixture.startswith("missing_keyword_name"):
+            postfix = fixture[len("missing_keyword_name"):]
+            metafunc.parametrize(fixture, ["MISSINGKEYWORD{:s}".format(postfix)])
+    
 @pytest.fixture(scope='function')
 def config(tmpdir):
     """DFW configuration."""
@@ -172,6 +192,12 @@ def backend(request, config):
 def dispatcher_name():
     """The dispatcher name"""
     return "+service+_dispatch_1"
+
+@pytest.fixture
+def dispatcher_name2():
+    """The dispatcher name"""
+    return "+service+_dispatch_2"
+
 
 @pytest.fixture
 def dispatcher(request, backend, servicename, config, dispatcher_name):
