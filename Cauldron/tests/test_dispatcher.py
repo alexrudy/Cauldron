@@ -200,7 +200,8 @@ def test_async_read(dispatcher, servicename):
     from Cauldron import ktl
     client = ktl.Service(servicename)
     task = client["KEYWORD"].read(wait=False)
-    assert task.get(timeout=0.1) == '1'
+    client["KEYWORD"].wait(sequence=task)
+    assert client["KEYWORD"]['ascii'] == '1'
     
 def test_async_write(dispatcher, servicename):
     """Aysnchronous writer"""
@@ -210,7 +211,7 @@ def test_async_write(dispatcher, servicename):
     from Cauldron import ktl
     client = ktl.Service(servicename)
     task = client["KEYWORD"].write('2', wait=False)
-    task.get(timeout=0.1)
+    client["KEYWORD"].wait(sequence=task)
     assert dkwd.value == '2'
 
 def test_broadcast(dispatcher):

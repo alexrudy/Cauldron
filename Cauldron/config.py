@@ -19,7 +19,8 @@ from six.moves import configparser
 
 from .exc import ConfigurationMissing
 from . import registry
-from .api import BASENAME
+
+BASENAME = ".".join(__name__.split(".")[:-1])
 
 __all__ = ['default_configuration', 'read_configuration', 'cauldron_configuration']
 

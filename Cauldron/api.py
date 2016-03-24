@@ -13,6 +13,7 @@ import logging
 import pkg_resources
 
 from . import registry
+from .config import get_configuration
 from .utils.helpers import _Setting
 
 __all__ = ['install', 'use', 'teardown', 'use_strict_xml', 'STRICT_KTL_XML', 'APISetting']
@@ -191,6 +192,13 @@ def setup_entry_points():
             obj()
     CAULDRON_ENTRYPOINT_SETUP.on()
     return
+    
+@registry.client.setup_for('all')
+@registry.dispatcher.setup_for('all')
+def setup_xml_from_config():
+    """Setup XML from configuation."""
+    if get_configuration().getboolean('core', 'strictxml'):
+        STRICT_KTL_XML.on()
 
 @registry.client.setup_for('all')
 def setup_client_service_module():
