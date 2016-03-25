@@ -102,15 +102,15 @@ def pytest_generate_tests(metafunc):
     for fixture in metafunc.fixturenames:
         if fixture.startswith("keyword_name_"):
             postfix = fixture[len("keyword_name_"):]
-            metafunc.parametrize(fixture, ["KEYWORD_{:s}".format(postfix)])
+            metafunc.parametrize(fixture, ["KEYWORD_{0:s}".format(postfix)])
         elif fixture.startswith("keyword_name"):
             number = int("0"+fixture[len("keyword_name"):])
             if number > MAX_KEYWORD_NUBMER:
                 raise ValueError("Fixture {0} doesn't represent a known keyword.".format(fixture))
-            metafunc.parametrize(fixture, ["KEYWORD{:d}".format(number)])
+            metafunc.parametrize(fixture, ["KEYWORD{0:d}".format(number)])
         if fixture.startswith("missing_keyword_name"):
             postfix = fixture[len("missing_keyword_name"):]
-            metafunc.parametrize(fixture, ["MISSINGKEYWORD{:s}".format(postfix)])
+            metafunc.parametrize(fixture, ["MISSINGKEYWORD{0:s}".format(postfix)])
     
 @pytest.fixture(scope='function')
 def config(tmpdir):
