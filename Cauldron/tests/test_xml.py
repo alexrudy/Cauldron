@@ -24,7 +24,7 @@ def test_xml_Service(xmlpath, servicename):
 def test_Service_with_xml(xmlvar, backend, servicename, config):
     """Test a service with XML."""
     from Cauldron import DFW
-    svc = DFW.Service(servicename, config)
+    svc = DFW.Service(servicename, config, dispatcher='+service+_dispatch_1')
     try:
         assert svc.xml is not None
         assert "LOOP" in svc
