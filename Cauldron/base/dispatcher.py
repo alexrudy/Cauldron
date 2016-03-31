@@ -307,8 +307,8 @@ class Service(object):
         else:
             # Implementors will be expected to assign Keyword instances
             # for each KTL keyword in this KTL service.
-            if STRICT_KTL_XML:
-                for keyword in self.xml.list():
+            for keyword in self.xml.list():
+                if self.dispatcher == get_dispatcher_XML(self, keyword):
                     self._keywords[keyword] = None
         
         self._prepare()
