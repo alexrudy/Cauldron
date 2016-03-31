@@ -7,6 +7,7 @@ from __future__ import absolute_import
 import weakref
 from .events import _DescriptorEvent, _KeywordEvent
 from .utils import descriptor__get__, hybridmethod
+from ...utils import ReferenceError
 from ...exc import CauldronException
 
 __all__ = ['KeywordDescriptor', 'DescriptorBase', 'ServiceNotBound', 'ServiceAlreadyBound', 'IntegrityError']
@@ -123,6 +124,7 @@ class KeywordDescriptor(object):
     
     _EVENTS = ['preread', 'read', 'postread', 'prewrite', 'write', 'postwrite', 'check']
     _service = None
+    _bound = False
     
     def __init__(self, name, initial=None, type=lambda v : v, doc=None, readonly=False, writeonly=False):
         super(KeywordDescriptor, self).__init__()
@@ -148,16 +150,49 @@ class KeywordDescriptor(object):
         self.callback = _DescriptorEvent("_propogate", replace_method=False)
         self._events.append(self.callback)
         
+        self._name_attr = "_{0}_name_{1}".format(self.__class__.__name__, self.name)
         self._attr = "_{0}_{1}".format(self.__class__.__name__, self.name)
         self._initial = initial
-        self._attr_initial = initial
+        self._orig_initial = initial
         self._bound = False
         
+    @property
+    def name(self):
+        """Keyword name"""
+        return self._name
+        
+    @name.setter
+    def name(self, value):
+        """Set the keyword name."""
+        if self._bound:
+            raise ServiceAlreadyBound("Can't change the name of the keyword after the service has bound to it.")
+        self._name = str(value).upper()
+    
+    def set_bound_name(self, obj, value):
+        """Set a bound name."""
+        if self._bound:
+            raise ServiceAlreadyBound("Can't change the name of the keyword after the service has bound to it.")
+        
+        # Set the new name value.
+        setattr(obj, self._name_attr, str(value).upper())
+        
+        # Compute the initial value.
+        try:
+            initial = str(self.type(getattr(obj, self._attr, self._initial)))
+        except TypeError:
+            # We catch this error in case it was caused because no initial value was set.
+            # If an initial value was set, then we want to raise this back to the user.
+            if not (self._initial is None and not hasattr(obj, self._attr)):
+                raise
+        
+        attr = "_{0}_{1}".format(self.__class__.__name__, str(value).upper())
+        setattr(obj, attr, initial)
+    
     def __repr__(self):
         """Represent"""
         try:
             repr_bind = " bound to {0}".format(self.service) if self.service is not None else ""
-        except weakref.ReferenceError:
+        except ReferenceError:
             repr_bind = ""
         
         return "<{0} name={1}{2}>".format(self.__class__.__name__, self.name, repr_bind)
@@ -168,35 +203,40 @@ class KeywordDescriptor(object):
         if self.writeonly:
             raise ValueError("Keyword {0} is write-only.".format(self.name))
         try:
-            return self.type(self.keyword.update())
+            return self.type(self.keyword(obj).update())
         except ServiceNotBound:
-            return self.type(getattr(obj, self._attr, self._attr_initial))
+            name = getattr(obj, self._name_attr, self.name)
+            attr = "_{0}_{1}".format(self.__class__.__name__, name.upper())
+            return self.type(getattr(obj, attr, self._orig_initial))
         
     def __set__(self, obj, value):
         """Set the value."""
         if self.readonly:
             raise ValueError("Keyword {0} is read-only.".format(self.name))
         try:
-            return self.keyword.modify(str(self.type(value)))
+            return self.keyword(obj).modify(str(self.type(value)))
         except ServiceNotBound:
-            return setattr(obj, self._attr, self.type(value))
+            name = getattr(obj, self._name_attr, self.name)
+            attr = "_{0}_{1}".format(self.__class__.__name__, name.upper())
+            return setattr(obj, attr, self.type(value))
         
     def _bind_initial_value(self, obj):
         """Bind the initial value for this service."""
         # We do this here to retain a reference to the same keyword object
         # thoughout the course of this function.
-        keyword = self.keyword
+        keyword = self.keyword(obj)
+        attr = "_{0}_{1}".format(self.__class__.__name__, keyword.name.upper())
         
         # Compute the initial value.
         try:
-            initial = str(self.type(getattr(obj, self._attr, self._initial)))
+            initial = str(self.type(getattr(obj, attr, self._initial)))
         except TypeError:
             # We catch this error in case it was caused because no initial value was set.
             # If an initial value was set, then we want to raise this back to the user.
-            if not (self._initial is None and not hasattr(obj, self._attr)):
+            if not (self._initial is None and not hasattr(obj, attr)):
                 raise
         else:
-            if getattr(obj, self._attr, self._initial) is None:
+            if getattr(obj, attr, self._initial) is None:
                 # Do nothing if it was really None everywhere.
                 pass
             elif keyword['value'] is None:
@@ -211,9 +251,11 @@ class KeywordDescriptor(object):
         
         # Clean up the instance initial values.
         try:
-            delattr(obj, self._attr)
+            delattr(obj, attr)
         except AttributeError:
             pass
+            
+        self._initial = None
         
         
     def bind(self, obj, service=None):
@@ -250,11 +292,11 @@ class KeywordDescriptor(object):
         elif service is not None and service.name != self.service.name and self._bound:
             raise ServiceAlreadyBound("Service {0!r} is already bound to {1}".format(self.service, self))
         
-        if not self._bound:
-            self._bind_initial_value(obj)
+        # if not self._bound:
+        self._bind_initial_value(obj)
         
         for event in self._events:
-            _KeywordEvent(self.keyword, obj, event)
+            _KeywordEvent(self.keyword(obj), obj, event)
             
         self._bound = True
         
@@ -277,12 +319,12 @@ class KeywordDescriptor(object):
         """Delete service."""
         self._service = None
         
-    @property
-    def keyword(self):
+    def keyword(self, obj):
         """The keyword instance for this descriptor."""
+        name = getattr(obj, self._name_attr, self.name)
         try:
-            return self._service[self.name]
-        except (AttributeError, TypeError, weakref.ReferenceError):
+            return self._service[name]
+        except (AttributeError, TypeError, ReferenceError):
             raise ServiceNotBound("No service is bound to {0}".format(self))
         
 

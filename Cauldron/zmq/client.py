@@ -10,8 +10,9 @@ from ..base import ClientService, ClientKeyword
 from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented, DispatcherError, TimeoutError
 from .common import zmq_get_address, check_zmq, teardown, zmq_connect_socket
 from .microservice import ZMQCauldronMessage, ZMQCauldronErrorResponse, FRAMEBLANK, FRAMEFAIL
+from .tasker import Task, TaskQueue
 from .. import registry
-from ..config import cauldron_configuration
+from ..config import get_configuration, get_timeout
 
 import six
 import threading
@@ -51,7 +52,7 @@ class _ZMQMonitorThread(threading.Thread):
             return
         socket = ctx.socket(zmq.SUB)
         try:
-            zmq_connect_socket(socket, self.service._config, "subscribe", log=self.log, label='client-monitor', address=self.address)
+            zmq_connect_socket(socket, get_configuration(), "subscribe", log=self.log, label='client-monitor', address=self.address)
             # Accept everything belonging to this service.
             socket.setsockopt_string(zmq.SUBSCRIBE, six.text_type(self.service.name))
             
@@ -92,8 +93,8 @@ class Service(ClientService):
         zmq = check_zmq()
         self.ctx = zmq.Context.instance()
         self._sockets = threading.local()
-        self._config = cauldron_configuration
-        self._thread = None
+        self._monitor = None
+        self._tasker = None
         self._lock = threading.RLock()
         self._type_ktl_cache = {}
         super(Service, self).__init__(name, populate)
@@ -107,16 +108,18 @@ class Service(ClientService):
         
         zmq = check_zmq()
         socket = self.ctx.socket(zmq.REQ)
-        zmq_connect_socket(socket, self._config, "broker", log=self.log, label='client')
+        zmq_connect_socket(socket, get_configuration(), "broker", log=self.log, label='client')
         self._sockets.socket = socket
         return socket
         
     def _prepare(self):
         """Prepare step."""
-        self._thread = _ZMQMonitorThread(self)
-        address = self._synchronous_command("lookup", "subscribe", direction="CBQ").payload
-        self._thread.address = address
-        self._thread.start()
+        self._monitor = _ZMQMonitorThread(self)
+        self._tasker = TaskQueue(self.name, ctx=self.ctx, log=self.log)
+        self._tasker.start()
+        address = self._synchronous_command("lookup", "subscribe", direction="CBQ")
+        self._monitor.address = address
+        self._monitor.start()
         
     def _ktl_type(self, key):
         """Get the KTL type of a specific keyword."""
@@ -125,8 +128,8 @@ class Service(ClientService):
             if name in self._type_ktl_cache:
                 return self._type_ktl_cache[name]
             message = self._synchronous_command("identify", payload=name, keyword=name, direction="CSQ")
-            items = list(set(message.payload.split(":")))
-            if len(items) == 1 and (items[0] not in (FRAMEBLANK, FRAMEFAIL)):
+            items = list(set(message.split(":")))
+            if len(items) == 1 and (items[0] not in (FRAMEBLANK.decode('utf-8'), FRAMEFAIL.decode('utf-8'))):
                 ktl_type = items[0]
             else:
                 raise KeyError("Keyword '{0}' does not exist.".format(name))
@@ -138,13 +141,12 @@ class Service(ClientService):
         self.shutdown()
         
     def shutdown(self):
-        """When this client is shutdown, close the subscription thread."""
-        if hasattr(self, '_thread'):
-            self._thread.stop()
-            self.log.debug("Joined monitor thread.")
+        if hasattr(self, '_monitor'):
+            self._monitor.stop()
+        if hasattr(self, '_tasker'):
+            self._tasker.stop()
         
     def has_keyword(self, name):
-        """Check if a dispatcher has a keyword."""
         assert name.upper() != self.name.upper()
         name = name.upper()
         try:
@@ -155,29 +157,36 @@ class Service(ClientService):
             return True
         
     def keywords(self):
-        """List all available keywords."""
         message = self._synchronous_command("enumerate", FRAMEBLANK, direction="CSQ")
-        return message.payload.split(":")
+        return message.split(":")
         
-    def _synchronous_command(self, command, payload, keyword=None, direction="CDQ", timeout=None):
-        """Execute a synchronous command."""
-        request = ZMQCauldronMessage(command, direction=direction,
-            service=self.name, dispatcher=FRAMEBLANK,
-            keyword=keyword if keyword else FRAMEBLANK, 
-            payload=payload if payload else FRAMEBLANK)
-        self.log.log(5, "{0!r}.send({1!s})".format(self, request))
-        self.socket.send_multipart(request.data)
-        
-        if timeout:
-            if not self.socket.poll(timeout * 1e3):
-                raise TimeoutError("Dispatcher timed out.")
-        
-        message = ZMQCauldronMessage.parse(self.socket.recv_multipart())
+    def _handle_response(self, message):
+        """Handle a response, and return the payload."""
         self.log.log(5, "{0!r}.recv({1!s})".format(self, message))
         if message.iserror:
             raise DispatcherError("Dispatcher error on command: {0}".format(message.payload))
         message.verify(self)
-        return message
+        return message.payload
+    
+    def _asynchronous_command(self, command, payload, keyword=None, direction="CDQ", timeout=None, callback=None):
+        """Run an asynchronous command."""
+        request = ZMQCauldronMessage(command, direction=direction,
+            service=self.name, dispatcher=FRAMEBLANK,
+            keyword=keyword if keyword else FRAMEBLANK, 
+            payload=payload if payload else FRAMEBLANK)
+        
+        callback = callback or self._handle_response
+        
+        task = Task(request, callback, get_timeout(timeout))
+        self._tasker.queue.put(task)
+        return task
+        
+    def _synchronous_command(self, command, payload, keyword=None, direction="CDQ", timeout=None, callback=None):
+        """Execute a synchronous command."""
+        timeout = get_timeout(timeout)
+        task = self._asynchronous_command(command, payload, keyword, direction, timeout, callback)
+        return task.get(timeout=timeout)
+        
     
 @registry.client.keyword_for("zmq")
 class Keyword(ClientKeyword):
@@ -193,49 +202,65 @@ class Keyword(ClientKeyword):
         
     def _ktl_monitored(self):
         """Is this keyword monitored."""
-        return self.name in self.service._thread.monitored
+        return self.name in self.service._monitor.monitored
+        
+    def _handle_response(self, message):
+        """Handle a response, and return the payload."""
+        self.service.log.log(5, "{0!r}.recv({1!s})".format(self, message))
+        if message.iserror:
+            raise DispatcherError("Dispatcher error on command: {0}".format(message.payload))
+        message.verify(self.service)
+        self._update(message.payload)
+        return self._current_value(binary=False, both=False)
+        
+    def _asynchronous_command(self, command, payload, timeout=None, callback=None):
+        """Execute a synchronous command."""
+        return self.service._asynchronous_command(command, payload, self.name, timeout=timeout, callback=self._handle_response)
         
     def _synchronous_command(self, command, payload, timeout=None):
         """Execute a synchronous command."""
         return self.service._synchronous_command(command, payload, self.name, timeout=timeout)
         
     def wait(self, timeout=None, operator=None, value=None, sequence=None, reset=False, case=False):
-        raise CauldronAPINotImplemented("Asynchronous operations are not supported for Cauldron.zmq")
+        if sequence is not None:
+            return sequence.wait(timeout=get_timeout(timeout))
+        raise CauldronAPINotImplemented("Asynchronous expression operations are not supported for Cauldron.zmq")
     
     def monitor(self, start=True, prime=True, wait=True):
         if start:
             if prime:
                 self.read(wait=wait)
-            self.service._thread.monitored.add(self.name)
+            self.service._monitor.monitored.add(self.name)
         else:
-            self.service._thread.monitored.remove(self.name)
+            self.service._monitor.monitored.remove(self.name)
     
     def read(self, binary=False, both=False, wait=True, timeout=None):
-        """Read a value, synchronously, always."""
-        
         if not self['reads']:
             raise NotImplementedError("Keyword '{0}' does not support reads.".format(self.name))
         
-        if not wait or timeout is not None:
-            warnings.warn("Cauldron.zmq doesn't support asynchronous reads.", CauldronAPINotImplementedWarning)
-        
-        message = self._synchronous_command("update", "", timeout=timeout)
-        self._update(message.payload)
-        return self._current_value(binary=binary, both=both)
+        task = self._asynchronous_command("update", "", timeout=timeout)
+        if wait is True:
+            task.wait(timeout=timeout)
+            return self._current_value(binary=binary, both=both)
+        else:
+            return task
         
     def write(self, value, wait=True, binary=False, timeout=None):
-        """Write a value"""
         if not self['writes']:
             raise NotImplementedError("Keyword '{0}' does not support writes.".format(self.name))
         
-        if not wait:
-            warnings.warn("Cauldron.zmq doesn't support asynchronous writes.", CauldronAPINotImplementedWarning)
-            
         # User-facing convenience to make writes smoother.
         try:
             value = self.cast(value)
         except (TypeError, ValueError):
             pass
-        message = self._synchronous_command("modify", value, timeout=timeout)
+        task = self._asynchronous_command("modify", value, timeout=timeout)
+        
+        if wait:
+            task.wait(timeout=timeout)
+            if task.error is not None:
+                raise task.error
+        else:
+            return task
         
         

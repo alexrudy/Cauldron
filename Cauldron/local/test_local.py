@@ -5,19 +5,21 @@ Tests specific to the local backend.
 
 import pytest
 pytestmark = pytest.mark.usefixtures("teardown_cauldron")
+from ..conftest import fail_if_not_teardown
 
 @pytest.fixture
-def uselocal(request):
+def backend(request):
     """Use the local backend."""
     from Cauldron.api import use
     use('local')
+    request.addfinalizer(fail_if_not_teardown)
 
 @pytest.fixture
-def local_service(uselocal, servicename, config):
+def local_service(backend, servicename, config, keyword_name):
     """docstring for local_service"""
     from Cauldron.DFW import Service
     svc = Service(servicename, config=config)
-    mykw = svc['KEYWORD']
+    mykw = svc[keyword_name]
     return svc
     
 @pytest.fixture
@@ -26,23 +28,23 @@ def local_client(local_service, servicename):
     from Cauldron import ktl
     return ktl.Service(servicename)
 
-def test_duplicate_services(uselocal):
+def test_duplicate_services(backend, servicename):
     """Test duplicate services."""
     from Cauldron.DFW import Service
-    svc = Service("MYSERVICE", config=None)
+    svc = Service(servicename, config=None)
     with pytest.raises(ValueError):
-        svc2 = Service("MYSERVICE", config=None)
-    svc3 = Service.get_service("MYSERVICE")
+        svc2 = Service(servicename, config=None)
+    svc3 = Service.get_service(servicename)
     assert svc3 is svc
     
-def test_client_not_started(uselocal, servicename):
+def test_client_not_started(backend, servicename):
     """Use local, but fail when a client hasn't been started yet."""
     from Cauldron.exc import ServiceNotStarted
     from Cauldron.ktl import Service
     with pytest.raises(ServiceNotStarted):
         Service(servicename)
     
-def test_monitor(local_service, local_client):
+def test_monitor(local_service, local_client, keyword_name):
     """Test monitoring"""
     
     def monitor(keyword):
@@ -52,21 +54,21 @@ def test_monitor(local_service, local_client):
     
     monitor.monitored = False
     
-    local_client["KEYWORD"].callback(monitor)
-    local_client["KEYWORD"].monitor(prime=False)
-    assert len(local_client['KEYWORD']._callbacks) == 1
+    local_client[keyword_name].callback(monitor)
+    local_client[keyword_name].monitor(prime=False)
+    assert len(local_client[keyword_name]._callbacks) == 1
     assert not monitor.monitored
-    assert len(local_service["KEYWORD"]._consumers) == 1
-    local_service["KEYWORD"].modify("SomeValue")
+    assert len(local_service[keyword_name]._consumers) == 1
+    local_service[keyword_name].modify("SomeValue")
     assert monitor.monitored
-    local_client["KEYWORD"].callback(monitor, remove=True)
-    assert len(local_client['KEYWORD']._callbacks) == 0
-    local_client["KEYWORD"].callback(monitor, preferred=True)
-    local_client["KEYWORD"].monitor(prime=True)
-    local_client["KEYWORD"].monitor(start=False)
-    assert len(local_service['KEYWORD']._consumers) == 0
+    local_client[keyword_name].callback(monitor, remove=True)
+    assert len(local_client[keyword_name]._callbacks) == 0
+    local_client[keyword_name].callback(monitor, preferred=True)
+    local_client[keyword_name].monitor(prime=True)
+    local_client[keyword_name].monitor(start=False)
+    assert len(local_service[keyword_name]._consumers) == 0
     
-def test_recursive_callback(local_service, local_client):
+def test_recursive_callback(local_service, local_client, keyword_name):
     """Test a recursive callback invoke"""
     def cb(keyword):
         cb.count += 1
@@ -77,17 +79,17 @@ def test_recursive_callback(local_service, local_client):
         print(keyword, type(keyword))
     
     cb.count = 0
-    local_client["KEYWORD"].callback(cb)
-    local_client["KEYWORD"].monitor(prime=False)
-    local_service["KEYWORD"].callback(cb2)
-    assert len(local_client['KEYWORD']._callbacks) == 1
-    assert len(local_service["KEYWORD"]._consumers) == 1
-    local_service["KEYWORD"].modify("SomeValue")
+    local_client[keyword_name].callback(cb)
+    local_client[keyword_name].monitor(prime=False)
+    local_service[keyword_name].callback(cb2)
+    assert len(local_client[keyword_name]._callbacks) == 1
+    assert len(local_service[keyword_name]._consumers) == 1
+    local_service[keyword_name].modify("SomeValue")
     assert cb.count == 2
-    assert local_client["KEYWORD"]['ascii'] == "OtherValue"
-    assert local_service["KEYWORD"].value == "OtherValue"
+    assert local_client[keyword_name]['ascii'] == "OtherValue"
+    assert local_service[keyword_name].value == "OtherValue"
 
-def test_subscribe(local_service, local_client):
+def test_subscribe(local_service, local_client, keyword_name):
     """Test monitoring"""
     
     def monitor(keyword):
@@ -97,45 +99,61 @@ def test_subscribe(local_service, local_client):
     
     monitor.monitored = False
     
-    local_client["KEYWORD"].callback(monitor)
-    local_client["KEYWORD"].subscribe(prime=False)
-    assert len(local_client['KEYWORD']._callbacks) == 1
+    local_client[keyword_name].callback(monitor)
+    local_client[keyword_name].subscribe(prime=False)
+    assert len(local_client[keyword_name]._callbacks) == 1
     assert not monitor.monitored
-    assert len(local_service["KEYWORD"]._consumers) == 1
-    local_service["KEYWORD"].modify("SomeValue")
+    assert len(local_service[keyword_name]._consumers) == 1
+    local_service[keyword_name].modify("SomeValue")
     assert monitor.monitored
     
 @pytest.mark.xfail
-def test_write_async(local_service, local_client, recwarn):
+def test_write_async(local_service, local_client, recwarn, keyword_name):
     """Test local asynchronous write."""
     from Cauldron.exc import CauldronAPINotImplementedWarning
-    local_client["KEYWORD"].write("10", wait=False)
+    local_client[keyword_name].write("10", wait=False)
     w = recwarn.pop()
     assert w.category == CauldronAPINotImplementedWarning
 
 @pytest.mark.xfail
-def test_read_async(local_client, recwarn):
+def test_read_async(local_client, recwarn, keyword_name):
     """Test local asynchronous read."""
     from Cauldron.exc import CauldronAPINotImplementedWarning
-    local_client["KEYWORD"].read(wait=False)
+    local_client[keyword_name].read(wait=False)
     w = recwarn.pop()
     assert w.category == CauldronAPINotImplementedWarning
     
-def test_wait(local_client):
+def test_wait(local_client, keyword_name):
     """Test local wait()"""
     from Cauldron.exc import CauldronAPINotImplemented
     with pytest.raises(CauldronAPINotImplemented):
-        local_client["KEYWORD"].wait()
+        local_client[keyword_name].wait()
         
 
-def test_readonly(local_client, local_service):
+def test_readonly(local_client, local_service, keyword_name3):
     """Test a read only keyword."""
-    local_service['ROKEYWORD'].readonly = True
+    local_service[keyword_name3].readonly = True
     with pytest.raises(ValueError):
-        local_client['ROKEYWORD'].write("10")
+        local_client[keyword_name3].write("10")
         
-def test_writeonly(local_client, local_service):
+def test_writeonly(local_client, local_service, keyword_name4):
     """Test a read only keyword."""
-    local_service['WOKEYWORD'].writeonly = True
+    local_service[keyword_name4].writeonly = True
     with pytest.raises(ValueError):
-        local_client['WOKEYWORD'].read()
+        local_client[keyword_name4].read()
+    
+
+def test_teardown(servicename, teardown_cauldron, keyword_name2, servicename2):
+    """Check that teardown really does tear things down, in local mode."""
+    from Cauldron.api import teardown, use
+    use("local")
+    from Cauldron.DFW import Service
+    svc = Service(servicename2, None)
+    svc[keyword_name2].modify('10')
+    teardown()
+    del svc
+    
+    use("local")
+    from Cauldron.DFW import Service
+    svc2 = Service(servicename2, None)
+    assert svc2[keyword_name2].read() == None

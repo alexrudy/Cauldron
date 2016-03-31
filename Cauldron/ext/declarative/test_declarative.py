@@ -90,7 +90,8 @@ def test_descriptor_basics(dispatcher, cls, dualcls):
     cb_name = [ cb.__name__ for cb in cls.mykeyword.callback.callbacks ][0]
     assert cb_name == "callback"
     
-    assert cls.mykeyword.keyword == dispatcher["MYKEYWORD"]
+    assert cls.mykeyword.keyword(instance) == dispatcher["MYKEYWORD"]
+    assert cls.mykeyword.keyword(newinstance) == dispatcher["MYKEYWORD"]
     
     assert "callback" in instance.called
     assert "prewrite" in instance.called
@@ -293,31 +294,7 @@ def test_multiple_binds_other_serivce(backend, dispatcher, config, cls):
     finally:
         svc.shutdown()
     
-def test_multiple_binds_initial_values(dispatcher):
-    """Test for multiple binds with initial values."""
-    class MKO(DescriptorBase):
-        """MultipleBind Keyword Test class!"""
-        mykeyword = KeywordDescriptor("MYKEYWORD", initial="SomeValue")
-    
-    MKO.bind(dispatcher)
-    i1 = MKO()
-    i1.mykeyword = "OtherValue"
-    # Should be fine, won't initialize, already bound.
-    i2 = MKO()
-    
-    # This is definitley a hack to unbind, but we can't cause
-    # the fixture 'dispatcher' to go out of scope.
-    assert MKO.mykeyword._bound
-    del MKO.mykeyword.service
-    MKO.mykeyword._bound = False
-    assert not MKO.mykeyword._bound
-    
-    # Now if we bind again, we should get
-    # an IntegrityError when we try to instantiate
-    # an instance, as the value was already set.
-    MKO.bind(dispatcher)
-    with pytest.raises(IntegrityError):
-        i3 = MKO()
+
 
 def test_multiple_class_binding():
     """docstring for test_multiple_class_binding"""
@@ -333,6 +310,21 @@ def test_multiple_class_binding():
             @mykeyword.prewrite
             def cb2(self):
                 pass
+
+def test_rename_keyword(dispatcher, cls):
+    """Test renaming a keyword."""
+    instance = cls()
+    cls.mykeyword.set_bound_name(instance, "OTHERKEYWORD")
+    cls.mungedkeyword.set_bound_name(instance, "OTHERKEYWORD2")
+    instance.bind(dispatcher)
+    
+    instance2 = cls()
+    instance2.bind(dispatcher)
+    
+    dispatcher['OTHERKEYWORD'].modify("10")
+    
+    assert instance.mykeyword == "10"
+    assert instance2.mykeyword != "10"
 
 def test_multiple_replacements(dispatcher, cls):
     """Test that multiple replacements raise errors."""

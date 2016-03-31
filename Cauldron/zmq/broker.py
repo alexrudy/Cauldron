@@ -54,7 +54,7 @@ class FanMessage(object):
     def __repr__(self):
         """A message representation."""
         return "<FanMessage {0:s} pending={1:d} lifetime={2:.0f} responses={3:d}>".format(
-            binascii.hexlify(self.id), len(self.pending), self.timeout - time.time(), len(self.responses)
+            binascii.hexlify(self.id).decode('utf-8'), len(self.pending), self.timeout - time.time(), len(self.responses)
         )
         
     @property
@@ -74,19 +74,20 @@ class FanMessage(object):
     def add(self, dispatcher, message):
         """Add item to the fan message."""
         self.client.log.log(5, "{0!r}.add({1!r})".format(self, message))
-        if message.payload not in (FRAMEBLANK, FRAMEFAIL) and not DIRECTIONS.iserror(message.direction):
+        if message.payload not in (FRAMEBLANK.decode('utf-8'), FRAMEFAIL.decode('utf-8')) and not DIRECTIONS.iserror(message.direction):
             self.responses[dispatcher.name] = message.payload
         self.pending.remove(dispatcher.id)
         
     def resolve(self):
         """Fan message responses."""
-        self.client.log.log(5, "{0!r}.resolve()".format(self))
+        # self.client.log.log(5, "{0!r}.resolve()".format(self))
         if not self.valid:
             response = self.message.error_response("No dispatchers for '{0}'".format(self.message.service))
             return response
         elif len(self.responses) == 1:
-            response = self.message.response(self.responses.values()[0])
-            response.dispatcher = self.responses.keys()[0]
+            dispatcher, payload  = self.responses.popitem()
+            response = self.message.response(payload)
+            response.dispatcher = dispatcher
             return response
         elif len(self.responses):
             return self.message.response(":".join(self.responses.values()))
@@ -156,7 +157,8 @@ class Lifetime(object):
     def expire(self):
         """Expire, by returning a list of messages to deactivate."""
         while len(self._message_pool):
-            yield self._message_pool.pop(self._message_pool.keys()[0])
+            key, value = self._message_pool.popitem()
+            yield value
             
     def clear(self):
         """Clear the message pool"""
@@ -170,7 +172,7 @@ class Client(Lifetime):
     def __init__(self, client_id, service):
         super(Client, self).__init__(service)
         self.id = client_id
-        self.name = binascii.hexlify(self.id)
+        self.name = binascii.hexlify(self.id).decode('utf-8')
         self.log = logger_getChild(service.log, "Client.{0}".format(binascii.hexlify(self.id)))
     
     def send(self, message, socket):
@@ -242,7 +244,6 @@ class Service(object):
             except ValueError:
                 raise DispatcherError("No dispatcher available for {0}".format(message.dispatcher))
         if recv:
-            self.log.log(5, "{0!r}.recv({1!r})".format(dispatcher_object, message))
             dispatcher_object.deactivate(message)
         return dispatcher_object
         
@@ -252,14 +253,12 @@ class Service(object):
             client_object = self.clients[message.client_id]
         except KeyError:
             client_object = self.clients[message.client_id] = Client(message.client_id, self)
-        if recv:
-            self.log.log(5, "{0!r}.recv({1!r})".format(client_object, message))
         return client_object
         
     def scrape(self, message):
         """Scrape a message for dispatcher information."""
         # Cache dispatcher identities for easy lookup later.
-        if message.dispatcher != FRAMEBLANK:
+        if message.dispatcher != FRAMEBLANK.decode('utf-8'):
             if message.isvalid:
                 # If this message can identify the disptacher, save it for later.
                 self.keywords[message.keyword.upper()] = message.dispatcher
@@ -269,9 +268,9 @@ class Service(object):
     
     def paste(self, message):
         """Opposite of scrape, paste the dispatcher back into the message."""
-        if message.dispatcher == FRAMEBLANK:
+        if message.dispatcher == FRAMEBLANK.decode('utf-8'):
             # Locate the correct dispatcher.
-            if message.keyword != FRAMEBLANK:
+            if message.keyword != FRAMEBLANK.decode('utf-8'):
                 try:
                     dispatcher_name = self.keywords[message.keyword.upper()]
                     dispatcher = self.dispatchers[dispatcher_name]
@@ -296,7 +295,7 @@ class Service(object):
         
     def expire(self, socket):
         """Expire messages."""
-        for name in self.dispatchers.keys():
+        for name in list(self.dispatchers.keys()):
             dispatcher = self.dispatchers[name]
             if dispatcher.alive:
                 continue
@@ -321,8 +320,9 @@ class Service(object):
         """Handle"""
         try:
             method = getattr(self, handlers[message.direction])
-            # self.log.log(5, "{0!r}.handle({1!r})".format(self, message))
             method(message, socket)
+        except KeyError as e:
+            raise
         except Exception as e:
             self.log.exception("Handling exception {0}".format(e))
             socket.send_multipart(message.error_response(repr(e)))
@@ -346,7 +346,7 @@ class Service(object):
             dispatcher.message = message
             self.log.info("{0!r} is ready.".format(dispatcher))
         elif message.command == "heartbeat":
-            self.log.info("{0!r} is alive.".format(dispatcher))
+            pass
             
         else:
             dispatcher.send(message.error_response("unknown command"), socket)
@@ -361,8 +361,12 @@ class Service(object):
         """
         dispatcher = self.get_dispatcher(message)
         client = self.get_client(message, recv=False)
-        self._fans[message.identifier].add(dispatcher, message)
-        
+        try:
+            self._fans[message.identifier].add(dispatcher, message)
+        except KeyError:
+            # Nothing to do, the message was probably disposed much earlier.
+            pass
+    
     @handler("CSQ")
     def handle_client_service_query(self, message, socket):
         """Handle the start of a fan message.
@@ -381,9 +385,7 @@ class Service(object):
             else:
                 raise KeyError
         except KeyError:
-            fmessage = FanMessage(self, client, message)
-            self.log.log(5, "{0!r}.start({1!r})".format(fmessage, message))
-        
+            fmessage = FanMessage(self, client, message)        
             self._fans[fmessage.id] = fmessage
         
             for dispatcher in self.dispatchers.values():
@@ -489,6 +491,21 @@ class ZMQBroker(threading.Thread):
         obj.daemon = daemon
         obj.start()
         return obj
+        
+    @classmethod
+    def setup(cls, config=None, timeout=2.0):
+        """Ensure a broker is set up to start."""
+        if not cls.check(timeout=timeout):
+            b = cls.thread(config=config, daemon=True)
+            b.running.wait(timeout=min([timeout, 2.0]))
+            if not b.running.is_set():
+                msg = "Couldn't start ZMQ broker."
+                if b._error is not None:
+                    msg += " Error: " + repr(b._error)
+                raise RuntimeError(msg)
+            return b
+        else:
+            return None
     
     @classmethod
     def check(cls, config=None, timeout=2.0, ctx=None, address=None):
@@ -599,7 +616,6 @@ class ZMQBroker(threading.Thread):
                 request = socket.recv_multipart()
                 if len(request) > 3:
                     message = ZMQCauldronMessage.parse(request)
-                    self.log.log(5, "Request: |{0!r}|".format(message))
                     if message.direction[0:2] == "UB":
                         self.respond_inquiry(message, socket)
                     else:
@@ -636,7 +652,7 @@ class ZMQBroker(threading.Thread):
         
             signal.connect("inproc://{0:s}".format(hex(id(self))))
             self.running.clear()
-            signal.send("", flags=zmq.NOBLOCK)
+            signal.send(b"", flags=zmq.NOBLOCK)
             signal.close(linger=0)
         else:
             self.running.clear()

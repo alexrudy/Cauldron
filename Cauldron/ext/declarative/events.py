@@ -5,6 +5,7 @@ import weakref
 import functools
 from ...compat import WeakOrderedSet, WeakSet
 from ...utils.callbacks import Callbacks
+from ...utils import ReferenceError
 
 __all__ = ['_DescriptorEvent', '_KeywordEvent', '_KeywordListener']
 
@@ -32,7 +33,7 @@ class _DescriptorEvent(object):
         for callback in self.callbacks:
             try:
                 returned = callback(keyword, *args, **kwargs)
-            except (TypeError, weakref.ReferenceError):
+            except (TypeError, ReferenceError):
                 returned = callback.bound(instance)(keyword, *args, **kwargs)
         
         return returned
@@ -52,7 +53,7 @@ class _KeywordEvent(object):
         """Construct or intercept the construction of a keyword event."""
         if isinstance(getattr(keyword, event.name), cls):
             return getattr(keyword, event.name)
-        return super(_KeywordEvent, cls).__new__(cls, keyword, instance, event)
+        return super(_KeywordEvent, cls).__new__(cls)
     
     def __init__(self, keyword, instance, event):
         super(_KeywordEvent, self).__init__()
@@ -97,7 +98,7 @@ class _KeywordEvent(object):
         for callback in self.listeners:
             try:
                 returned = callback(*args, **kwargs)
-            except weakref.ReferenceError:
+            except ReferenceError:
                 _remove.append(callback)
                 continue
             
@@ -131,7 +132,7 @@ class _KeywordListener(object):
             return NotImplemented
         try:
             return (self.event == other.event and self.keyword == other.keyword and self.instance == other.instance)
-        except weakref.ReferenceError:
+        except ReferenceError:
             # Listeners are by definition not equal 
             return False
     

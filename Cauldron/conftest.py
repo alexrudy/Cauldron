@@ -36,21 +36,25 @@ try:
 except NameError:   # Needed to support Astropy <= 1.0.0
     pass
 
-available_backends = ["local"]
-
-try:
-    import zmq
-except ImportError:
-    pass
-else:
-    from . import registry
-    PYTEST_HEADER_MODULES['zmq'] = 'zmq'
-    if "zmq" in registry.keys():
-        available_backends.append("zmq")
-
 import pkg_resources
 import os
 from .utils._weakrefset import WeakSet
+
+def setup_entry_points_api():
+    """Set up the entry points API if Cauldron isn't installed."""
+    from .zmq import setup_zmq_backend
+    setup_zmq_backend()
+    from .local import setup_local_backend
+    setup_local_backend()
+    from . import mock
+
+from . import registry
+setup_entry_points_api()
+available_backends = set(registry.keys())
+available_backends.discard("mock")
+
+if "zmq" in available_backends:
+    PYTEST_HEADER_MODULES['zmq'] = 'zmq'
 
 def _pytest_get_option(config, name, default):
     """Get pytest options in a version independent way, with allowed defaults."""
@@ -88,6 +92,26 @@ def servicename():
     """Get the service name."""
     return "testsvc"
     
+@pytest.fixture
+def servicename2():
+    """Get a second servicename"""
+    return "testaltsvc"
+    
+MAX_KEYWORD_NUBMER = 4
+def pytest_generate_tests(metafunc):
+    for fixture in metafunc.fixturenames:
+        if fixture.startswith("keyword_name_"):
+            postfix = fixture[len("keyword_name_"):]
+            metafunc.parametrize(fixture, ["KEYWORD_{0:s}".format(postfix)])
+        elif fixture.startswith("keyword_name"):
+            number = int("0"+fixture[len("keyword_name"):])
+            if number > MAX_KEYWORD_NUBMER:
+                raise ValueError("Fixture {0} doesn't represent a known keyword.".format(fixture))
+            metafunc.parametrize(fixture, ["KEYWORD{0:d}".format(number)])
+        if fixture.startswith("missing_keyword_name"):
+            postfix = fixture[len("missing_keyword_name"):]
+            metafunc.parametrize(fixture, ["MISSINGKEYWORD{0:s}".format(postfix)])
+    
 @pytest.fixture(scope='function')
 def config(tmpdir):
     """DFW configuration."""
@@ -95,6 +119,7 @@ def config(tmpdir):
     cauldron_configuration.set("zmq", "broker", "inproc://broker")
     cauldron_configuration.set("zmq", "publish", "inproc://publish")
     cauldron_configuration.set("zmq", "subscribe", "inproc://subscribe")
+    cauldron_configuration.set("core", "timeout", "5")
     return cauldron_configuration
     
 @pytest.fixture
@@ -106,7 +131,6 @@ SEEN_THREADS = WeakSet()
 def fail_if_not_teardown():
     """Fail if teardown has not happedned properly."""
     from Cauldron.api import teardown, CAULDRON_SETUP
-    print("Teardown...")
     teardown()
     failures = ["DFW", "ktl", "_DFW", "_ktl"]
     if CAULDRON_SETUP:
@@ -140,8 +164,9 @@ def fail_if_not_teardown():
             count += 1
             SEEN_THREADS.add(thread)
     if count > 1:
-        raise ValueError("{0:d} non-deamon thread{1:s} left alive!\n{2!s}".format(count-1, "s" if (count-1)>1 else "",
-            "\n".join([repr(thread) for thread in threading.enumerate()])))
+        threads_str = "\n".join([repr(thread) for thread in threading.enumerate()])
+        raise ValueError("{0:d} non-deamon thread{1:s} left alive!\n{2!s}".format(
+            count-1, "s" if (count-1)>1 else "", threads_str))
     
 @pytest.fixture(scope='function')
 def teardown_cauldron(request):
@@ -157,16 +182,9 @@ def backend(request, config):
     request.addfinalizer(fail_if_not_teardown)
     
     if request.param == 'zmq':
-        print(config.items('zmq'))
         from Cauldron.zmq.broker import ZMQBroker
-        if not ZMQBroker.check(timeout=0.01):
-            b = ZMQBroker.thread(config=config)
-            b.running.wait(timeout=2.0)
-            if not b.running.is_set():
-                msg = "Couldn't start ZMQ broker."
-                if b._error is not None:
-                    msg += " Error: " + repr(b._error)
-                raise RuntimeError(msg)
+        b = ZMQBroker.setup(config=config, timeout=0.01)
+        if b:
             request.addfinalizer(b.stop)
     return request.param
 
@@ -174,6 +192,12 @@ def backend(request, config):
 def dispatcher_name():
     """The dispatcher name"""
     return "+service+_dispatch_1"
+
+@pytest.fixture
+def dispatcher_name2():
+    """The dispatcher name"""
+    return "+service+_dispatch_2"
+
 
 @pytest.fixture
 def dispatcher(request, backend, servicename, config, dispatcher_name):

@@ -7,6 +7,8 @@ import weakref
 import functools
 import inspect
 
+from . import ReferenceError
+
 __all__ = ['WeakMethod', 'Callbacks']
 
 class WeakMethod(object):
@@ -27,11 +29,11 @@ class WeakMethod(object):
             self.func = meth.__func__
         else:
             self.func = meth
-        if hasattr(meth, "__self__"):
+        if inspect.ismethod(meth) or hasattr(meth, '__self__'):
             if meth.__self__ is not None:
                 self.instance = meth.__self__
             self.method = True
-        functools.update_wrapper(self, meth)
+        functools.update_wrapper(self, weakref.proxy(meth))
         self.callback = callback
         
     def __call__(self, *args, **kwargs):
@@ -71,7 +73,7 @@ class WeakMethod(object):
                 return "<{0} to '{1}' at {2}>".format(
                     self.__class__.__name__, name, hex(id(self))
                 )
-        except weakref.ReferenceError:
+        except ReferenceError:
             return "<{0} broken at {1}>".format(self.__class__.__name__, hex(id(self)))
         
     def copy(self):
@@ -133,11 +135,11 @@ class WeakMethod(object):
         """Get the bound method."""
         if self.method:
             if self.func is None or self.instance is None:
-                raise weakref.ReferenceError("Weak reference to a bound method has expired.")
+                raise ReferenceError("Weak reference to a bound method has expired.")
             return self.func.__get__(self.instance, type(self.instance))
         else:
             if self.func is None:
-                raise weakref.ReferenceError("Weak reference to function has expired.")
+                raise ReferenceError("Weak reference to function has expired.")
             return self.func
         
     def bound(self, instance):

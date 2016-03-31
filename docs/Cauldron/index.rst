@@ -85,5 +85,3 @@ the following will work::
     import ktl, DFW
     
 
-
-.. _REDIS: http://redis.io
