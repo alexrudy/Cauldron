@@ -111,6 +111,7 @@ def test_subscribe(local_service, local_client, keyword_name):
     
 def test_write_async(local_service, local_client, recwarn, keyword_name):
     """Test local asynchronous write."""
+    warnings.filterwarnings('always')
     from Cauldron.exc import CauldronAPINotImplementedWarning
     local_client[keyword_name].write("10", wait=False)
     w = recwarn.pop()
