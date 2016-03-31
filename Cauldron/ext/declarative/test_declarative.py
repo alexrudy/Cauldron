@@ -282,8 +282,6 @@ def test_event_singleton_nature(dispatcher, cls):
     
 def test_multiple_binds_other_serivce(backend, dispatcher, config, cls):
     """Test for binds against multiple services"""
-    if backend == "zmq":
-        pytest.skip("Can't spawn multiple zmq services easily.")
     from Cauldron import DFW
     svc = DFW.Service("OTHERSERVCE", config)
     try:
