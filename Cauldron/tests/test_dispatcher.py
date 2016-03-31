@@ -4,6 +4,7 @@ Test dispatcher.
 """
 import pytest
 import threading
+from Cauldron.exc import CauldronAPINotImplemented
 
 @pytest.fixture
 def waittime():
@@ -134,15 +135,17 @@ def test_update_no_value(dispatcher, keyword_name):
     keyword = dispatcher[keyword_name]
     assert keyword.update() is None
 
-@pytest.mark.xfail
+@pytest.mark.xfail(raises=CauldronAPINotImplemented)
 def test_initialize_with_period(dispatcher, keyword_name):
     """Test the dispatcher keyword's period argument."""
     from Cauldron import DFW
+    from Cauldron.exc import CauldronAPINotImplemented
     DFW.Keyword.Keyword(keyword_name, dispatcher, period=10)
 
-@pytest.mark.xfail
+@pytest.mark.xfail(raises=CauldronAPINotImplemented)
 def test_period(dispatcher, keyword_name):
     """Fail with period tests."""
+    from Cauldron.exc import CauldronAPINotImplemented
     dispatcher[keyword_name].period(10)
     
 def test_with_non_string(dispatcher, keyword_name):
@@ -158,7 +161,7 @@ def test_value(dispatcher, keyword_name):
     del dispatcher[keyword_name].value
     assert dispatcher[keyword_name]['value'] is None
 
-@pytest.mark.xfail
+@pytest.mark.xfail(raises=CauldronAPINotImplemented)
 def test_schedule(dispatcher, keyword_name):
     """Test the schedule method."""
     import datetime

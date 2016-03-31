@@ -6,6 +6,8 @@ Tests specific to the local backend.
 import pytest
 pytestmark = pytest.mark.usefixtures("teardown_cauldron")
 from ..conftest import fail_if_not_teardown
+from ..exc import CauldronAPINotImplemented
+import warnings
 
 @pytest.fixture
 def backend(request):
@@ -107,7 +109,6 @@ def test_subscribe(local_service, local_client, keyword_name):
     local_service[keyword_name].modify("SomeValue")
     assert monitor.monitored
     
-@pytest.mark.xfail
 def test_write_async(local_service, local_client, recwarn, keyword_name):
     """Test local asynchronous write."""
     from Cauldron.exc import CauldronAPINotImplementedWarning
@@ -115,19 +116,20 @@ def test_write_async(local_service, local_client, recwarn, keyword_name):
     w = recwarn.pop()
     assert w.category == CauldronAPINotImplementedWarning
 
-@pytest.mark.xfail
 def test_read_async(local_client, recwarn, keyword_name):
     """Test local asynchronous read."""
+    warnings.filterwarnings('always')
     from Cauldron.exc import CauldronAPINotImplementedWarning
     local_client[keyword_name].read(wait=False)
     w = recwarn.pop()
     assert w.category == CauldronAPINotImplementedWarning
     
+@pytest.mark.xfail(raises=CauldronAPINotImplemented)
 def test_wait(local_client, keyword_name):
     """Test local wait()"""
+    warnings.filterwarnings('always')
     from Cauldron.exc import CauldronAPINotImplemented
-    with pytest.raises(CauldronAPINotImplemented):
-        local_client[keyword_name].wait()
+    local_client[keyword_name].wait()
         
 
 def test_readonly(local_client, local_service, keyword_name3):
