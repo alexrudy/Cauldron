@@ -6,7 +6,7 @@ Compatibility version of the logging Null Handler
 import logging
 if hasattr(logging, 'NullHandler'):
     NullHandler = logging.NullHandler
-else:
+else: # pragma: no cover
     class NullHandler(logging.Handler):
         """
         This handler does nothing. It's intended to be used to avoid the

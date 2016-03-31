@@ -2,7 +2,7 @@
 
 try:
     from six.moves.builtins import ReferenceError
-except (NameError, ImportError):
+except (NameError, ImportError): # pragma: no cover
     from weakref import ReferenceError
 
 __all__ = ['ReferenceError']
