@@ -10,11 +10,46 @@ Overview
 
 The Keck telescope library provides an API for communicating small amounts of data between processes.
 
-KTL provides an API for reading and writing keyword values. To support KTL keywords, applications provide a dispatcher, which responds to read and write requests that it recieves via the KTL backend.
+KTL provides an API for reading and writing keyword values. To support KTL keywords, applications provide a dispatcher, which responds to read and write requests that it recieves via the KTL backend. Users use a KTL client to communicate with the dispatchers. This communication is mediated by a broker. Keywords are grouped into "Services". A schematic is below:
 
-The KTL system relies on a message passing interface and routing system which is complex and composed of a lot of software. In order to use KTL, you must be running on a machine that has the full Lick or Keck Observatory installation call stack. This makes it difficult to write modular tests, and to write code which depends heavily on the KTL library.
+.. graphviz:: 
+    
+    digraph g {
+        compound = true
+        subgraph cluster_service_1 {
+            color = black;
+            label = "Service 1";
+            "Dispatcher A" 
+            "Dispatcher B"
+        }
+        
+        subgraph cluster_service_2 {
+            color = black;
+            label = "Service 2";
+            "Dispatcher C"
+        }
+        Broker [shape=box]
+        
+        {
+            node [color=blue];
+            "Client A"
+            "Client B"
+            "Dispatcher A"
+            "Dispatcher B"
+            "Dispatcher C"
+        }
+        
+        "Client B" -> Broker
+        "Client A" -> Broker
+        
+        Broker -> "Dispatcher A"
+        Broker -> "Dispatcher B"
+        Broker -> "Dispatcher C"
+    }
 
-Well written instrument code and facility tools will naturally heavily depend on the KTL API to monitor and maintain state, and to provide a control interface. On the other hand, writing an instrument or facility tool with no KTL integration requires that KTL be "bolted-on" during a later phase of development, and can lead a developer to depend on concepts which are not well-suited to the KTL API (such as directly exposing an interpreter). In order to facilitate development with the KTL API, :mod:`Cauldron` was designed to remove the dependency on facility software, and to allow users to write code which runs just as well in the real environment as it does in test environments.
+The KTL system relies on a message passing interface and routing system which is complex and composed of a lot of software (called the "Broker" above). In order to use KTL, you must be running on a machine that has the full Lick or Keck Observatory installation call stack. This makes it difficult to write modular tests, and to write code which depends heavily on the KTL library.
+
+Well written instrument code and facility tools will naturally heavily depend on the KTL API to monitor and maintain state, and to provide a control interface. On the other hand, writing an instrument or facility tool with no KTL integration requires that KTL be "bolted-on" during a later phase of development, and can lead a developer to depend on concepts which are not well-suited to the KTL API (such as directly exposing an interpreter, or maintaining a single state in multiple places). In order to facilitate development with the KTL API, :mod:`Cauldron` was designed to remove the dependency on facility software, and to allow users to write code which runs just as well in the real environment as it does in test environments.
 
 The KTL API can be thought of as a message passing interface, with essentially two types of messages:
 
@@ -23,9 +58,11 @@ The KTL API can be thought of as a message passing interface, with essentially t
 
 Messages are passed in ASCII encoded strings on the backend, with type checking (at least for :mod:`Cauldron`) only enforced by the frontend code. Type checking in the real KTL environemnt can also be done by the message passing interface.
 
-Keywords and services are discovered via XML configuration files on the KTL backend, and support for KTL XML files is possible, but not implemented, in :mod:`Cauldron`.
+Keywords and services are discovered via XML configuration files on the KTL backend, and support for KTL XML files is possible, but not enforced, in :mod:`Cauldron`.
 
-The KTL API is implemented by two entities, Clients and Dispatchers. Clients are user-facing entities which read and write keyword values. Dispatchers are the facility-facing tools which respond to read and write requests. The KTL API works across many languages, but :mod:`Cauldron` is really only designed for use with python.
+The KTL API is implemented by two entities, Clients and Dispatchers. Clients are user-facing entities which read and write keyword values. Dispatchers are the facility-facing tools which respond to read and write requests. The KTL API works across many languages, but :mod:`Cauldron` is really only designed for use with python. [#f1]_
+
+.. [#f1] It is conceivable that someone could hitch any programming language to the ZMQ-based KTL backend in :mod:`Cauldron`.
 
 Clients
 =======

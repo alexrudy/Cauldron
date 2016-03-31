@@ -69,7 +69,7 @@ If you wish to use :mod:`Cauldron` with a test suite, it can be desirable to sel
     from Cauldron import use, teardown
     use("local")
     teardown()
-    use("redis") # +DOCTEST: SKIP
+    use("zmq") # +DOCTEST: SKIP
 
 .. _zmq: http://zeromq.org
 

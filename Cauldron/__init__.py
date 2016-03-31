@@ -1,7 +1,7 @@
 # Licensed under a 3-clause BSD style license - see LICENSE.rst
 
 """
-Cauldron is the Abstract implementation of KTL, along with a REDIS-based concrete implementation.
+Cauldron is the Abstract implementation of KTL, along with a zmq-based concrete implementation.
 
 Cauldron is quick-and-dirty. It doesn't implement anywhere near all of the features of KTL, and shouldn't try to.
 Its just here to be a simple drop-in for KTL-based functionality.

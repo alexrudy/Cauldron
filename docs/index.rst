@@ -16,6 +16,6 @@ running on a local, non-production machine.
 Cauldron is available on GitHub: https://github.com/alexrudy/Cauldron.
 
 .. toctree::
-  :maxdepth: 1
+  :maxdepth: 2
   
   Cauldron/index.rst
