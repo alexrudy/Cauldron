@@ -38,21 +38,10 @@ except NameError:   # Needed to support Astropy <= 1.0.0
 
 import pkg_resources
 import os
-from .utils._weakrefset import WeakSet
 
-def setup_entry_points_api():
-    """Set up the entry points API if Cauldron isn't installed."""
-    from .zmq import setup_zmq_backend
-    setup_zmq_backend()
-    from .local import setup_local_backend
-    setup_local_backend()
-    from . import mock
+from .test_helpers import fail_if_not_teardown, get_available_backends
 
-from . import registry
-setup_entry_points_api()
-available_backends = set(registry.keys())
-available_backends.discard("mock")
-
+available_backends = get_available_backends()
 if "zmq" in available_backends:
     PYTEST_HEADER_MODULES['zmq'] = 'zmq'
 
@@ -122,52 +111,7 @@ def config(tmpdir):
     cauldron_configuration.set("core", "timeout", "5")
     return cauldron_configuration
     
-@pytest.fixture
-def check_teardown(request):
-    """Check that a module has been torn down."""
-    request.addfinalizer(fail_if_not_teardown)
 
-SEEN_THREADS = WeakSet()
-def fail_if_not_teardown():
-    """Fail if teardown has not happedned properly."""
-    from Cauldron.api import teardown, CAULDRON_SETUP
-    teardown()
-    failures = ["DFW", "ktl", "_DFW", "_ktl"]
-    if CAULDRON_SETUP:
-        raise ValueError("Cauldron is marked as 'setup'.")
-    for module in sys.modules:
-        for failure in failures:
-            if failure in module.split("."):
-                mod = sys.modules[module]
-                if mod is not None:
-                    raise ValueError("Module {0}/{1} not properly torn down.".format(module, sys.modules[module]))
-    try:
-        from Cauldron import DFW
-    except ImportError as e:
-        pass
-    else:
-        raise ValueError("Shouldn't be able to import DFW now!")
-    
-    try:
-        from Cauldron import ktl
-    except ImportError as e:
-        pass
-    else:
-        raise ValueError("Shouldn't be able to import ktl now!")
-    
-    import threading, time
-    if threading.active_count() > 1:
-        time.sleep(0.1) #Allow zombies to die!
-    count = 0
-    for thread in threading.enumerate():
-        if not thread.daemon and thread not in SEEN_THREADS:
-            count += 1
-            SEEN_THREADS.add(thread)
-    if count > 1:
-        threads_str = "\n".join([repr(thread) for thread in threading.enumerate()])
-        raise ValueError("{0:d} non-deamon thread{1:s} left alive!\n{2!s}".format(
-            count-1, "s" if (count-1)>1 else "", threads_str))
-    
 @pytest.fixture(scope='function')
 def teardown_cauldron(request):
     """A specific fixture to force cauldron teardown."""
