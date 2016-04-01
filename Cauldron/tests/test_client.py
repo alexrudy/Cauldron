@@ -7,9 +7,9 @@ import inspect
 import threading
 
 @pytest.fixture
-def service(request, dispatcher):
+def service(request, dispatcher, keyword_name):
     """A service dispatch tool."""
-    mykw = dispatcher['KEYWORD']
+    mykw = dispatcher[keyword_name]
     return dispatcher
     
 def test_create_and_destroy_client(service):
@@ -18,99 +18,99 @@ def test_create_and_destroy_client(service):
     svc = ktl.Service(service.name)
     del svc
 
-def test_read_write(service, client):
+def test_read_write(service, client, keyword_name):
     """Test a write method."""
     
-    client['KEYWORD'].write("10")
-    assert client['KEYWORD'].read() == "10"
+    client[keyword_name].write("10")
+    assert client[keyword_name].read() == "10"
     service.shutdown()
     
-def test_read_write_client(service, client):
+def test_read_write_client(service, client, keyword_name):
     """Test a write/read via the client object."""
-    client.write('KEYWORD',"10")
-    assert client.read('KEYWORD') == "10"
+    client.write(keyword_name,"10")
+    assert client.read(keyword_name) == "10"
     service.shutdown()
     
-def test_read_write_asynchronous(service, client):
+def test_read_write_asynchronous(service, client, keyword_name):
     """docstring for test_read_write_asynchronous"""
-    client.write('KEYWORD',"10", wait=False)
+    client.write(keyword_name,"10", wait=False)
     
-def test_monitored(service, client):
+def test_monitored(service, client, keyword_name):
     """Check for clients which broadcast, should be true by default."""
-    assert client['KEYWORD']['monitored'] == False
-    assert client['KEYWORD']['monitor'] == False
+    assert client[keyword_name]['monitored'] == False
+    assert client[keyword_name]['monitor'] == False
     service.shutdown()
     
-def test_has_keyword(service, client):
+def test_has_keyword(service, client, keyword_name, missing_keyword_name):
     """Has keyword."""
-    assert client.has_keyword("KEYWORD")
-    assert client.has_key("KEYWORD")
-    assert "KEYWORD" in client
-    assert not client.has_keyword("MISSINGKEYWORD")
-    assert not client.has_key("MISSINGKEYWORD")
-    assert "MISSINGKEYWORD" not in client
+    assert client.has_keyword(keyword_name)
+    assert client.has_key(keyword_name)
+    assert keyword_name in client
+    assert not client.has_keyword(missing_keyword_name)
+    assert not client.has_key(missing_keyword_name)
+    assert missing_keyword_name not in client
     service.shutdown()
     
     
-def test_missing_keyword(service, client):
+def test_missing_keyword(service, client, missing_keyword_name):
     """Test missing keyword."""
     with pytest.raises(KeyError):
-        client['MISSINGKEYWORD']
+        client[missing_keyword_name]
     service.shutdown()
     
     
-def test_populate_keywords(backend, servicename, service):
+def test_populate_keywords(backend, servicename, service, keyword_name, missing_keyword_name):
     """Test populate keywords"""
     from Cauldron import ktl
     client = ktl.Service(servicename, populate=True)
-    assert "KEYWORD" in client.populated()
-    assert "MISSINGKEYWORD" not in client.populated()
+    assert keyword_name in client.populated()
+    assert missing_keyword_name not in client.populated()
     service.shutdown()
     
     
-def test_populated_keyword(service, client):
+def test_populated_keyword(service, client, keyword_name):
     """Test populated"""
-    assert client['KEYWORD']['populated'] == False
-    client["KEYWORD"].write("10")
-    client["KEYWORD"].read()
-    assert client['KEYWORD']['populated'] == True
+    assert client[keyword_name]['populated'] == False
+    client[keyword_name].write("10")
+    client[keyword_name].read()
+    assert client[keyword_name]['populated'] == True
     service.shutdown()
     
     
 
-def test_clone(service, client):
+def test_clone(service, client, keyword_name):
     """Test the clone."""
-    assert client["KEYWORD"].clone().name == "KEYWORD"
+    assert client[keyword_name].clone().name == keyword_name
     service.shutdown()
     
 
-def test_timestamp(service, client):
+def test_timestamp(service, client, keyword_name):
     """Test timestamp"""
-    client["KEYWORD"].write("10")
-    client["KEYWORD"].read()
-    assert isinstance(client['KEYWORD']['timestamp'], float)
+    client[keyword_name].write("10")
+    client[keyword_name].read()
+    assert isinstance(client[keyword_name]['timestamp'], float)
     service.shutdown()
     
 
-def test_populated(service, client):
+def test_populated(service, client, keyword_name):
     """Test populated."""
-    keyword = client["KEYWORD"]
-    assert client.populated() == ["KEYWORD"]
+    keyword = client[keyword_name]
+    assert client.populated() == [keyword_name]
     service.shutdown()
     
     
-def test_binary(service, client):
+def test_binary(service, client, keyword_name):
     """Get the binary version of a keyword value."""
-    keyword = client["KEYWORD"]
+    keyword = client[keyword_name]
     keyword.write("SomeValue")
     keyword.read()
     assert keyword['binary'] == "SomeValue"
     service.shutdown()
     
     
-def test_current_value(service, client):
+def test_current_value(service, client, keyword_name):
     """Get the current value."""
-    keyword = client["KEYWORD"]
+    keyword = client[keyword_name]
     keyword.write("SomeValue")
     keyword.read()
     assert keyword._current_value() == "SomeValue"
@@ -119,7 +119,7 @@ def test_current_value(service, client):
     assert keyword._current_value(both=True, binary=True) == ("SomeValue", "SomeValue")
     service.shutdown()
 
-def test_monitor(service, client, waittime):
+def test_monitor(service, client, waittime, keyword_name):
     """Test .monitor() for asynchronous broadcast monitoring."""
     
     def monitor(keyword):
@@ -129,36 +129,36 @@ def test_monitor(service, client, waittime):
     
     monitor.monitored = threading.Event()
     
-    client["KEYWORD"].callback(monitor)
-    client["KEYWORD"].monitor(prime=False)
+    client[keyword_name].callback(monitor)
+    client[keyword_name].monitor(prime=False)
     monitor.monitored.wait(waittime)
     assert not monitor.monitored.is_set()
     
-    service["KEYWORD"].modify("SomeValue")
+    service[keyword_name].modify("SomeValue")
     monitor.monitored.wait(waittime)
     assert monitor.monitored.is_set()
     
-    client["KEYWORD"].callback(monitor, remove=True)
+    client[keyword_name].callback(monitor, remove=True)
     monitor.monitored.clear()
-    service["KEYWORD"].modify("OtherValue")
+    service[keyword_name].modify("OtherValue")
     monitor.monitored.wait(waittime)
     assert not monitor.monitored.is_set()
     
     monitor.monitored.clear()
-    client["KEYWORD"].callback(monitor, preferred=True)
-    client["KEYWORD"].monitor(prime=True)
-    service["KEYWORD"].modify("SomeValue")
+    client[keyword_name].callback(monitor, preferred=True)
+    client[keyword_name].monitor(prime=True)
+    service[keyword_name].modify("SomeValue")
     monitor.monitored.wait(waittime)
     assert monitor.monitored.is_set()
     monitor.monitored.clear()
     
-    client["KEYWORD"].monitor(start=False)
-    service["KEYWORD"].modify("OtherValue")
+    client[keyword_name].monitor(start=False)
+    service[keyword_name].modify("OtherValue")
     monitor.monitored.wait(waittime)
     assert not monitor.monitored.is_set()
     
 
-def test_subscribe(service, client, waittime):
+def test_subscribe(service, client, waittime, keyword_name):
     """Test .subscribe() which should work like .monitor()"""
     
     def monitor(keyword):
@@ -168,11 +168,11 @@ def test_subscribe(service, client, waittime):
     
     monitor.monitored = threading.Event()
     
-    client["KEYWORD"].callback(monitor)
-    client["KEYWORD"].subscribe(prime=False)
+    client[keyword_name].callback(monitor)
+    client[keyword_name].subscribe(prime=False)
     monitor.monitored.wait(waittime)
     assert not monitor.monitored.is_set()
-    service["KEYWORD"].modify("SomeValue")
+    service[keyword_name].modify("SomeValue")
     monitor.monitored.wait(waittime)
     assert monitor.monitored.is_set()
     

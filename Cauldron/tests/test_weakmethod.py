@@ -5,7 +5,9 @@ Tests for the weak method class and the Callbacks container.
 
 import pytest
 import weakref
-
+import six
+import gc
+from ..utils import ReferenceError
 from ..utils.callbacks import WeakMethod, Callbacks
 
 def check_weak_method(wm, func, instance=None):
@@ -67,8 +69,10 @@ def test_wm_bound(my_class):
 def test_manual_bind(my_class):
     """Test a bind manually."""
     wm = WeakMethod(my_class.my_method)
-    assert wm.method
-    with pytest.raises(weakref.ReferenceError):
+    if six.PY2:
+        assert wm.method
+    wm.method = True
+    with pytest.raises(ReferenceError):
         wm()
     my_instance = wm.instance = my_class()
     assert wm.method
@@ -104,15 +108,18 @@ def test_copy(my_class):
     
 def test_drop_instance_reference(my_class):
     """Test dropping references"""
+    import inspect
     my_instance = my_class()
     wm = WeakMethod(my_instance.my_method)
     assert wm.instance is my_instance
     assert wm.valid
     del my_instance
+    my_instance = None
+    print(gc.get_referrers(wm.instance))
     assert not wm.valid
-    with pytest.raises(weakref.ReferenceError):
+    with pytest.raises(ReferenceError):
         wm.get()
-    with pytest.raises(weakref.ReferenceError):
+    with pytest.raises(ReferenceError):
         wm()
     assert repr(wm) == "<{0} invalid at {1}>".format(wm.__class__.__name__, hex(id(wm)))
     
@@ -127,9 +134,9 @@ def test_drop_func_reference():
     assert wm.valid
     del my_function
     assert not wm.valid
-    with pytest.raises(weakref.ReferenceError):
+    with pytest.raises(ReferenceError):
         wm.get()
-    with pytest.raises(weakref.ReferenceError):
+    with pytest.raises(ReferenceError):
         wm()
     assert repr(wm) == "<{0} invalid at {1}>".format(wm.__class__.__name__, hex(id(wm)))
         
@@ -150,9 +157,9 @@ def test_callback():
     assert wm.valid
     del my_function
     assert not wm.valid
-    with pytest.raises(weakref.ReferenceError):
+    with pytest.raises(ReferenceError):
         wm.get()
-    with pytest.raises(weakref.ReferenceError):
+    with pytest.raises(ReferenceError):
         wm()
     assert wm in cb.invalid
         
@@ -160,7 +167,8 @@ def test_delete_instance(my_class):
     """Test explicitly deleting an instacne."""
     my_instance = my_class()
     m_bound = WeakMethod(my_class.my_method)
-    assert m_bound.method
+    if six.PY2:
+        assert m_bound.method
     m_bound.instance = my_instance
     assert m_bound.method
     del m_bound.instance

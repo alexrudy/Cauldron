@@ -4,13 +4,14 @@ Test dispatcher.
 """
 import pytest
 import threading
+from Cauldron.exc import CauldronAPINotImplemented
 
 @pytest.fixture
 def waittime():
     """Event waiting time."""
     return 0.1
 
-def test_callbacks(dispatcher):
+def test_callbacks(dispatcher, keyword_name):
     """Test callback propagation."""
     
     class CallbackRecieved(Exception): pass
@@ -19,16 +20,16 @@ def test_callbacks(dispatcher):
         """Dummy Callback"""
         raise CallbackRecieved()
         
-    dispatcher['MODE'].callback(cb)
+    dispatcher[keyword_name].callback(cb)
     
     with pytest.raises(CallbackRecieved):
-        dispatcher['MODE'].modify('1')
+        dispatcher[keyword_name].modify('1')
     
-    assert not dispatcher['MODE']._acting
-    dispatcher['MODE'].callback(cb, remove=True)
-    dispatcher['MODE'].modify('1')
+    assert not dispatcher[keyword_name]._acting
+    dispatcher[keyword_name].callback(cb, remove=True)
+    dispatcher[keyword_name].modify('1')
     
-def test_callbacks_from_client(dispatcher, client, waittime):
+def test_callbacks_from_client(dispatcher, client, waittime, keyword_name):
     """Test that when modified from a client, exceptions don't kill the responder thread."""
     from Cauldron.exc import DispatcherError
     
@@ -41,44 +42,44 @@ def test_callbacks_from_client(dispatcher, client, waittime):
     
     cb.triggered = threading.Event()
     
-    dispatcher['MODE'].callback(cb)
+    dispatcher[keyword_name].callback(cb)
     with pytest.raises(CallbackRecieved):
-        dispatcher['MODE'].modify('1')
+        dispatcher[keyword_name].modify('1')
         
     cb.triggered.wait(waittime)
     assert cb.triggered.is_set()
     cb.triggered.clear()
     
     with pytest.raises(DispatcherError):
-        client['MODE'].write('2')
+        client[keyword_name].write('2')
     
     cb.triggered.wait(waittime)
     assert cb.triggered.is_set()
     cb.triggered.clear()
     
     with pytest.raises(CallbackRecieved):
-        dispatcher['MODE'].modify('3')
+        dispatcher[keyword_name].modify('3')
     
     cb.triggered.wait(waittime)
     assert cb.triggered.is_set()
     cb.triggered.clear()
     
-    dispatcher['MODE'].callback(cb, remove=True)
-    dispatcher['MODE'].modify('4')
+    dispatcher[keyword_name].callback(cb, remove=True)
+    dispatcher[keyword_name].modify('4')
     
-def test_recursive_callbacks(dispatcher):
+def test_recursive_callbacks(dispatcher, keyword_name):
     """Test a recursive callback function."""
     def cb(keyword):
         cb.count += 1
         keyword.modify("OtherValue")
     
     cb.count = 0
-    dispatcher["KEYWORD"].callback(cb)
-    dispatcher["KEYWORD"].modify("SomeValue")
+    dispatcher[keyword_name].callback(cb)
+    dispatcher[keyword_name].modify("SomeValue")
     assert cb.count == 2
-    assert dispatcher["KEYWORD"].value == "OtherValue"
+    assert dispatcher[keyword_name].value == "OtherValue"
         
-def test_check(dispatcher, client):
+def test_check(dispatcher, client, keyword_name1):
     """Test that check accepts only values of the correct type, etc."""
     class CheckFailed(Exception): pass
     
@@ -86,7 +87,7 @@ def test_check(dispatcher, client):
         raise CheckFailed
     
     from Cauldron import DFW
-    kw = DFW.Keyword.Keyword("TYPEDKW", dispatcher)
+    kw = DFW.Keyword.Keyword(keyword_name1, dispatcher)
     kw.check = fail_check 
     
     with pytest.raises(CheckFailed):
@@ -96,169 +97,178 @@ def test_check(dispatcher, client):
         kw.modify("10")
     
 
-def test_modfiy(dispatcher, client):
+def test_modfiy(dispatcher, client, keyword_name):
     """Check that a modify happens correctly between a dispatcher and a client."""
-    dispatcher['MODE'].modify("16xTest")
-    assert "16xTest" == client['MODE'].read()
-    assert "16xTest" == dispatcher['MODE'].read()
+    dispatcher[keyword_name].modify("16xTest")
+    assert "16xTest" == client[keyword_name].read()
+    assert "16xTest" == dispatcher[keyword_name].read()
     
-def test_duplicate_keyword(dispatcher):
+def test_duplicate_keyword(dispatcher, keyword_name):
     """Test creating a duplicate keyword"""
     from Cauldron import DFW
-    DFW.Keyword.Keyword("KEYWORD", dispatcher)
+    DFW.Keyword.Keyword(keyword_name, dispatcher)
     
     with pytest.raises(ValueError):
-        otherkw = DFW.Keyword.Keyword("KEYWORD", dispatcher)
+        otherkw = DFW.Keyword.Keyword(keyword_name, dispatcher)
         
-def test_contains(dispatcher):
+def test_contains(dispatcher, keyword_name):
     """Test the 'in' for service"""
     from Cauldron import DFW
     
-    assert "KEYWORD" not in dispatcher
-    assert "keyword" not in dispatcher
-    DFW.Keyword.Keyword("KEYWORD", dispatcher)
-    assert "KEYWORD" in dispatcher
-    assert "keyword" in dispatcher
+    assert keyword_name not in dispatcher
+    assert keyword_name.lower() not in dispatcher
+    DFW.Keyword.Keyword(keyword_name, dispatcher)
+    assert keyword_name in dispatcher
+    assert keyword_name.lower() in dispatcher
     
 
-def test_keyword_contains(dispatcher):
+def test_keyword_contains(dispatcher, keyword_name):
     """Test the 'in' for keywords"""
-    keyword = dispatcher['KEYWORD']
+    keyword = dispatcher[keyword_name]
     assert "Some" not in keyword
     keyword.modify("SomeValue")
     assert "omeV" in keyword
     assert "Other" not in keyword
     
-def test_update_no_value(dispatcher):
+def test_update_no_value(dispatcher, keyword_name):
     """Test an update with no value."""
-    keyword = dispatcher['KEYWORD']
+    keyword = dispatcher[keyword_name]
     assert keyword.update() is None
 
-@pytest.mark.xfail
-def test_initialize_with_period(dispatcher):
+@pytest.mark.xfail(raises=CauldronAPINotImplemented)
+def test_initialize_with_period(dispatcher, keyword_name):
     """Test the dispatcher keyword's period argument."""
     from Cauldron import DFW
-    DFW.Keyword.Keyword("keyword", dispatcher, period=10)
+    from Cauldron.exc import CauldronAPINotImplemented
+    DFW.Keyword.Keyword(keyword_name, dispatcher, period=10)
 
-@pytest.mark.xfail
-def test_period(dispatcher):
+@pytest.mark.xfail(raises=CauldronAPINotImplemented)
+def test_period(dispatcher, keyword_name):
     """Fail with period tests."""
-    dispatcher["KEYWORD"].period(10)
+    from Cauldron.exc import CauldronAPINotImplemented
+    dispatcher[keyword_name].period(10)
     
-def test_with_non_string(dispatcher):
+def test_with_non_string(dispatcher, keyword_name):
     """Test with a non-string value."""
     with pytest.raises(TypeError):
-        dispatcher['KEYWORD'].set(10)
+        dispatcher[keyword_name].set(10)
     
-def test_value(dispatcher):
+def test_value(dispatcher, keyword_name):
     """Test the value."""
-    assert dispatcher['KEYWORD']['value'] is None
-    dispatcher['KEYWORD'].modify("1")
-    assert dispatcher["KEYWORD"]['value'] is not None
-    del dispatcher['KEYWORD'].value
-    assert dispatcher['KEYWORD']['value'] is None
+    assert dispatcher[keyword_name]['value'] is None
+    dispatcher[keyword_name].modify("1")
+    assert dispatcher[keyword_name]['value'] is not None
+    del dispatcher[keyword_name].value
+    assert dispatcher[keyword_name]['value'] is None
 
-@pytest.mark.xfail
-def test_schedule(dispatcher):
+@pytest.mark.xfail(raises=CauldronAPINotImplemented)
+def test_schedule(dispatcher, keyword_name):
     """Test the schedule method."""
     import datetime
-    dispatcher['KEYWORD'].schedule(datetime.datetime.now() + datetime.timedelta(seconds=10))
+    dispatcher[keyword_name].schedule(datetime.datetime.now() + datetime.timedelta(seconds=10))
 
-def test_setup_function(backend, servicename, config):
+def test_setup_function(backend, servicename, config, keyword_name):
     """Test a dispatcher setup function."""
     from Cauldron import DFW
     def setup(service):
         """Set up a service"""
-        kwd = DFW.Keyword.Keyword("KEYWORD", service)
+        kwd = DFW.Keyword.Keyword(keyword_name, service)
         print("Service setup")
         
     service = DFW.Service(servicename, config, setup=setup)
     print("Service __init__")
-    assert "KEYWORD" in service
+    assert keyword_name in service
     print("Service check")
     del service
     print("Service done.")
     
-def test_service_setitem(dispatcher):
+def test_service_setitem(dispatcher, keyword_name, keyword_name1):
     """Test a dispatcher service's setitem."""
     from Cauldron import DFW
-    keyword = DFW.Keyword.Keyword("KEYWORD", dispatcher)
+    keyword = DFW.Keyword.Keyword(keyword_name, dispatcher)
     with pytest.raises(ValueError):
-        DFW.Keyword.Keyword("KEYWORD", dispatcher)
+        DFW.Keyword.Keyword(keyword_name, dispatcher)
     with pytest.raises(RuntimeError):
-        dispatcher['KEYWORD'] = keyword
+        dispatcher[keyword_name] = keyword
     
     with pytest.raises(TypeError):
-        dispatcher['KEYWORD'] = 10
+        dispatcher[keyword_name] = 10
     with pytest.raises(TypeError):
-        dispatcher['OKEYWORD'] = 10
+        dispatcher[keyword_name1] = 10
 
-def test_broadcast(dispatcher):
+def test_async_read(dispatcher, servicename, keyword_name):
+    """Aysnchronous writer"""
+    dkwd = dispatcher[keyword_name]
+    dkwd.modify('1')
+    from Cauldron import ktl
+    client = ktl.Service(servicename)
+    task = client[keyword_name].read(wait=False)
+    client[keyword_name].wait(sequence=task)
+    assert client[keyword_name]['ascii'] == '1'
+    
+def test_async_write(dispatcher, servicename, keyword_name):
+    """Aysnchronous writer"""
+    dkwd = dispatcher[keyword_name]
+    dkwd.modify('1')
+    
+    from Cauldron import ktl
+    client = ktl.Service(servicename)
+    task = client[keyword_name].write('2', wait=False)
+    client[keyword_name].wait(sequence=task)
+    assert dkwd.value == '2'
+
+def test_broadcast(dispatcher, keyword_name):
     """Check that broadcast works."""
-    keyword = dispatcher['KEYWORD']
+    keyword = dispatcher[keyword_name]
     keyword.set("10")
     dispatcher.broadcast()
     
-def test_set_statuskeyword(dispatcher):
+def test_set_statuskeyword(dispatcher, keyword_name, keyword_name1):
     """Check that broadcast works."""
-    assert dispatcher.setStatusKeyword('KEYWORD')
-    assert not dispatcher.setStatusKeyword('KEYWORD')
-    assert dispatcher.setStatusKeyword('OTHERKEYWORD')
+    assert dispatcher.setStatusKeyword(keyword_name)
+    assert not dispatcher.setStatusKeyword(keyword_name)
+    assert dispatcher.setStatusKeyword(keyword_name1)
     
-def test_keyword_list(dispatcher):
+def test_keyword_list(dispatcher, keyword_name):
     """Check the keyword list."""
     assert dispatcher.keywords() == []
-    dispatcher['KEYWORD'].modify("10")
-    assert dispatcher.keywords() == ['KEYWORD']
+    dispatcher[keyword_name].modify("10")
+    assert dispatcher.keywords() == [keyword_name]
     
 
-def test_bad_initial_value(backend, servicename, config):
+def test_bad_initial_value(backend, servicename, config, keyword_name, keyword_name1):
     """Test a dispatcher setup function."""
     from Cauldron import DFW
     def setup(service):
         """Set up a service"""
-        DFW.Keyword.Boolean("BADKEYWORD", service, initial=100)
-        DFW.Keyword.Integer("KEYWORD", service, initial=100)
+        DFW.Keyword.Boolean(keyword_name1, service, initial=100)
+        DFW.Keyword.Integer(keyword_name, service, initial=100)
         
     service = DFW.Service(servicename, config, setup=setup)
-    assert "BADKEYWORD" in service
-    assert service['BADKEYWORD']['value'] == None
-    assert int(service['KEYWORD']['value']) == 100
+    assert keyword_name1 in service
+    assert service[keyword_name1]['value'] == None
+    assert int(service[keyword_name]['value']) == 100
     
-def test_write_before_begin(backend, servicename, config):
+def test_write_before_begin(backend, servicename, config, keyword_name):
     """Test a dispatcher setup function."""
     from Cauldron import DFW
     def setup(service):
         """Set up a service"""
-        DFW.Keyword.Integer("KEYWORD", service, initial=5)
-        service['KEYWORD'].modify(str(10))
+        DFW.Keyword.Integer(keyword_name, service, initial=5)
+        service[keyword_name].modify(str(10))
         
     service = DFW.Service(servicename, config, setup=setup)
-    assert "KEYWORD" in service
-    assert service['KEYWORD']['value'] == str(10)
+    assert keyword_name in service
+    assert service[keyword_name]['value'] == str(10)
 
-def test_teardown(servicename, teardown_cauldron):
-    """Check that teardown really does tear things down, in local mode."""
-    from Cauldron.api import teardown, use
-    use("local")
-    from Cauldron.DFW import Service
-    svc = Service(servicename+"2", None)
-    svc['MYKEYWORD'].modify('10')
-    teardown()
-    del svc
-    
-    use("local")
-    from Cauldron.DFW import Service
-    svc2 = Service(servicename+"2", None)
-    assert svc2['MYKEYWORD'].read() == None
-    
-def test_getitem_interface(dispatcher):
+
+def test_getitem_interface(dispatcher, keyword_name):
     """Test the getitem interface to dispatcher keywords."""
-    keyword = dispatcher['MYKEYWORD']
+    keyword = dispatcher[keyword_name]
     keyword.modify("SomeValue")
     
     assert keyword['value'] == "SomeValue"
-    assert keyword['name'] == "MYKEYWORD"
+    assert keyword['name'] == keyword_name
     assert keyword['readonly'] == False
     assert keyword['writeonly'] == False
     
@@ -267,10 +277,10 @@ def test_getitem_interface(dispatcher):
     with pytest.raises(KeyError):
         keyword[1]
     
-def test_keyword_fullname(dispatcher):
+def test_keyword_fullname(dispatcher, keyword_name):
     """Test a keyword fullname."""
-    keyword = dispatcher['MYKEYWORD']
-    assert keyword.full_name == "{0}.MYKEYWORD".format(dispatcher.name)
+    keyword = dispatcher[keyword_name]
+    assert keyword.full_name == "{0}.{1}".format(dispatcher.name, keyword_name)
     
 def test_strict_xml(backend, servicename, xmlvar):
     """Test the XML validation in strict mode."""

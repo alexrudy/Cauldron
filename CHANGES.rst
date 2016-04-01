@@ -1,6 +1,16 @@
 Changes to Cauldron
 -------------------
 
+0.5.1
+=====
+- Asynchronous support in ZMQ backend. (Quasi, network requests still happen serially.)
+- Better setup for standard ktl, supports the Cauldron keyword type interface.
+- XML support is improved when STRICT_KTL_XML is not enabled.
+- Primitive support for python3 (uses 2to3 for bundeled packages.)
+- Support for python2.6 even though astropy dropped support for it.
+- Tests more consistently generate keyword names.
+- Documentation improvements.
+
 0.5.0
 =====
 - Consistent backend registration API, which uses the ``Cauldron.backends`` entry point.

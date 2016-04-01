@@ -47,10 +47,10 @@ class Registry(object):
         """Return the active and available registry keys."""
         return list(set(self._keyword.keys()).union(self._service.keys()))
         
-    def _guard(self, msg):
+    def guard(self, msg, error=RuntimeError):
         """Guard against backends that aren't set up."""
         if self._backend is None:
-            raise RuntimeError("The backend must be set before {0}. Call Cauldron.use('backend') to set the backend.".format(msg))
+            raise error("The backend must be set before {0}. Call Cauldron.api.use('backend') to set the backend.".format(msg))
         
     def _insert_setup(self, func, backend='all'):
         """Add a setup function for a particual backend."""
@@ -69,13 +69,13 @@ class Registry(object):
     @property
     def Keyword(self):
         """The Keyword class."""
-        self._guard("accessing the Keyword class")
+        self.guard("accessing the Keyword class")
         return self._keyword[self._backend]
         
     @property
     def Service(self):
         """The Service class."""
-        self._guard("accessing the Service class")
+        self.guard("accessing the Service class")
         return self._service[self._backend]
         
     def keyword_for(self, backend, keyword=None):
@@ -122,7 +122,7 @@ class Registry(object):
         
     def setup(self):
         """Do the setup process."""
-        self._guard("calling the setup functions")
+        self.guard("calling the setup functions")
         for func in self._setup['all']:
             func()
         for func in self._setup[self._backend]:

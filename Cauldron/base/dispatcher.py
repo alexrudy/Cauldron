@@ -14,9 +14,9 @@ import warnings
 import collections
 import time
 from ..compat import WeakOrderedSet
-from .core import _BaseKeyword
+from .core import _BaseKeyword, _BaseService
 from ..config import read_configuration
-from ..exc import CauldronAPINotImplemented, NoWriteNecessary, CauldronXMLWarning, WrongDispatcher
+from ..exc import CauldronAPINotImplemented, NoWriteNecessary, CauldronXMLWarning, WrongDispatcher, CauldronWarning
 from ..utils.helpers import api_not_required, api_not_implemented, api_required, api_override
 from ..utils.callbacks import Callbacks
 from ..bundled import ktlxml
@@ -25,7 +25,7 @@ from .. import registry
 
 __all__ = ['Keyword', 'Service']
 
-def check_dispatcher_XML(service, name):
+def get_dispatcher_XML(service, name):
     """Check that the XML for the dispatcher is correct.
     
     Checks that if this service has a dispatcher value, that it
@@ -35,12 +35,8 @@ def check_dispatcher_XML(service, name):
         keyword_node = service.xml[name]
         dispatcher_node = ktlxml.get.dispatcher(keyword_node)
         dispatcher = ktlxml.get.value(dispatcher_node, 'name')
-        if dispatcher != service.dispatcher:
-            if STRICT_KTL_XML:
-                raise WrongDispatcher("service dispatcher is '%s', dispatcher for %s is '%s'" % (service.dispatcher, name, dispatcher))
-            else:
-                warnings.warn(CauldronXMLWarning("Service dispatcher '{0}' does not match keyword {1} dispatcher '{2}'".format(service.name, name, dispatcher)))
-    
+        return dispatcher
+    return None
 
 def get_initial_XML(xml, name):
     """Get the keyword's initial value from the XML configuraton.
@@ -102,7 +98,12 @@ class Keyword(_BaseKeyword):
         
         try:
             if service.xml is not None:
-                check_dispatcher_XML(service, name)
+                dispatcher = get_dispatcher_XML(service, name)
+                if dispatcher != service.dispatcher:
+                    if STRICT_KTL_XML:
+                        raise WrongDispatcher("service dispatcher is '%s', dispatcher for %s is '%s'" % (service.dispatcher, name, dispatcher))
+                    warnings.warn(CauldronXMLWarning("Service {0} dispatcher '{1}' does not match keyword {2} dispatcher '{3}'".format(service.name, service.dispatcher, name, dispatcher)))
+                
                 if initial is None:
                     initial = get_initial_XML(service.xml, name)
         except Exception as e:
@@ -275,19 +276,17 @@ class Keyword(_BaseKeyword):
         return value
 
 
-@six.add_metaclass(abc.ABCMeta)
-class Service(object):
+class Service(_BaseService):
     """A dispatcher is a KTL service server-side. It owns the values."""
     
     name = None
     
     def __init__(self, name, config, setup=None, dispatcher=None):
-        super(Service, self).__init__()
+        super(Service, self).__init__(name=name)
         
         self._config = read_configuration(config)
         self._configuration_location = config if isinstance(config, six.string_types) else "???"
         self.dispatcher = dispatcher if dispatcher else "DEFAULT"
-        self.name = name.lower()
         self.log = logging.getLogger("DFW.Service.{0}".format(self.name))
         self.log.info("Starting Service '{0}' using backend '{1}'".format(self.name, registry.dispatcher.backend))
         
@@ -307,7 +306,8 @@ class Service(object):
             # Implementors will be expected to assign Keyword instances
             # for each KTL keyword in this KTL service.
             for keyword in self.xml.list():
-                self._keywords[keyword] = None
+                if self.dispatcher == get_dispatcher_XML(self, keyword):
+                    self._keywords[keyword] = None
         
         self._prepare()
         
@@ -317,10 +317,6 @@ class Service(object):
         self.setupOrphans()
         
         self.begin()
-    
-    def __repr__(self):
-        """Represent this object"""
-        return "<{0} name='{1}' at {2}>".format(self.__class__.__name__, self.name, hex(id(self)))
     
     @property
     def _Keyword_cls(self):
@@ -345,7 +341,9 @@ class Service(object):
         """Set up orphaned keywords, that is keywords which aren't attached to a specific keyword class."""
         for name, keyword in self._keywords.items():
             if keyword is None:
-                self._setupOrphan(name)
+                dispatcher = get_dispatcher_XML(self, name)
+                if dispatcher == self.dispatcher:
+                    self._setupOrphan(name)
     
     def _setupOrphan(self, name):
         """Set up a single orphan."""
@@ -357,12 +355,17 @@ class Service(object):
         except Exception as e:
             if STRICT_KTL_XML:
                 raise
+            warnings.warn(CauldronXMLWarning("XML setup for orphan keyword {0} failed: {1}".format(name, str(e))))
             cls = DFW.Keyword.Keyword
         
         try:
             cls(name, service=self)
         except WrongDispatcher:
             pass
+        else:
+            warnings.warn(CauldronWarning("Set up an orphaned keyword {0} for service {1} dispatcher {2}".format(
+                name, self.name, self.dispatcher
+            )))
     
     @api_override
     def _prepare(self):
@@ -387,7 +390,7 @@ class Service(object):
                     keyword.set(initial)
                 except ValueError as e:
                     self.log.error("Bad initial value '%s' for '%s'", initial, keyword.name)
-                    self.log.error(e)
+                    self.log.error(str(e))
         
         self._begin()
         

@@ -20,6 +20,7 @@ import logging
 from .exc import CauldronAPINotImplementedWarning, CauldronXMLWarning
 from .api import guard_use, STRICT_KTL_XML
 from .bundled import ktlxml
+from .base.core import _CauldronBaseMeta
 from . import registry
 
 __all__ = ['KeywordType', 'Basic', 'Keyword', 'Boolean', 'Double', 'Float', 'Integer', 'Enumerated', 'Mask', 'String', 'IntegerArray', 'FloatArray', 'DoubleArray', 'dispatcher_keyword', 'client_keyword']
@@ -41,7 +42,20 @@ def client_keyword(cls):
 def generate_keyword_subclasses(basecls, subclasses, module):
     """Given a base class, generate keyword subclasses."""
     for subclass in subclasses:
-        yield type(subclass.__name__, (subclass, basecls), dict(__module__=module))
+        cls = type(subclass.__name__, (subclass, basecls), dict(__module__=module))
+        subclass.cls = cls
+        yield cls
+
+def _setup_keyword_class(kwcls, module):
+    """Set up a keyword class on a module."""
+    if kwcls.KTL_TYPE is not None:
+        if not hasattr(module, kwcls.__name__):
+            # Don't replace already existing keywords.
+            setattr(module, kwcls.__name__, kwcls)
+            module.__all__.append(kwcls.__name__)
+        module.types[kwcls.KTL_TYPE] = kwcls
+        for alias in kwcls.KTL_ALIASES:
+            module.types[alias] = kwcls
 
 @registry.client.setup_for('all')
 def setup_client_keyword_module():
@@ -50,15 +64,7 @@ def setup_client_keyword_module():
     basecls = registry.client.Keyword
     from .ktl import Keyword
     for kwcls in generate_keyword_subclasses(basecls, _client, module="ktl.Keyword"):
-        if hasattr(Keyword, kwcls.__name__):
-            # Don't replace already existing keywords.
-            continue
-        setattr(Keyword, kwcls.__name__, kwcls)
-        Keyword.__all__.append(kwcls.__name__)
-        if kwcls.KTL_TYPE is not None:
-            Keyword.types[kwcls.KTL_TYPE] = kwcls
-            for alias in kwcls.KTL_ALIASES:
-                Keyword.types[alias] = kwcls
+        _setup_keyword_class(kwcls, Keyword)
     Keyword.__all__ = list(set(Keyword.__all__))
     
 @registry.dispatcher.setup_for('all')
@@ -68,26 +74,23 @@ def setup_dispatcher_keyword_module():
     basecls = registry.dispatcher.Keyword
     from .DFW import Keyword
     for kwcls in generate_keyword_subclasses(basecls, _dispatcher, module="DFW.Keyword"):
-        if hasattr(Keyword, kwcls.__name__):
-            # Don't replace already existing keywords.
-            continue
-        setattr(Keyword, kwcls.__name__, kwcls)
-        Keyword.__all__.append(kwcls.__name__)
-        if kwcls.KTL_TYPE is not None:
-            Keyword.types[kwcls.KTL_TYPE] = kwcls
-            for alias in kwcls.KTL_ALIASES:
-                Keyword.types[alias] = kwcls
+        _setup_keyword_class(kwcls, Keyword)
     Keyword.__all__ = list(set(Keyword.__all__))
     
 
-@six.add_metaclass(abc.ABCMeta)
+@six.add_metaclass(_CauldronBaseMeta)
 class KeywordType(object):
     """A base class for all subclasses of KTL Keyword which implement a type specialization.
     
     The name of each type specialization is available as the :attr:`KTL_TYPE` class attribute.
     """
     KTL_TYPE = None
+    """The KTL-API type name corresponding to this class."""
+    
     KTL_ALIASES = ()
+    """A list of additional KTL-API type names that can be used with this class."""
+    
+    cls = None
     
     def __init__(self, *args, **kwargs):
         super(KeywordType, self).__init__(*args, **kwargs)

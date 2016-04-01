@@ -4,7 +4,7 @@
 		<name>+service+_dispatch_1</name>
 	</dispatcher>
 	<keyword>
-		<name>LOOP</name>
+		<name>KEYWORD_ENUMERATED</name>
 		<type>enumerated</type>
 		<help level="brief">Control loop mode</help>
 		<help level="verbose">Control loop mode.</help>

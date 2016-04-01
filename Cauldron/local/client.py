@@ -4,13 +4,23 @@ from __future__ import absolute_import
 
 import weakref
 import warnings
+import threading
 
 from .dispatcher import Service as Dispatcher
 from ..base import ClientService, ClientKeyword
+from ..base.core import Task as _BaseTask
 from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented, ServiceNotStarted, DispatcherError
 from .. import registry
 
 __all__ = ['Service', 'Keyword']
+
+def _local_task_callback(arg):
+    return arg
+
+class LocalTask(_BaseTask):
+    """A simple object to mock asynchronous operations."""
+    def __init__(self, result, timeout=None):
+        super(LocalTask, self).__init__(result, callback=_local_task_callback, timeout=timeout)
 
 @registry.client.keyword_for("local")
 class Keyword(ClientKeyword):
@@ -47,15 +57,18 @@ class Keyword(ClientKeyword):
         if not self['reads']:
             raise ValueError("Keyword '{0}' does not support reads, it is write-only.".format(self.name))
         
-        if not wait or timeout is not None:
-            warnings.warn("Cauldron.local doesn't support asynchronous reads.", CauldronAPINotImplementedWarning)
-        
         try:
             new_value = self.source.update()
         except Exception as e:
             raise DispatcherError("Error in Dispatcher: {0}".format(str(e)))
         else:
             self._update(new_value)
+            
+        if not wait:
+            warnings.warn("Cauldron.local doesn't support asynchronous reads. Returning a fake task object.", CauldronAPINotImplementedWarning)
+            task = LocalTask(self._current_value(binary=binary, both=both), timeout=timeout)
+            task()
+            return task
             
         return self._current_value(binary=binary, both=both)
         
@@ -64,8 +77,6 @@ class Keyword(ClientKeyword):
         if not self['writes']:
             raise ValueError("Keyword '{0}' does not support writes, it is read-only.".format(self.name))
         
-        if (not wait) or (timeout is not None):
-            warnings.warn("Cauldron.local doesn't support asynchronous writes.", CauldronAPINotImplementedWarning)
         # User-facing convenience to make writes smoother.
         try:
             value = self.cast(value)
@@ -77,8 +88,16 @@ class Keyword(ClientKeyword):
         except Exception as e:
             raise DispatcherError("Error in Dispatcher: {0}".format(str(e)))
         
+        if not wait:
+            warnings.warn("Cauldron.local doesn't support asynchronous writes. Returning a fake task object.", CauldronAPINotImplementedWarning)
+            task = LocalTask(None, timeout=timeout)
+            task()
+            return task
+        
         
     def wait(self, timeout=None, operator=None, value=None, sequence=None, reset=False, case=False):
+        if sequence is not None:
+            return sequence.wait()
         raise CauldronAPINotImplemented("Asynchronous operations are not supported for Cauldron.local")
 
 @registry.client.service_for("local")

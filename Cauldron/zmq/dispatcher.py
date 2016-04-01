@@ -196,7 +196,6 @@ class Service(DispatcherService):
             response.verify(self)
         
     def shutdown(self):
-        """Shutdown this object."""
         zmq = check_zmq()
         if hasattr(self, '_thread') and self._thread.is_alive():
             self._thread.stop()

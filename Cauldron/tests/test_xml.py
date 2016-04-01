@@ -15,26 +15,23 @@ def test_xml_index(xmlpath, servicename):
     from ..bundled import ktlxml
     index = ktlxml.index(servicename, directory=xmlpath)
     
-def test_xml_Service(xmlpath, servicename):
+def test_xml_Service(xmlpath, servicename, keyword_name_ENUMERATED):
     """Test the XML service object."""
     from ..bundled import ktlxml
     xml = ktlxml.Service(servicename, directory=xmlpath)
-    assert "LOOP" in xml
+    assert keyword_name_ENUMERATED in xml
     
-def test_Service_with_xml(xmlvar, backend, servicename, config):
+def test_Service_with_xml(xmlvar, backend, servicename, config, missing_keyword_name, keyword_name_ENUMERATED):
     """Test a service with XML."""
     from Cauldron import DFW
-    svc = DFW.Service(servicename, config)
-    try:
-        assert svc.xml is not None
-        assert "LOOP" in svc
-        assert "KEYWORD" not in svc
-        kwd = svc["KEYWORD"]
-        assert "KEYWORD" in svc
-        kwd = svc["LOOP"]
-        assert kwd.KTL_TYPE == 'enumerated'
-    finally:
-        svc.shutdown()
+    svc = DFW.Service(servicename, config, dispatcher='+service+_dispatch_1')
+    assert svc.xml is not None
+    assert keyword_name_ENUMERATED in svc
+    assert missing_keyword_name not in svc
+    kwd = svc[missing_keyword_name]
+    assert missing_keyword_name in svc
+    kwd = svc[keyword_name_ENUMERATED]
+    assert kwd.KTL_TYPE == 'enumerated'
     
 def test_Service_with_strict_xml(backend, servicename, config, dispatcher_name):
     """Test the backend with strict xml enabled, so it should raise an exception."""
@@ -50,36 +47,31 @@ def test_Service_with_strict_xml(backend, servicename, config, dispatcher_name):
         svc = DFW.Service(servicename, config, dispatcher=dispatcher_name)
     
 
-def test_Keyword_with_xml(xmlvar, dispatcher):
+def test_Keyword_with_xml(xmlvar, dispatcher, keyword_name_ENUMERATED):
     """Test the backend with XML enabled."""
-    keyword = dispatcher['LOOP']
+    keyword = dispatcher[keyword_name_ENUMERATED]
     
-def test_Keyword_with_strict_xml(strictxml, dispatcher):
+def test_Keyword_with_strict_xml(strictxml, dispatcher, keyword_name_ENUMERATED, missing_keyword_name):
     """Test keyword with strict xml"""
-    keyword = dispatcher['LOOP']
+    keyword = dispatcher[keyword_name_ENUMERATED]
     
     assert keyword.initial == "Open"
     
     with pytest.raises(KeyError):
-        dispatcher["OTHERKEYWORD"]
+        dispatcher[missing_keyword_name]
         
 
-def test_Service_with_dispatcher(xmlvar, backend, servicename, config):
+def test_Service_with_dispatcher(xmlvar, backend, servicename, config, keyword_name_ENUMERATED, dispatcher_name):
     """XML service with dispatcher explicitly set."""
     from Cauldron import DFW
-    svc = DFW.Service(servicename, config, dispatcher='+service+_dispatch_2')
-    try:
-        keyword = svc['LOOP']
-    finally:
-        svc.shutdown()
+    svc = DFW.Service(servicename, config, dispatcher=dispatcher_name)
+    keyword = svc[keyword_name_ENUMERATED]
+    svc.shutdown()
     
-def test_Service_with_wrong_dispatcher(strictxml, backend, servicename, config):
+def test_Service_with_wrong_dispatcher(strictxml, backend, servicename, config, keyword_name_ENUMERATED, dispatcher_name2):
     """XML service with dispatcher explicitly set."""
     from Cauldron import DFW
     from Cauldron.exc import WrongDispatcher
-    svc = DFW.Service(servicename, config, dispatcher='+service+_dispatch_2')
-    try:
-        with pytest.raises(WrongDispatcher):
-            keyword = svc['LOOP']
-    finally:
-        svc.shutdown()
+    svc = DFW.Service(servicename, config, dispatcher=dispatcher_name2)
+    with pytest.raises(WrongDispatcher):
+        keyword = svc[keyword_name_ENUMERATED]
