@@ -4,7 +4,7 @@ Implements the abstract-base Keyword and Service classes used for clients.
 This piece of Cauldron is a rough mock of :mod:`ktl`, the client side interface.
 
 The actual implementation of client side features outside of the :class:`Keyword` and :class:`Service` classes
-is in the :mod:`_ktl` module.
+is in the :mod:`~Cauldron.ktl` module.
 """
 from __future__ import absolute_import
 
@@ -25,7 +25,7 @@ from ..utils.helpers import api_not_required, api_not_implemented, api_required,
 __all__ = ['Keyword', 'Service']
 
 class Keyword(_BaseKeyword):
-    """A keyword object.
+    """A client-side KTL keyword object.
     
     Parameters
     ----------
@@ -216,7 +216,7 @@ class Keyword(_BaseKeyword):
 
 @six.add_metaclass(abc.ABCMeta)
 class Service(_BaseService):
-    """A Cauldron-based service.
+    """A client-side KTL service object.
     
     :param name: The KTL service name.
     :param bool populate: Whether to pre-populate this KTL service with all of the known keys.

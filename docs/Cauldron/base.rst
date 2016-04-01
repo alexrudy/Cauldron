@@ -14,21 +14,21 @@ API Implementation Status
 
 A brief summary of major KTL API features is provided in the table below. API features marked as *Planned* are ones that I do intend to implement at some point in support of ShadyAO. API features marked as *Not Implemented* would require more work.
 
-======================== ===================
-Feature                  Status
-======================== ===================
-Synchronous read/write   Implemented
-Asynchronous read/write  *Planned*
-Heartbeats               *Planned*
-Callbacks                Implemented
-Polling                  Not Implemented
-Scheduling               Not Implemented
-Expressions              Not Implemented
-XML Keyword Validation   Implemented
-Operator Overloading     Not Implemented
-======================== ===================
+======================== =================== ========
+Feature                  Status              Comments
+======================== =================== ========
+Synchronous read/write   Implemented         
+Asynchronous read/write  *Implemented*       KTL calls are still serial on most backends.
+Heartbeats               *Planned*           
+Callbacks                Implemented         
+Polling                  Not Implemented     
+Scheduling               Not Implemented     
+Expressions              Not Implemented     
+XML Keyword Validation   Implemented         
+Operator Overloading     Not Implemented     
+======================== =================== ========
 
-When Cauldron does not implement a feature, using that feature will raise an :exc:`CauldronAPINotImplemented` error, which is a subclass of :exc:`NotImplementedError`.
+When Cauldron does not implement a feature, using that feature will raise an :exc:`~Cauldron.exc.CauldronAPINotImplemented` error, which is a subclass of :exc:`NotImplementedError`.
 
 Reference/API
 =============

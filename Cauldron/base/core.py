@@ -58,8 +58,11 @@ class Task(object):
 @six.add_metaclass(_CauldronBaseMeta)
 class _BaseService(object):
     """Common service implementation details between the client and the dispatcher."""
+    
     def __init__(self, name):
         super(_BaseService, self).__init__()
+        
+        #: Service name (string, lower-case)
         self.name = str(name).lower()
         
     def __repr__(self):
@@ -73,7 +76,7 @@ class _BaseKeyword(object):
     _ALLOWED_KEYS = None
     
     service = None
-    #: The parent :class:`Service` object for this keyword.
+    """The parent :class:`Service` object for this keyword."""
     
     def __init__(self, service, name, type=None):
         super(_BaseKeyword, self).__init__()
