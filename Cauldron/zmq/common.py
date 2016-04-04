@@ -30,7 +30,7 @@ def zmq_get_bind(config, name, group='zmq'):
     if url.startswith("tcp://"):
         parts = list(url.split(":"))
         host = parts[1][2:]
-        if host != "*":
+        if host == "localhost":
             parts[1] = "//" + socket.gethostbyname(host)
         url = ":".join(parts)
     return url
