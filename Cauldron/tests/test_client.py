@@ -39,7 +39,6 @@ def test_monitored(service, client, keyword_name):
     """Check for clients which broadcast, should be true by default."""
     assert client[keyword_name]['monitored'] == False
     assert client[keyword_name]['monitor'] == False
-    service.shutdown()
     
 def test_has_keyword(service, client, keyword_name, missing_keyword_name):
     """Has keyword."""
@@ -49,14 +48,12 @@ def test_has_keyword(service, client, keyword_name, missing_keyword_name):
     assert not client.has_keyword(missing_keyword_name)
     assert not client.has_key(missing_keyword_name)
     assert missing_keyword_name not in client
-    service.shutdown()
     
     
 def test_missing_keyword(service, client, missing_keyword_name):
     """Test missing keyword."""
     with pytest.raises(KeyError):
         client[missing_keyword_name]
-    service.shutdown()
     
     
 def test_populate_keywords(backend, servicename, service, keyword_name, missing_keyword_name):
@@ -65,7 +62,6 @@ def test_populate_keywords(backend, servicename, service, keyword_name, missing_
     client = ktl.Service(servicename, populate=True)
     assert keyword_name in client.populated()
     assert missing_keyword_name not in client.populated()
-    service.shutdown()
     
     
 def test_populated_keyword(service, client, keyword_name):
@@ -74,30 +70,21 @@ def test_populated_keyword(service, client, keyword_name):
     client[keyword_name].write("10")
     client[keyword_name].read()
     assert client[keyword_name]['populated'] == True
-    service.shutdown()
-    
-    
 
 def test_clone(service, client, keyword_name):
     """Test the clone."""
     assert client[keyword_name].clone().name == keyword_name
-    service.shutdown()
-    
 
 def test_timestamp(service, client, keyword_name):
     """Test timestamp"""
     client[keyword_name].write("10")
     client[keyword_name].read()
-    assert isinstance(client[keyword_name]['timestamp'], float)
-    service.shutdown()
-    
+    assert isinstance(client[keyword_name]['timestamp'], float)    
 
 def test_populated(service, client, keyword_name):
     """Test populated."""
     keyword = client[keyword_name]
     assert client.populated() == [keyword_name]
-    service.shutdown()
-    
     
 def test_binary(service, client, keyword_name):
     """Get the binary version of a keyword value."""
@@ -105,8 +92,6 @@ def test_binary(service, client, keyword_name):
     keyword.write("SomeValue")
     keyword.read()
     assert keyword['binary'] == "SomeValue"
-    service.shutdown()
-    
     
 def test_current_value(service, client, keyword_name):
     """Get the current value."""
@@ -117,7 +102,6 @@ def test_current_value(service, client, keyword_name):
     assert keyword._current_value(both=True) == ("SomeValue", "SomeValue")
     assert keyword._current_value(binary=True) == "SomeValue"
     assert keyword._current_value(both=True, binary=True) == ("SomeValue", "SomeValue")
-    service.shutdown()
 
 def test_monitor(service, client, waittime, keyword_name):
     """Test .monitor() for asynchronous broadcast monitoring."""
