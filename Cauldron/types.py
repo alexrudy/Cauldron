@@ -48,7 +48,7 @@ def _generate_keyword_subclass(basecls, subclass, module):
         doc = _inherited_docstring(basecls)
     cls = type(subclass.__name__, (subclass, basecls),
         {'__module__':module, '__doc__':doc})
-    subclass.cls = cls
+    subclass._subcls = cls
     return cls
     
 def generate_keyword_subclasses(basecls, subclasses, module):
@@ -101,23 +101,35 @@ class KeywordType(object):
     KTL_ALIASES = ()
     """A list of additional KTL-API type names that can be used with this class."""
     
-    cls = None
+    _subcls = None
     
     @classmethod
     def _get_cauldron_basecls(cls):
         """Get the Cauldron basecls."""
         raise RuntimeError("Generic KeywordType shouldn't try to subclass itself.")
         
+    @classmethod
+    def _make_subclass(cls, basecls):
+        """Make a Cauldron subclass."""
+        if cls.__dict__.get('_subcls',None) is None or not issubclass(cls._subcls, basecls):
+            cls._subcls = type(cls.__name__, (cls, basecls), {'__module__':cls.__module__, '__doc__':cls.__doc__})
+        return cls._subcls
     
     def __new__(cls, *args, **kwargs):
         if cls.KTL_TYPE is None:
             basecls = cls._get_cauldron_basecls()
             if not issubclass(cls, basecls):
-                newcls = type(cls.__name__, (cls, basecls), {'__module__':cls.__module__, '__doc__':cls.__doc__})
+                newcls = cls._make_subclass(basecls)
                 return newcls.__new__(newcls, *args, **kwargs)
+        
+        # See http://stackoverflow.com/questions/19277399/why-does-object-new-work-differently-in-these-three-cases for why this is necessary.
+        # Basically, because some child may override __new__, we must override it here to never pass arguments to the object.__new__ method.
+        if super(KeywordType, cls).__new__ is object.__new__:
+            return super(KeywordType, cls).__new__(cls)
         return super(KeywordType, cls).__new__(cls, *args, **kwargs)
     
-    
+    def __init__(self, *args, **kwargs):
+        super(KeywordType, self).__init__(*args, **kwargs)
 
 class DispatcherKeywordType(KeywordType):
     """Keyword type for dispatchers."""
