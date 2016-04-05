@@ -184,7 +184,7 @@ def setup_entry_points():
     if CAULDRON_ENTRYPOINT_SETUP:
         return
     for ep in pkg_resources.iter_entry_points('Cauldron.backends'):
-        if six.PY2 and sys.version_info[1] < 7:
+        if hasattr(ep, 'load'):
             obj = ep.load(require=False)
         else:
             obj = ep.resolve()
