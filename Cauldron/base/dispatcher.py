@@ -277,7 +277,25 @@ class Keyword(_BaseKeyword):
 
 
 class Service(_BaseService):
-    """A dispatcher is a KTL service server-side. It owns the values."""
+    """A dispatcher is a KTL service server-side.
+    
+    A class encapsulating a basic representation of a complete KTL service. The `name` argument is case sensitive, and will be used to locate (and load) the service's KTLXML representation. The `config` argument specifies the stdiosvc configuration file that will be used when loading the stdiosvc front-end. The `setup` function will be called to properly instantiate all keywords associated with this :class:`Service` instance; it accepts a :class:`Service` instance as its sole argument, and should instantiate :class:`Keyword.Basic` objects directly. If any keywords are not instantiated, they will be given placeholder "cacheing" :class:`Keyword.Basic` instances of the appropriate type (string, integer, etc.). See :func:`setupOrphans` for an example. If `dispatcher` is specified, only keywords corresponding to that dispatcher number will be instantiated.
+    
+    Parameters
+    ----------
+    name : str
+        the Service name.
+    
+    config : str
+        the stdiosvc configuration filename, or the Cauldron configuration filename.
+    
+    setup : callable
+        a function which will be called to set up the keywords for this service.
+    
+    dispatcher : str, optional
+        The name of the dispatcher to use for this service. If not provided, all keywords will be used.
+    
+    """
     
     name = None
     
