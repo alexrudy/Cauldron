@@ -165,13 +165,17 @@ def parseModifyCommands(parser, commands, flags):
 
 def modify():
     """Argument parsing and actions for modify"""
-    parser = argparse.ArgumentParser(description="Show a single keyword value.")
+    epilog="""
+    For compatibility with the KROOT version of this script, flags may be passed without the prefix '-' in the list of regular command items. For example, to modify with nowait, you could write `modify -s SVC KWD=blah nowait`
+    
+    """
+    parser = argparse.ArgumentParser(description="Modify a keyword value or a series of keyword values on a given KTL service.", epilog=epilog)
     parser.add_argument('-c', '--configuration', action=ConfigureAction, 
-        help="The Cauldron configuration file.")
+        help="The Cauldron configuration file.", metavar='config.cfg')
     parser.add_argument('-k', '--backend', action=BackendAction, default='ktl',
         help="The Cauldron Backend to use.")
     parser.add_argument('-s', '--service', type=str, required=True,
-        help="Name of the KTL service containing the keyword(s) to display.")
+        help="Name of the KTL service containing the keyword(s) to modify.")
     parser.add_argument('-b', '--binary', action='store_true',
         help="Interpret an argument as.")
     parser.add_argument('-d', '--debug', action='store_true',
