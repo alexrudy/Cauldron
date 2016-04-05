@@ -1,6 +1,12 @@
 Changes to Cauldron
 -------------------
 
+0.5.2
+=====
+- Fixed a bug in ZMQ addressing to properly specify
+- Console script implementations of ``modify`` and ``show``.
+- Improved ``ktl.procedural`` to match most features of the original. (Some no-ops are not implemented.)
+
 0.5.1
 =====
 - Asynchronous support in ZMQ backend. (Quasi, network requests still happen serially.)
