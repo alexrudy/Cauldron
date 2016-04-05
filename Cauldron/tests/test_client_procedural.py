@@ -11,6 +11,14 @@ def test_read_write(service, servicename, keyword_name):
     write(servicename, keyword_name, "10")
     assert read(servicename, keyword_name) == "10"
     
+def test_argument_checking(service, servicename, keyword_name):
+    """Check argument type checking."""
+    from Cauldron.ktl.procedural import read, write
+    with pytest.raises(TypeError):
+        read(1, "hello")
+    with pytest.raises(TypeError):
+        read(servicename, 1)
+    
 
 def test_monitor(service, waittime, keyword_name, servicename):
     """Test .monitor() for asynchronous broadcast monitoring."""
