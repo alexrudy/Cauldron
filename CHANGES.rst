@@ -6,6 +6,7 @@ Changes to Cauldron
 - Fixed a bug in ZMQ addressing to properly specify
 - Console script implementations of ``modify`` and ``show``.
 - Improved ``ktl.procedural`` to match most features of the original. (Some no-ops are not implemented.)
+- Documentation now uses full ktl/DFW api for ease of use.
 
 0.5.1
 =====
