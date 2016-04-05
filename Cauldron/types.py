@@ -106,15 +106,14 @@ class KeywordType(object):
     @classmethod
     def _get_cauldron_basecls(cls):
         """Get the Cauldron basecls."""
-        registry.dispatcher.guard("initializing any keyword objects.")
-        return registry.dispatcher.Keyword
+        raise RuntimeError("Generic KeywordType shouldn't try to subclass itself.")
         
     
     def __new__(cls, *args, **kwargs):
         if cls.KTL_TYPE is None:
             basecls = cls._get_cauldron_basecls()
             if not issubclass(cls, basecls):
-                newcls = type(cls.__name__, (cls, basecls), {'__module__':cls.__module__})
+                newcls = type(cls.__name__, (cls, basecls), {'__module__':cls.__module__, '__doc__':cls.__doc__})
                 return newcls.__new__(newcls, *args, **kwargs)
         return super(KeywordType, cls).__new__(cls, *args, **kwargs)
     
@@ -122,7 +121,12 @@ class KeywordType(object):
 
 class DispatcherKeywordType(KeywordType):
     """Keyword type for dispatchers."""
-    pass
+    
+    @classmethod
+    def _get_cauldron_basecls(cls):
+        """Get the Cauldron basecls."""
+        registry.dispatcher.guard("initializing any keyword objects.")
+        return registry.dispatcher.Keyword
     
 class ClientKeywordType(KeywordType):
     """Keyword type for ktl clients."""
