@@ -18,10 +18,11 @@ import abc
 import six
 import logging
 from .exc import CauldronAPINotImplementedWarning, CauldronXMLWarning
-from .api import guard_use, STRICT_KTL_XML
+from .api import guard_use, STRICT_KTL_XML, BASENAME
 from .bundled import ktlxml
 from .base.core import _CauldronBaseMeta
 from . import registry
+from .utils.helpers import _inherited_docstring, _prepend_to_docstring
 
 __all__ = ['KeywordType', 'Basic', 'Keyword', 'Boolean', 'Double', 'Float', 'Integer', 'Enumerated', 'Mask', 'String', 'IntegerArray', 'FloatArray', 'DoubleArray', 'dispatcher_keyword', 'client_keyword']
 
@@ -42,20 +43,26 @@ def client_keyword(cls):
 def generate_keyword_subclasses(basecls, subclasses, module):
     """Given a base class, generate keyword subclasses."""
     for subclass in subclasses:
-        cls = type(subclass.__name__, (subclass, basecls), dict(__module__=module))
+        if getattr(subclass, '__doc__', None) is not None:
+            doc = _prepend_to_docstring(_inherited_docstring(basecls), subclass.__doc__)
+        else:
+            doc = _inherited_docstring(basecls)
+        cls = type(subclass.__name__, (subclass, basecls),
+            {'__module__':module, '__doc__':doc})
         subclass.cls = cls
         yield cls
 
 def _setup_keyword_class(kwcls, module):
     """Set up a keyword class on a module."""
     if kwcls.KTL_TYPE is not None:
+        module.types[kwcls.KTL_TYPE] = kwcls
+        for alias in kwcls.KTL_ALIASES:
+            module.types[alias] = kwcls
         if not hasattr(module, kwcls.__name__):
             # Don't replace already existing keywords.
             setattr(module, kwcls.__name__, kwcls)
             module.__all__.append(kwcls.__name__)
-        module.types[kwcls.KTL_TYPE] = kwcls
-        for alias in kwcls.KTL_ALIASES:
-            module.types[alias] = kwcls
+
 
 @registry.client.setup_for('all')
 def setup_client_keyword_module():
@@ -63,7 +70,7 @@ def setup_client_keyword_module():
     guard_use("setting up the ktl.Keyword module")
     basecls = registry.client.Keyword
     from .ktl import Keyword
-    for kwcls in generate_keyword_subclasses(basecls, _client, module="ktl.Keyword"):
+    for kwcls in generate_keyword_subclasses(basecls, _client, module="{0}.ktl.Keyword".format(BASENAME)):
         _setup_keyword_class(kwcls, Keyword)
     Keyword.__all__ = list(set(Keyword.__all__))
     
@@ -73,7 +80,7 @@ def setup_dispatcher_keyword_module():
     guard_use("setting up the DFW.Keyword module")
     basecls = registry.dispatcher.Keyword
     from .DFW import Keyword
-    for kwcls in generate_keyword_subclasses(basecls, _dispatcher, module="DFW.Keyword"):
+    for kwcls in generate_keyword_subclasses(basecls, _dispatcher, module="{0}.DFW.Keyword".format(BASENAME)):
         _setup_keyword_class(kwcls, Keyword)
     Keyword.__all__ = list(set(Keyword.__all__))
     
