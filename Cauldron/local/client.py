@@ -24,7 +24,6 @@ class LocalTask(_BaseTask):
 
 @registry.client.keyword_for("local")
 class Keyword(ClientKeyword):
-    """A keyword for local dispatcher implementations."""
     
     @property
     def source(self):
@@ -102,7 +101,6 @@ class Keyword(ClientKeyword):
 
 @registry.client.service_for("local")
 class Service(ClientService):
-    """A local service client."""
     
     def __init__(self, name, populate=False):
         try:

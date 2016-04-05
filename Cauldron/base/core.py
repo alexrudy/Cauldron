@@ -13,11 +13,18 @@ import threading
 
 from ..config import get_timeout
 from ..utils.callbacks import WeakMethod
+from ..utils.helpers import _inherited_docstring
 
 from astropy.utils.misc import InheritDocstrings
 
-class _CauldronBaseMeta(abc.ABCMeta, InheritDocstrings):
+class _CauldronBaseMeta(InheritDocstrings, abc.ABCMeta):
     """Combined MetaClass for Cauldron classes."""
+    
+    def __new__(mcls, name, bases, dct):
+        doc = dct.get('__doc__', None)
+        if doc is None or doc.strip() == '':
+            doc = dct['__doc__'] = _inherited_docstring(*bases)
+        return super(_CauldronBaseMeta, mcls).__new__(mcls, name, bases, dct)
 
 class Task(object):
     """A task container for the task queue."""
