@@ -20,7 +20,6 @@ import logging
 from .exc import CauldronAPINotImplementedWarning, CauldronXMLWarning
 from .api import guard_use, STRICT_KTL_XML, BASENAME
 from .bundled import ktlxml
-from .base.core import _CauldronBaseMeta
 from . import registry
 from .utils.helpers import _inherited_docstring, _prepend_to_docstring
 

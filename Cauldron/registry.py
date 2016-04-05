@@ -76,10 +76,8 @@ class Registry(object):
         self.guard("accessing the Keyword class")
         if self._keyword_cls is None:
             cls = self._keyword[self._backend]
-            __doc__ = _inherited_docstring(cls)
             self._keyword_cls = type('Keyword', (cls,),
-                {'__module__':'{0}.Keyword'.format(self._modname),
-                 '__doc__':__doc__})
+                {'__module__':'{0}.Keyword'.format(self._modname)})
         return self._keyword[self._backend]
         
     @property
@@ -88,10 +86,8 @@ class Registry(object):
         self.guard("accessing the Service class")
         if self._service_cls is None:
             cls = self._service[self._backend]
-            __doc__ = _inherited_docstring(cls)
             self._service_cls = type('Service', (cls,),
-                {'__module__':'{0}.Service'.format(self._modname),
-                 '__doc__':__doc__})
+                {'__module__':'{0}.Service'.format(self._modname)})
         return self._service_cls
         
     def keyword_for(self, backend, keyword=None):

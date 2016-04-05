@@ -155,7 +155,7 @@ class _ZMQResponder(ZMQMicroservice):
 
 @registry.dispatcher.service_for("zmq")
 class Service(DispatcherService):
-    """A ZMQ-based service."""
+    # A ZMQ-based service.
     def __init__(self, name, config, setup=None, dispatcher=None):
         zmq = check_zmq()
         self.ctx = zmq.Context.instance()
@@ -223,7 +223,7 @@ class Service(DispatcherService):
 
 @registry.dispatcher.keyword_for("zmq")
 class Keyword(DispatcherKeyword):
-    """A keyword object for ZMQ Cauldron backends."""
+    # A keyword object for ZMQ Cauldron backends.
     
     def _broadcast(self, value):
         """Broadcast this keyword value."""

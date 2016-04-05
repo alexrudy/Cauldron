@@ -17,7 +17,6 @@ registry.dispatcher.teardown_for("mock")(clear)
 
 @registry.dispatcher.service_for("mock")
 class Service(LDService):
-    """A minorly-modified service for the mock backend."""
     
     @classmethod
     def get_service(cls, name):
@@ -35,7 +34,7 @@ registry.dispatcher.keyword_for("mock", LDKeyword)
 from .local.client import Service as LCService
 @registry.client.service_for("mock")
 class Service(LCService):
-    """Local Service"""
+    
     def __init__(self, name, populate=False):
         self._dispatcher = MDService.get_service(name)
         super(LCService, self).__init__(name, populate)
