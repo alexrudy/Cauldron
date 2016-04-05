@@ -5,6 +5,7 @@ A registry of setup and teardown functions for dispatchers and clients.
 
 import collections
 from .compat import WeakOrderedSet
+from .utils.helpers import _inherited_docstring
 
 __all__ = ['client', 'dispatcher', 'keys', 'teardown', 'Registry']
 
@@ -27,7 +28,7 @@ class Registry(object):
         
     
     """
-    def __init__(self, name, doc=None):
+    def __init__(self, name, doc=None, modname="Cauldron.DFW"):
         super(Registry, self).__init__()
         self.name = name
         self._setup = collections.defaultdict(WeakOrderedSet)
@@ -35,6 +36,9 @@ class Registry(object):
         self._keyword = {}
         self._service = {}
         self._backend = None
+        self._modname = modname
+        self._service_cls = None
+        self._keyword_cls = None
         if doc is not None:
             self.__doc__ = doc
             
@@ -70,13 +74,21 @@ class Registry(object):
     def Keyword(self):
         """The Keyword class."""
         self.guard("accessing the Keyword class")
+        if self._keyword_cls is None:
+            cls = self._keyword[self._backend]
+            self._keyword_cls = type('Keyword', (cls,),
+                {'__module__':'{0}.Keyword'.format(self._modname)})
         return self._keyword[self._backend]
         
     @property
     def Service(self):
         """The Service class."""
         self.guard("accessing the Service class")
-        return self._service[self._backend]
+        if self._service_cls is None:
+            cls = self._service[self._backend]
+            self._service_cls = type('Service', (cls,),
+                {'__module__':'{0}.Service'.format(self._modname)})
+        return self._service_cls
         
     def keyword_for(self, backend, keyword=None):
         """Register a keyword class."""
@@ -137,10 +149,12 @@ class Registry(object):
         for func in self._teardown[self._backend]:
             func()
         self._backend = None
+        self._service_cls = None
+        self._keyword_cls = None
         
 
-client = Registry("client", doc="A registry of setup and teardown functions to support the KTL client interface.")
-dispatcher = Registry("dispatcher", doc="A registry of setup and teardown functions to support the KTL dispatcher interface.")
+client = Registry("client", doc="A registry of setup and teardown functions to support the KTL client interface.", modname="Cauldron.ktl")
+dispatcher = Registry("dispatcher", doc="A registry of setup and teardown functions to support the KTL dispatcher interface.", modname="Cauldron.DFW")
 
 def keys():
     """Keys available in both registries."""

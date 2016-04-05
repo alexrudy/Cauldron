@@ -3,6 +3,7 @@
 import abc
 import textwrap
 import re
+import inspect
 from ..exc import CauldronAPINotImplemented, CauldronAPINotImplementedWarning
 
 try:
@@ -12,9 +13,19 @@ except ImportError:
 
 __all__ = ['api_not_implemented', 'api_not_required', 'api_required']
 
-def _append_to_docstring(docstring, text):
-    """Append `text` to `docstring` preserving indentation rules."""
-    
+def _inherited_docstring(*clses):
+    """Make a class inherit docstrings."""
+    for cls in clses:
+        for bcls in inspect.getmro(cls):
+            if ('__doc__' in bcls.__dict__ and 
+                bcls.__dict__['__doc__'] is not None and 
+                bcls.__dict__['__doc__'].strip() != ''):
+                return bcls.__dict__['__doc__']
+    else:
+        raise ValueError("Can't find an inheritable docstring for {0!r}".format(cls))
+
+def _docstring_left_indent(docstring):
+    """Compute the left indent from a docstring."""
     lines = docstring.expandtabs().splitlines()
     if len(lines) > 1:
         matches = [ re.search('(\S)', line) for line in lines[1:] ]
@@ -24,9 +35,22 @@ def _append_to_docstring(docstring, text):
             raise ValueError("Malformed docstring '{0:s}'".format(docstring))
     else:
         left_indent = 0
+    return left_indent
+
+def _append_to_docstring(docstring, text):
+    """Append `text` to `docstring` preserving indentation rules."""
+    left_indent = _docstring_left_indent(docstring)
     newlines = [''] + text.splitlines()
     newlines = [ (' ' * left_indent) + newline for newline in newlines ]
     docstring += "\n" + "\n".join(newlines)
+    return docstring
+    
+def _prepend_to_docstring(docstring, text):
+    """Prepend `text` to `docstring` preserving indentation rules."""
+    left_indent = _docstring_left_indent(docstring) * ' '
+    newlines = [''] + text.splitlines()
+    newlines = [ left_indent + newline for newline in newlines ]
+    docstring = "\n" + "\n".join(newlines) + ("\n" + left_indent) * 2  + docstring
     return docstring
     
 

@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-This is a private module that shouldn't be imported if you haven't called .use() yet. It will become the implemetnation of .ktl.
-
-To implement new features of the KTL library here, implement them in the appropriate submodules, using relative imports in this package.
+This is the Cauldron implementation of :mod:`ktl`, the clinet side of the KTL keyword system. Don't import this module if you haven't called :func:`~Cauldron.api.use` to set the backend yet, this module is not importable. It is set up to match :mod:`ktl` as closely as possible.
 """
 from __future__ import absolute_import
 

@@ -87,7 +87,7 @@ class _ZMQMonitorThread(threading.Thread):
 
 @registry.client.service_for("zmq")
 class Service(ClientService):
-    """Client service object for use with ZMQ."""
+    # Client service object for use with ZMQ.
     
     def __init__(self, name, populate=False):
         zmq = check_zmq()
@@ -190,7 +190,7 @@ class Service(ClientService):
     
 @registry.client.keyword_for("zmq")
 class Keyword(ClientKeyword):
-    """Client keyword object for use with ZMQ."""
+    # Client keyword object for use with ZMQ.
     
     def _ktl_reads(self):
         """Is this keyword readable?"""

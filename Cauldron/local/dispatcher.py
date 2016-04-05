@@ -23,7 +23,6 @@ def clear():
 
 @registry.dispatcher.service_for("local")
 class Service(DispatcherService):
-    """Local dispatcher service."""
     
     @classmethod
     def get_service(cls, name):
@@ -47,7 +46,7 @@ class Service(DispatcherService):
 
 @registry.dispatcher.keyword_for("local")
 class Keyword(DispatcherKeyword):
-    """A keyword"""
+    
     def __init__(self, name, service, initial=None, period=None):
         super(Keyword, self).__init__(name, service, initial, period)
         self._consumers = Callbacks()

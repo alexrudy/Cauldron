@@ -26,6 +26,7 @@ def _make_cached_service_method(method):
         if not isinstance(keyword, str):
             raise TypeError("Keyword must be a string.")
         return method(cached(service), keyword, *args, **kwargs)
+    _cached_service_method.__module__ = __name__
     return _cached_service_method
     
 def _make_cached_keyword_method(method):
@@ -39,6 +40,7 @@ def _make_cached_keyword_method(method):
             raise TypeError("Keyword must be a string.")
         keyword = cached(service)[keyword]
         return method(keyword, *args, **kwargs)
+    _cached_keyword_method.__module__ = __name__
     return _cached_keyword_method
 
 write = _make_cached_keyword_method('write')
