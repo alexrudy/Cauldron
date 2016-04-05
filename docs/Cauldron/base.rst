@@ -30,9 +30,18 @@ Operator Overloading     Not Implemented
 
 When Cauldron does not implement a feature, using that feature will raise an :exc:`~Cauldron.exc.CauldronAPINotImplemented` error, which is a subclass of :exc:`NotImplementedError`.
 
-Reference/API
-=============
+ktl Reference/API
+=================
 
-.. automodapi:: Cauldron.base.client
+.. automodapi:: Cauldron.ktl.Keyword
 
-.. automodapi:: Cauldron.base.dispatcher
+.. automodapi:: Cauldron.ktl.Service
+
+.. automodapi:: Cauldron.ktl.procedural
+
+DFW Reference/API
+=================
+
+.. automodapi:: Cauldron.DFW.Service
+
+.. automodapi:: Cauldron.DFW.Keyword
