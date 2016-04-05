@@ -6,8 +6,8 @@ import threading
 @pytest.fixture
 def command_keyword(dispatcher):
     """Make a command-keyword object."""
-    from Cauldron.DFW import Keyword
-    return Keyword.CommandKeyword("COMMAND", dispatcher)
+    from Cauldron.ext.commandkeywords import CommandKeyword
+    return CommandKeyword("COMMAND", dispatcher)
 
 def test_write_command_keyword(dispatcher, client, command_keyword):
     """Write to a command keyword."""

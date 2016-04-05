@@ -18,13 +18,13 @@ import abc
 import six
 import logging
 from .exc import CauldronAPINotImplementedWarning, CauldronXMLWarning
-from .api import guard_use, STRICT_KTL_XML, BASENAME
+from .api import guard_use, STRICT_KTL_XML, BASENAME, CAULDRON_SETUP
 from .base.core import _CauldronBaseMeta
 from .bundled import ktlxml
 from . import registry
 from .utils.helpers import _inherited_docstring, _prepend_to_docstring
 
-__all__ = ['KeywordType', 'Basic', 'Keyword', 'Boolean', 'Double', 'Float', 'Integer', 'Enumerated', 'Mask', 'String', 'IntegerArray', 'FloatArray', 'DoubleArray', 'dispatcher_keyword', 'client_keyword']
+__all__ = ['KeywordType', 'Basic', 'Keyword', 'Boolean', 'Double', 'Float', 'Integer', 'Enumerated', 'Mask', 'String', 'IntegerArray', 'FloatArray', 'DoubleArray', 'dispatcher_keyword', 'client_keyword', 'ClientKeywordType', 'DispatcherKeywordType']
 
 log = logging.getLogger(__name__)
 
@@ -40,17 +40,21 @@ def client_keyword(cls):
     _client.add(cls)
     return cls
     
+def _generate_keyword_subclass(basecls, subclass, module):
+    """Generate a single keyword subclass."""
+    if getattr(subclass, '__doc__', None) is not None:
+        doc = _prepend_to_docstring(_inherited_docstring(basecls), subclass.__doc__)
+    else:
+        doc = _inherited_docstring(basecls)
+    cls = type(subclass.__name__, (subclass, basecls),
+        {'__module__':module, '__doc__':doc})
+    subclass.cls = cls
+    return cls
+    
 def generate_keyword_subclasses(basecls, subclasses, module):
     """Given a base class, generate keyword subclasses."""
     for subclass in subclasses:
-        if getattr(subclass, '__doc__', None) is not None:
-            doc = _prepend_to_docstring(_inherited_docstring(basecls), subclass.__doc__)
-        else:
-            doc = _inherited_docstring(basecls)
-        cls = type(subclass.__name__, (subclass, basecls),
-            {'__module__':module, '__doc__':doc})
-        subclass.cls = cls
-        yield cls
+        yield _generate_keyword_subclass(basecls, subclass, module)
 
 def _setup_keyword_class(kwcls, module):
     """Set up a keyword class on a module."""
@@ -99,8 +103,35 @@ class KeywordType(object):
     
     cls = None
     
-    def __init__(self, *args, **kwargs):
-        super(KeywordType, self).__init__(*args, **kwargs)
+    @classmethod
+    def _get_cauldron_basecls(cls):
+        """Get the Cauldron basecls."""
+        registry.dispatcher.guard("initializing any keyword objects.")
+        return registry.dispatcher.Keyword
+        
+    
+    def __new__(cls, *args, **kwargs):
+        if cls.KTL_TYPE is None:
+            basecls = cls._get_cauldron_basecls()
+            if not issubclass(cls, basecls):
+                newcls = type(cls.__name__, (cls, basecls), {'__module__':cls.__module__})
+                return newcls.__new__(newcls, *args, **kwargs)
+        return super(KeywordType, cls).__new__(cls, *args, **kwargs)
+    
+    
+
+class DispatcherKeywordType(KeywordType):
+    """Keyword type for dispatchers."""
+    pass
+    
+class ClientKeywordType(KeywordType):
+    """Keyword type for ktl clients."""
+    
+    @classmethod
+    def _get_cauldron_basecls(self):
+        """Get the Cauldron basecls."""
+        registry.client.guard("initializing any keyword objects.")
+        return registry.client.Keyword
 
 class _NotImplemented(KeywordType):
     """An initializer for not-yet implemented keywords which emits a warning."""

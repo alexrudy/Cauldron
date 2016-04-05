@@ -4,17 +4,16 @@ An extension for a command-based keyword.
 """
 from __future__ import absolute_import
 
-from Cauldron.types import Boolean, dispatcher_keyword
+from Cauldron.types import Boolean, DispatcherKeywordType
 from Cauldron.exc import NoWriteNecessary
 
-@dispatcher_keyword
-class CommandKeyword(Boolean):
+class CommandKeyword(Boolean, DispatcherKeywordType):
     """This keyword will receive boolean writes as 1, and will always be set to 0. 
         
         Actions can then be performed in callbacks, etc., every time this keyword is triggered.
     """
     
-    KTL_TYPE = 'command'
+    KTL_TYPE = None
     
     def __init__(self, *args, **kwargs):
         kwargs['initial'] = '0'
