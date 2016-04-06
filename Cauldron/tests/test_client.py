@@ -31,9 +31,12 @@ def test_read_write_client(service, client, keyword_name):
     assert client.read(keyword_name) == "10"
     service.shutdown()
     
-def test_read_write_asynchronous(service, client, keyword_name):
-    """docstring for test_read_write_asynchronous"""
-    client.write(keyword_name,"10", wait=False)
+def test_read_write_asynchronous(service, client, keyword_name, waittime):
+    """Test the the client can write in an asynchronous fashion."""
+    keyword = client[keyword_name]
+    sequence = keyword.write("10", wait=False)
+    keyword.wait(sequence=sequence, timeout=waittime)
+    
     
 def test_monitored(service, client, keyword_name):
     """Check for clients which broadcast, should be true by default."""
