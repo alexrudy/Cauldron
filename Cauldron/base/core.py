@@ -71,6 +71,12 @@ class Task(object):
         if self.error is not None:
             raise self.error
         return self.result
+        
+    def timedout(self, msg="Task timed out."):
+        """Cause a timeout."""
+        if not self.event.isset():
+            self.error = TimeoutError(msg)
+            self.event.set()
 
 @six.add_metaclass(_CauldronBaseMeta)
 class _BaseService(object):

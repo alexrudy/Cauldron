@@ -127,22 +127,22 @@ def test_broker_register_two_dispatchers(broker, dsocket, dasocket, servicename,
     dispatcher(broker, dasocket, servicename, dispatcher_alt_name, message, timeout)
     assert len(broker.services[servicename.upper()].dispatchers) == 2
     
-def test_broker_check(address, pub_address, sub_address):
+def test_broker_check(address, pub_address, sub_address, waittime):
     """Test broker check."""
-    assert not ZMQBroker.check(address=address)
+    assert not ZMQBroker.check(address=address, timeout=waittime)
     broker = ZMQBroker("Test-Broker", address, pub_address, sub_address)
     broker.start()
     broker.running.wait()
     try:
-        assert broker.check(address=address), "Broker wasn't alive!"
+        assert broker.check(address=address, timeout=waittime), "Broker wasn't alive!"
     finally:
         broker.stop()
         
-def test_broker_run_and_stop(address, pub_address, sub_address):
+def test_broker_run_and_stop(address, pub_address, sub_address, waittime):
     """Test broker run and stop."""
     broker = ZMQBroker("Test-Broker", address, pub_address, sub_address)
     broker.start()
-    broker.running.wait()
+    broker.running.wait(timeout=waittime)
     broker.stop()
     
 def test_broker_register_unknown_command(broker, dsocket, message, timeout, dispatcher_name):

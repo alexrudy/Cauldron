@@ -570,7 +570,7 @@ class ZMQBroker(threading.Thread):
         socket = self._local.socket = self.connect(self._address)
         xpub = self._local.xpub = self.connect(self._pub_address, 'XPUB')
         xsub = self._local.xsub = self.connect(self._sub_address, 'XSUB')
-        signal = self._local.signal = self.connect("inproc://{0}".format(hex(id(self))), "PAIR")
+        signal = self._local.signal = self.connect("inproc://{0}".format(hex(id(self))), "PULL")
         self._local.poller = zmq.Poller()
         self._local.poller.register(socket, zmq.POLLIN)
         self._local.poller.register(xsub, zmq.POLLIN)
@@ -648,7 +648,7 @@ class ZMQBroker(threading.Thread):
             return
         
         if self.running.is_set() and not self.context.closed:
-            signal = self.context.socket(zmq.PAIR)
+            signal = self.context.socket(zmq.PUSH)
         
             signal.connect("inproc://{0:s}".format(hex(id(self))))
             self.running.clear()
