@@ -235,19 +235,27 @@ class Keyword(ClientKeyword):
             self.service._monitor.monitored.remove(self.name)
     
     def read(self, binary=False, both=False, wait=True, timeout=None):
+        _call_msg = lambda : "{0!r}.read(wait={1}, timeout={2})".format(self, wait, timeout)
+        
         if not self['reads']:
             raise NotImplementedError("Keyword '{0}' does not support reads.".format(self.name))
         
         task = self._asynchronous_command("update", "", timeout=timeout)
-        if wait is True:
-            self.service.log.debug("{0!r}.read(wait={1}, timeout={2}) waiting.".format(self, wait, timeout))
-            if not task.wait(timeout=timeout):
-                raise TimeoutError("{0!r}.read(wait={1}, timeout={2}) timed out.".format(self, wait, timeout))
+        if wait:
+            self.service.log.debug("{0} waiting.".format(_call_msg()))
+            try:
+                task.get(timeout=timeout)
+            except TimeoutError:
+                raise TimeoutError("{0} timed out.".format(_call_msg()))
+            else:
+                self.service.log.debug("{0} complete.".format(_call_msg()))
             return self._current_value(binary=binary, both=both)
         else:
             return task
         
     def write(self, value, wait=True, binary=False, timeout=None):
+        _call_msg = lambda : "{0!r}.write(wait={1}, timeout={2})".format(self, wait, timeout)
+        
         if not self['writes']:
             raise NotImplementedError("Keyword '{0}' does not support writes.".format(self.name))
         
@@ -257,10 +265,14 @@ class Keyword(ClientKeyword):
         except (TypeError, ValueError):
             pass
         task = self._asynchronous_command("modify", value, timeout=timeout)
-        
         if wait:
-            self.service.log.debug("{0!r}.write(wait={1}, timeout={2}) waiting.".format(self, wait, timeout))
-            result = task.get(timeout=timeout)
+            self.service.log.debug("{0} waiting.".format(_call_msg()))
+            try:
+                result = task.get(timeout=timeout)
+            except TimeoutError:
+                raise TimeoutError("{0} timed out.".format(_call_msg()))
+            else:
+                self.service.log.debug("{0} complete.".format(_call_msg()))
         else:
             return task
         

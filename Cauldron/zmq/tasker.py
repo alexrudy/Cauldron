@@ -24,11 +24,12 @@ class Task(_BaseTask):
             try:
                 if not socket.poll(self.timeout * 1e3):
                     self.error = TimeoutError("Dispatcher timed out.")
+                    self.event.set()
                     return
             except Exception as e:
                 self.error = e
-            finally:
                 self.event.set()
+                return
         try:
             self.result = self.callback(ZMQCauldronMessage.parse(socket.recv_multipart()))
         except Exception as e:
