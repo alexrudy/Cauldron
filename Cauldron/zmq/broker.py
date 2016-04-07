@@ -519,7 +519,7 @@ class ZMQBroker(threading.Thread):
         
         message = ZMQCauldronMessage(command="check", direction="UBQ")
         socket.send_multipart(message.data)
-        if socket.poll(timeout):
+        if socket.poll(timeout * 1e3):
             response = ZMQCauldronMessage.parse(socket.recv_multipart())
             print(response)
             if response.payload == "Broker Alive":
