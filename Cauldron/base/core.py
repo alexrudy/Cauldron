@@ -15,6 +15,7 @@ import logging
 from ..config import get_timeout
 from ..utils.callbacks import WeakMethod
 from ..utils.helpers import _inherited_docstring
+from ..exc import TimeoutError
 
 from astropy.utils.misc import InheritDocstrings
 
