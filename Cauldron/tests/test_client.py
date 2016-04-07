@@ -22,14 +22,13 @@ def test_read_write(service, client, keyword_name):
     """Test a write method."""
     
     client[keyword_name].write("10")
+    assert client[keyword_name]['ascii'] == "10"
     assert client[keyword_name].read() == "10"
-    service.shutdown()
     
 def test_read_write_client(service, client, keyword_name):
     """Test a write/read via the client object."""
     client.write(keyword_name,"10")
     assert client.read(keyword_name) == "10"
-    service.shutdown()
     
 def test_read_write_asynchronous(service, client, keyword_name, waittime):
     """Test the the client can write in an asynchronous fashion."""
