@@ -63,8 +63,15 @@ def fail_if_not_teardown():
     else:
         raise ValueError("Shouldn't be able to import ktl now!")
     
+    # Check for cycles.
+    import gc
+    gc.collect()
+    if len(gc.garbage):
+        print(gc.garbage)
+        raise ValueError("There is garbage: {0!r}".format(gc.garbage))
+    
     # Check for zombie threads.
-    import threading, time, gc
+    import threading, time
     if threading.active_count() > 1:
         time.sleep(0.1) #Allow zombies to die!
     count = 0
