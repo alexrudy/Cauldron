@@ -76,7 +76,7 @@ def test_recursive_callbacks(dispatcher, keyword_name):
     cb.count = 0
     dispatcher[keyword_name].callback(cb)
     dispatcher[keyword_name].modify("SomeValue")
-    assert cb.count == 2
+    assert cb.count == 1
     assert dispatcher[keyword_name].value == "OtherValue"
         
 def test_check(dispatcher, client, keyword_name1):

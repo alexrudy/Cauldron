@@ -87,7 +87,7 @@ def test_recursive_callback(local_service, local_client, keyword_name):
     assert len(local_client[keyword_name]._callbacks) == 1
     assert len(local_service[keyword_name]._consumers) == 1
     local_service[keyword_name].modify("SomeValue")
-    assert cb.count == 2
+    assert cb.count == 1
     assert local_client[keyword_name]['ascii'] == "OtherValue"
     assert local_service[keyword_name].value == "OtherValue"
 

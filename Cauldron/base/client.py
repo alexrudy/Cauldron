@@ -162,10 +162,11 @@ class Keyword(_BaseKeyword):
         
         This is an internal function, invoked after a Keyword instance successfully completes a :meth:`read` call, or a KTL broadcast event occurs.
         """
+        if self._acting:
+            return
         try:
             self._acting = True
-            for cb in self._callbacks:
-                cb(self)
+            self._callbacks(self)
         finally:
             self._acting = False
         
