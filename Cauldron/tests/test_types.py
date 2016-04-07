@@ -199,3 +199,18 @@ def test_custom_type_nobackend(servicename, keyword_name):
         assert keyword.counter == 1
     finally:
         teardown()
+        
+    
+def test_custom_type_generic(dispatcher, keyword_name):
+    """docstring for test_custom_type_generic"""
+    from Cauldron.types import KeywordType
+    class CustomKeyword(KeywordType):
+        """A custom keyword type"""
+        counter = 0
+        def __init__(self, *args, **kwargs):
+            self.counter += 1
+            super(CustomKeyword, self).__init__(*args, **kwargs)
+            
+    
+    kwd = CustomKeyword(keyword_name, dispatcher)
+    assert kwd.counter == 1

@@ -104,9 +104,28 @@ class KeywordType(object):
     _subcls = None
     
     @classmethod
-    def _get_cauldron_basecls(cls):
+    def _is_dispatcher(cls, args, kwargs):
+        """Get the service argument."""
+        if "service" in kwargs:
+            return getattr(kwargs["service"],'_DISPATCHER', None)
+        for i,arg in enumerate(args):
+            if i > 1:
+                break
+            if not isinstance(arg, six.string_types):
+                return getattr(arg, '_DISPATCHER', None)
+        return None
+    
+    @classmethod
+    def _get_cauldron_basecls(cls, dispatcher=None):
         """Get the Cauldron basecls."""
-        raise RuntimeError("Generic KeywordType shouldn't try to subclass itself.")
+        if dispatcher is None:
+            raise RuntimeError("Generic KeywordType shouldn't try to subclass itself.")
+        elif dispatcher is True:
+            registry.dispatcher.guard("initializing any keyword objects.")
+            return registry.dispatcher.Keyword
+        else:
+            registry.client.guard("initializing any keyword objects.")
+            return registry.client.Keyword
         
     @classmethod
     def _make_subclass(cls, basecls):
@@ -117,7 +136,8 @@ class KeywordType(object):
     
     def __new__(cls, *args, **kwargs):
         if cls.KTL_TYPE is None:
-            basecls = cls._get_cauldron_basecls()
+            dispatcher = cls._is_dispatcher(args, kwargs)
+            basecls = cls._get_cauldron_basecls(dispatcher)
             if not issubclass(cls, basecls):
                 newcls = cls._make_subclass(basecls)
                 return newcls.__new__(newcls, *args, **kwargs)
@@ -135,8 +155,9 @@ class DispatcherKeywordType(KeywordType):
     """Keyword type for dispatchers."""
     
     @classmethod
-    def _get_cauldron_basecls(cls):
+    def _get_cauldron_basecls(cls, dispatcher):
         """Get the Cauldron basecls."""
+        assert dispatcher in (None, True)
         registry.dispatcher.guard("initializing any keyword objects.")
         return registry.dispatcher.Keyword
     
@@ -144,8 +165,9 @@ class ClientKeywordType(KeywordType):
     """Keyword type for ktl clients."""
     
     @classmethod
-    def _get_cauldron_basecls(self):
+    def _get_cauldron_basecls(self, dispatcher):
         """Get the Cauldron basecls."""
+        assert dispatcher in (None, False)
         registry.client.guard("initializing any keyword objects.")
         return registry.client.Keyword
 
