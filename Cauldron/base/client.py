@@ -231,6 +231,8 @@ class Service(_BaseService):
     Using dictionary indexing always returns a :class:`~Cauldron.base.keyword.Keyword` object.
     
     """
+    _DISPATCHER = False
+    
     def __init__(self, name, populate=False):
         super(Service, self).__init__(name=name)
         self._keywords = {}

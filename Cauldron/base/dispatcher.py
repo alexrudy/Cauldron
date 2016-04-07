@@ -298,6 +298,7 @@ class Service(_BaseService):
     """
     
     name = None
+    _DISPATCHER = True
     
     def __init__(self, name, config, setup=None, dispatcher=None):
         super(Service, self).__init__(name=name)
