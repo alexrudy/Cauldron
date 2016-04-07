@@ -209,6 +209,7 @@ class Keyword(_BaseKeyword):
         """An internal callback to handle value updates."""
         self._last_read = datetime.datetime.now()
         if self._last_value != value:
+            self.service.log.debug("{0!r}._update({1!r})".format(self, value))
             self._last_value = value
             self.propagate()
         

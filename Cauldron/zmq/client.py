@@ -240,7 +240,9 @@ class Keyword(ClientKeyword):
         
         task = self._asynchronous_command("update", "", timeout=timeout)
         if wait is True:
-            task.wait(timeout=timeout)
+            self.service.log.debug("{0!r}.read(wait={1}, timeout={2}) waiting.".format(self, wait, timeout))
+            if not task.wait(timeout=timeout):
+                raise TimeoutError("{0!r}.read(wait={1}, timeout={2}) timed out.".format(self, wait, timeout))
             return self._current_value(binary=binary, both=both)
         else:
             return task
@@ -257,9 +259,8 @@ class Keyword(ClientKeyword):
         task = self._asynchronous_command("modify", value, timeout=timeout)
         
         if wait:
-            task.wait(timeout=timeout)
-            if task.error is not None:
-                raise task.error
+            self.service.log.debug("{0!r}.write(wait={1}, timeout={2}) waiting.".format(self, wait, timeout))
+            result = task.get(timeout=timeout)
         else:
             return task
         

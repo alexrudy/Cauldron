@@ -21,15 +21,20 @@ class Task(_BaseTask):
         socket.send_multipart(self.request.data)
         
         if self.timeout:
-            if not socket.poll(self.timeout * 1e3):
-                self.error = TimeoutError("Dispatcher timed out.")
+            try:
+                if not socket.poll(self.timeout * 1e3):
+                    self.error = TimeoutError("Dispatcher timed out.")
+                    return
+            except Exception as e:
+                self.error = e
+            finally:
                 self.event.set()
-                return
         try:
             self.result = self.callback(ZMQCauldronMessage.parse(socket.recv_multipart()))
         except Exception as e:
             self.error = e
-        self.event.set()
+        finally:
+            self.event.set()
         
     
 
