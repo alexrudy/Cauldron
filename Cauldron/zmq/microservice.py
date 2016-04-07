@@ -403,7 +403,7 @@ class ZMQMicroservice(threading.Thread):
         else:
             socket = self.ctx.socket(zmq.REP)
         
-        signal = self.ctx.socket(zmq.PAIR)
+        signal = self.ctx.socket(zmq.PULL)
         signal.bind("inproc://{0:s}".format(hex(id(self))))
         try:
             if self.use_broker:
@@ -496,7 +496,7 @@ class ZMQMicroservice(threading.Thread):
         
         if self.running.is_set() and (not self.ctx.closed):
             self.running.clear()
-            signal = self.ctx.socket(zmq.PAIR)
+            signal = self.ctx.socket(zmq.PUSH)
             signal.connect("inproc://{0:s}".format(hex(id(self))))
             signal.send(b"", flags=zmq.NOBLOCK)
             signal.close(linger=0)
