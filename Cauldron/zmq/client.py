@@ -178,7 +178,7 @@ class Service(ClientService):
         callback = callback or self._handle_response
         
         task = Task(request, callback, get_timeout(timeout))
-        self._tasker.queue.put(task)
+        self._tasker.put(task)
         return task
         
     def _synchronous_command(self, command, payload, keyword=None, direction="CDQ", timeout=None, callback=None):
