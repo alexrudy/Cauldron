@@ -14,13 +14,10 @@ from .. import registry
 
 __all__ = ['Service', 'Keyword']
 
-def _local_task_callback(arg):
-    return arg
 
 class LocalTask(_BaseTask):
     """A simple object to mock asynchronous operations."""
-    def __init__(self, result, timeout=None):
-        super(LocalTask, self).__init__(result, callback=_local_task_callback, timeout=timeout)
+    pass
 
 @registry.client.keyword_for("local")
 class Keyword(ClientKeyword):
@@ -57,22 +54,23 @@ class Keyword(ClientKeyword):
             raise ValueError("Keyword '{0}' does not support reads, it is write-only.".format(self.name))
         
         try:
-            new_value = self.source.update()
+            result = self.source.update()
         except Exception as e:
             raise DispatcherError("Error in Dispatcher: {0}".format(str(e)))
-        else:
-            self._update(new_value)
+        
+        task = LocalTask(result, self._update, timeout)
+        task()
             
         if not wait:
             warnings.warn("Cauldron.local doesn't support asynchronous reads. Returning a fake task object.", CauldronAPINotImplementedWarning)
-            task = LocalTask(self._current_value(binary=binary, both=both), timeout=timeout)
-            task()
             return task
             
         return self._current_value(binary=binary, both=both)
         
     def write(self, value, wait=True, binary=False, timeout=None):
         """Write a value"""
+        _call_msg = lambda : "{0!r}.write(wait={1}, timeout={2})".format(self, wait, timeout)
+        
         if not self['writes']:
             raise ValueError("Keyword '{0}' does not support writes, it is read-only.".format(self.name))
         
@@ -84,15 +82,16 @@ class Keyword(ClientKeyword):
         
         try:
             self.source.modify(value)
+            result = self.source.value
         except Exception as e:
             raise DispatcherError("Error in Dispatcher: {0}".format(str(e)))
+        self.service.log.debug("{0} modified to {1}".format(_call_msg(), result))
+        task = LocalTask(result, self._update, timeout)
+        task()
         
         if not wait:
             warnings.warn("Cauldron.local doesn't support asynchronous writes. Returning a fake task object.", CauldronAPINotImplementedWarning)
-            task = LocalTask(None, timeout=timeout)
-            task()
             return task
-        
         
     def wait(self, timeout=None, operator=None, value=None, sequence=None, reset=False, case=False):
         if sequence is not None:
