@@ -73,9 +73,11 @@ class FanMessage(object):
         
     def add(self, dispatcher, message):
         """Add item to the fan message."""
-        self.client.log.log(5, "{0!r}.add({1!r})".format(self, message))
         if message.payload not in (FRAMEBLANK.decode('utf-8'), FRAMEFAIL.decode('utf-8')) and not DIRECTIONS.iserror(message.direction):
             self.responses[dispatcher.name] = message.payload
+            self.client.log.log(5, "{0!r}.add({1!r}) success".format(self, message))
+        else:
+            self.client.log.log(5, "{0!r}.add({1!r}) ignore".format(self, message))
         self.pending.remove(dispatcher.id)
         
     def resolve(self):

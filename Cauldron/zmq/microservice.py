@@ -183,6 +183,10 @@ def decode(str_or_bytes):
         result = str_or_bytes.decode('utf-8')
     else:
         result = six.text_type(str_or_bytes)
+    for special in [FRAMEBLANK, FRAMEFAIL]:
+        if result.startswith(special.decode('utf-8')):
+            if len(result) != len(special.decode('utf-8')):
+                result = result[len(special.decode('utf-8')):]
     return result
 
 class ZMQCauldronMessage(object):
