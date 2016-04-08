@@ -44,7 +44,7 @@ def sub_address():
 @pytest.fixture
 def broker(request, address, pub_address, sub_address):
     """A broker object."""
-    b = ZMQBroker("Test-Broker", address, pub_address, sub_address)
+    b = ZMQBroker("Test-Broker", address, pub_address, sub_address, sub_address)
     b.prepare()
     request.addfinalizer(b.close)
     return b
@@ -52,7 +52,7 @@ def broker(request, address, pub_address, sub_address):
 @pytest.fixture
 def broker_quick_expire(request, address, pub_address, sub_address, timeout):
     """docstring for broker_quick_expire"""
-    b = ZMQBroker("Test-Broker", address, pub_address, sub_address, timeout=timeout)
+    b = ZMQBroker("Test-Broker", address, pub_address, sub_address, sub_address, timeout=timeout)
     b.prepare()
     request.addfinalizer(b.close)
     return b
@@ -130,7 +130,7 @@ def test_broker_register_two_dispatchers(broker, dsocket, dasocket, servicename,
 def test_broker_check(address, pub_address, sub_address, waittime):
     """Test broker check."""
     assert not ZMQBroker.check(address=address, timeout=waittime)
-    broker = ZMQBroker("Test-Broker", address, pub_address, sub_address)
+    broker = ZMQBroker("Test-Broker", address, pub_address, sub_address, sub_address)
     broker.start()
     broker.running.wait()
     try:
@@ -140,7 +140,7 @@ def test_broker_check(address, pub_address, sub_address, waittime):
         
 def test_broker_run_and_stop(address, pub_address, sub_address, waittime):
     """Test broker run and stop."""
-    broker = ZMQBroker("Test-Broker", address, pub_address, sub_address)
+    broker = ZMQBroker("Test-Broker", address, pub_address, sub_address, sub_address)
     broker.start()
     broker.running.wait(timeout=waittime)
     broker.stop()
@@ -160,7 +160,7 @@ def test_broker_register_unknown_command(broker, dsocket, message, timeout, disp
     assert response.payload == "unknown command"
     assert response.direction == "DBE"
     
-def test_client_broker_query(broker, csocket, pub_address, message, timeout):
+def test_client_broker_query(broker, csocket, pub_address, sub_address, message, timeout):
     """Test a client asking for the broker publication address."""
     lookup = message.copy()
     lookup.direction = "CBQ"
@@ -172,7 +172,7 @@ def test_client_broker_query(broker, csocket, pub_address, message, timeout):
     assert csocket.poll(timeout) != 0, "No messages were ready!"
     response = ZMQCauldronMessage.parse(csocket.recv_multipart())
     
-    assert response.payload == pub_address
+    assert response.payload == sub_address
     assert response.direction == "CBP"
     
 def test_client_broker_query_error(broker, csocket, message, timeout):
