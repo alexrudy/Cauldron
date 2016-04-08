@@ -431,7 +431,7 @@ class Service(object):
         client.activate(message)
         if message.command == "lookup":
             # The client has asked for the subscription address, we should send that to them.
-            response = message.response(self.broker._pub_address)
+            response = message.response(self.broker._mon_address)
         elif message.command == "locate":
             # The client has asked us if a service is locatable.
             response = message.response("yes" if len(self.dispatchers) else "no")
@@ -444,7 +444,7 @@ class Service(object):
 
 class ZMQBroker(threading.Thread):
     """A broker object for handling ZMQ Messaging patterns"""
-    def __init__(self, name, address, pub_address, sub_address, context=None, timeout=1.0):
+    def __init__(self, name, address, pub_address, sub_address, mon_address, context=None, timeout=1.0):
         super(ZMQBroker, self).__init__(name=name)
         import zmq
         self.context = context or zmq.Context.instance()
@@ -453,6 +453,7 @@ class ZMQBroker(threading.Thread):
         self._address = address
         self._pub_address = pub_address
         self._sub_address = sub_address
+        self._mon_address = mon_address
         self.timeout = float(timeout)
         self._local = threading.local()
         self._error = None
@@ -465,8 +466,9 @@ class ZMQBroker(threading.Thread):
         address = zmq_get_address(config, "broker", bind=True)
         sub_address = zmq_get_address(config, "publish", bind=True)
         pub_address = zmq_get_address(config, "subscribe", bind=True)
+        mon_address = zmq_get_address(config, "subscribe", bind=False)
         timeout = config.getfloat("zmq", "timeout")
-        return cls(name, address, pub_address, sub_address, timeout=timeout)
+        return cls(name, address, pub_address, sub_address, mon_address, timeout=timeout)
         
     @classmethod
     def serve(cls, config, name="ServerBroker"):
