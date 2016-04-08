@@ -33,7 +33,7 @@ class TaskQueue(threading.Thread):
     def __init__(self, name, ctx=None, log=None, timeout=None):
         super(TaskQueue, self).__init__(name="Task Queue for {0:s}".format(name))
         self._pending = {}
-        self._task_timeout = (get_timeout(timeout) * 1e3) * 1e3 # Wait 1000x the normal timeout, then clear old stuff.
+        self._task_timeout = ((get_timeout(timeout) or 1.0) * 1e3) * 1e3 # Wait 1000x the normal timeout, then clear old stuff.
         self.ctx = ctx or zmq.Context.instance()
         self.frontend_address = "inproc://{0:s}-frontend".format(hex(id(self)))
         self.signal_address = "inproc://{0:s}-signal".format(hex(id(self)))
