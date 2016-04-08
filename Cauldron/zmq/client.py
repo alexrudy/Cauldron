@@ -99,19 +99,6 @@ class Service(ClientService):
         self._type_ktl_cache = {}
         super(Service, self).__init__(name, populate)
         
-    @property
-    def socket(self):
-        """A thread-local ZMQ socket for sending commands to the responder thread."""
-        # Short out if we already have a socket.
-        if hasattr(self._sockets, 'socket'):
-            return self._sockets.socket
-        
-        zmq = check_zmq()
-        socket = self.ctx.socket(zmq.REQ)
-        zmq_connect_socket(socket, get_configuration(), "broker", log=self.log, label='client')
-        self._sockets.socket = socket
-        return socket
-        
     def _prepare(self):
         """Prepare step."""
         self._monitor = _ZMQMonitorThread(self)
