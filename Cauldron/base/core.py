@@ -74,7 +74,7 @@ class Task(object):
         
     def timedout(self, msg="Task timed out."):
         """Cause a timeout."""
-        if not self.event.isset():
+        if not self.event.isSet():
             self.error = TimeoutError(msg)
             self.event.set()
 
