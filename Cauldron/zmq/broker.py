@@ -87,8 +87,7 @@ class FanMessage(object):
             self.client.log.log(5, "{0!r}.resolve() no dispatcher".format(self))
             return response
         elif len(self.responses) == 1:
-            dispatcher = self.responses.keys()[0]
-            payload = self.responses[dispatcher]
+            dispatcher, payload = next(iter(self.responses.items()))
             response = self.message.response(payload)
             response.dispatcher = dispatcher
             self.client.log.log(5, "{0!r}.resolve() single response {1}".format(self, payload))
