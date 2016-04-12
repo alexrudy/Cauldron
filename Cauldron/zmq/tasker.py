@@ -31,7 +31,7 @@ class Task(_BaseTask):
 class TaskQueue(threading.Thread):
     """A client task queue"""
     def __init__(self, name, ctx=None, log=None, timeout=None):
-        super(TaskQueue, self).__init__(name="Task Queue for {0:s}".format(name))
+        super(TaskQueue, self).__init__(name="ktl.Service.{0:s}.Tasks".format(name))
         self._pending = {}
         self._task_timeout = ((get_timeout(timeout) or 1.0) * 1e3) * 1e3 # Wait 1000x the normal timeout, then clear old stuff.
         self.ctx = ctx or zmq.Context.instance()
@@ -51,12 +51,12 @@ class TaskQueue(threading.Thread):
                 if (starttime + self._task_timeout) < now:
                     self.log.debug("Task {0} took way too long. Orphaning.".format())
                     task.timedout("Orphaned task stuck in queue.")
-                    self._pending.pop(task.identifier)
+                    self._pending.pop(task.request.identifier)
                 continue
             dur = starttime + task.timeout
             if dur < now:
                 task.timedout()
-                self._pending.pop(task.identifier)
+                self._pending.pop(task.request.identifier)
             elif (timeout > (task.timeout * 1e3)):
                 timeout = task.timeout * 1e3
         return timeout
@@ -108,6 +108,7 @@ class TaskQueue(threading.Thread):
             if backend in ready:
                 try:
                     message = ZMQCauldronMessage.parse(backend.recv_multipart())
+                    self.log.debug("{0!r}.recv({1!r})".format(self, message))
                 except Exception as e:
                     # un-parseable message, discard it.
                     self.log.exception("Discarding {0}".format(str(e)))
@@ -118,7 +119,8 @@ class TaskQueue(threading.Thread):
             # We need to ask for something new.
             if frontend in ready:
                 identifier = frontend.recv()
-                starttime, task = self._pending.get(identifier)
+                starttime, task = self._pending[identifier]
+                self.log.debug("{0!r}.send({1!r})".format(self, task.request))
                 backend.send(b"", flags=zmq.SNDMORE)
                 backend.send_multipart(task.request.data)
             
