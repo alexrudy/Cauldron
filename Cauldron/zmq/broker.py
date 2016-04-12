@@ -54,7 +54,7 @@ class FanMessage(object):
     def __repr__(self):
         """A message representation."""
         return "<FanMessage {0:s} pending={1:d} lifetime={2:.0f} responses={3:d}>".format(
-            binascii.hexlify(self.id).decode('utf-8'), len(self.pending), self.timeout - time.time(), len(self.responses)
+            binascii.hexlify(self.id).decode('utf-8')[:6], len(self.pending), self.timeout - time.time(), len(self.responses)
         )
         
     @property
@@ -73,27 +73,31 @@ class FanMessage(object):
         
     def add(self, dispatcher, message):
         """Add item to the fan message."""
+        self.pending.remove(dispatcher.id)
         if message.payload not in (FRAMEBLANK.decode('utf-8'), FRAMEFAIL.decode('utf-8')) and not DIRECTIONS.iserror(message.direction):
             self.responses[dispatcher.name] = message.payload
             self.client.log.log(5, "{0!r}.add({1!r}) success".format(self, message))
         else:
             self.client.log.log(5, "{0!r}.add({1!r}) ignore".format(self, message))
-        self.pending.remove(dispatcher.id)
         
     def resolve(self):
         """Fan message responses."""
-        # self.client.log.log(5, "{0!r}.resolve()".format(self))
         if not self.valid:
             response = self.message.error_response("No dispatchers for '{0}'".format(self.message.service))
+            self.client.log.log(5, "{0!r}.resolve() no dispatcher".format(self))
             return response
         elif len(self.responses) == 1:
-            dispatcher, payload  = self.responses.popitem()
+            dispatcher = self.responses.keys()[0]
+            payload = self.responses[dispatcher]
             response = self.message.response(payload)
             response.dispatcher = dispatcher
+            self.client.log.log(5, "{0!r}.resolve() single response {1}".format(self, payload))
             return response
         elif len(self.responses):
+            self.client.log.log(5, "{0!r}.resolve() multiple response {1!r}".format(self, self.responses))
             return self.message.response(":".join(self.responses.values()))
         else:
+            self.client.log.log(5, "{0!r}.resolve() failure".format(self))
             return self.message.response(FRAMEFAIL)
         
     def send(self, socket):
@@ -180,8 +184,8 @@ class Client(Lifetime):
     def send(self, message, socket):
         """Send a message to this client."""
         message.prefix = [self.id, b""]
-        socket.send_multipart(message.data)
         self.log.log(5, "{0!r}.send({1!r})".format(self, message))
+        socket.send_multipart(message.data)
         self.deactivate(message)
         
 
@@ -199,8 +203,8 @@ class Dispatcher(Lifetime):
     def send(self, message, socket):
         """Send a message to this dispatcher."""
         message.prefix = [self.id, b""] + message.prefix
-        socket.send_multipart(message.data)
         self.log.log(5, "{0!r}.send({1!r})".format(self, message))
+        socket.send_multipart(message.data)
         self.activate(message)
         
 
@@ -246,6 +250,7 @@ class Service(object):
             except ValueError:
                 raise DispatcherError("No dispatcher available for {0}".format(message.dispatcher))
         if recv:
+            self.log.log(5, "{0!r}.recv({1})".format(dispatcher_object, message))
             dispatcher_object.deactivate(message)
         return dispatcher_object
         
@@ -255,6 +260,8 @@ class Service(object):
             client_object = self.clients[message.client_id]
         except KeyError:
             client_object = self.clients[message.client_id] = Client(message.client_id, self)
+        if recv:
+            self.log.log(5, "{0!r}.recv({1})".format(client_object, message))
         return client_object
         
     def scrape(self, message):
@@ -387,11 +394,12 @@ class Service(object):
             else:
                 raise KeyError
         except KeyError:
-            fmessage = FanMessage(self, client, message)        
+            fmessage = FanMessage(self, client, message)
             self._fans[fmessage.id] = fmessage
         
             for dispatcher in self.dispatchers.values():
                 dispatcher.send(fmessage.generate_message(dispatcher), socket)
+            self.log.log(5, "{0!r}.fan()".format(fmessage))
         else:
             response = message.response(ktl_type)
             response.dispatcher = dispatcher_name

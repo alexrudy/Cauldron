@@ -64,9 +64,9 @@ class _ZMQMonitorThread(threading.Thread):
                         keyword = self.service[message.keyword]
                         if keyword.name in self.monitored:
                             keyword._update(message.payload)
-                            self.log.log(5, "Accepted broadcast for {0}: {1}".format(keyword.name, message.payload))
+                            self.log.log(5, "{0!r}.monitor({1}={2})".format(self, keyword.name, message.payload))
                         else:
-                            self.log.log(5, "Ignored broadcast for {0}, not monitored.".format(keyword.name))
+                            self.log.log(5, "{0!r}.monitor({1}) ignored".format(self, keyword.name))
                     except ZMQCauldronErrorResponse as e:
                         self.log.error("Broadcast Message Error: {0!r}".format(e))
                     except (zmq.ContextTerminated, zmq.ZMQError):
