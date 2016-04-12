@@ -118,7 +118,7 @@ def teardown_cauldron(request):
     request.addfinalizer(fail_if_not_teardown)
     return None
 
-@pytest.fixture(params=available_backends, scope='function')
+@pytest.fixture(params=list(available_backends), scope='function')
 def backend(request, config):
     """The backend name."""
     from Cauldron.api import use, teardown, CAULDRON_SETUP
