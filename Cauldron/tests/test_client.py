@@ -46,6 +46,8 @@ def test_read_write_asynchronous(service, client, keyword_name, waittime):
     keyword = client[keyword_name]
     sequence = keyword.write("10", wait=False)
     keyword.wait(sequence=sequence, timeout=waittime)
+    sequence = keyword.read(wait=False)
+    keyword.wait(sequence=sequence, timeout=waittime)
     
 def test_read_write_timeout(service, client, slow_keyword, keyword_name1, waittime):
     """docstring for test_read_write_timeout"""
@@ -53,7 +55,15 @@ def test_read_write_timeout(service, client, slow_keyword, keyword_name1, waitti
     slow_keyword(keyword_name1, service)
     with pytest.raises(TimeoutError):
         client[keyword_name1].write("blah", timeout=waittime)
-    
+def test_history(service, client, keyword_name):
+    """Test history."""
+    keyword = client[keyword_name]
+    for i in range(6):
+        keyword.write(str(i))
+    assert keyword.history[-2].binary == '4'
+    assert len(keyword.history) == 5
+    assert keyword.history[0].ascii == '1'
+    assert all(h[3] == keyword_name for h in keyword.history)
     
 def test_monitored(service, client, keyword_name):
     """Check for clients which broadcast, should be true by default."""
