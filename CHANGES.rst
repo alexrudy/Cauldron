@@ -1,6 +1,14 @@
 Changes to Cauldron
 -------------------
 
+0.6.0
+=====
+- Better handling of asynchronous dispatcher requests. [zmq]
+- Fix a broker addressing bug. [zmq]
+- Clients are now fully asynchronous, task requests are made as fast as possible. [zmq]
+- Fix for entrypoints API.
+- Fix for documentation builds on readthedocs.
+
 0.5.2
 =====
 - Fixed a bug in ZMQ addressing to properly specify
