@@ -87,7 +87,7 @@ def test_recursive_callback(local_service, local_client, keyword_name):
     assert len(local_client[keyword_name]._callbacks) == 1
     assert len(local_service[keyword_name]._consumers) == 1
     local_service[keyword_name].modify("SomeValue")
-    assert cb.count == 2
+    assert cb.count == 1
     assert local_client[keyword_name]['ascii'] == "OtherValue"
     assert local_service[keyword_name].value == "OtherValue"
 
@@ -108,22 +108,6 @@ def test_subscribe(local_service, local_client, keyword_name):
     assert len(local_service[keyword_name]._consumers) == 1
     local_service[keyword_name].modify("SomeValue")
     assert monitor.monitored
-    
-def test_write_async(local_service, local_client, recwarn, keyword_name):
-    """Test local asynchronous write."""
-    warnings.filterwarnings('always')
-    from Cauldron.exc import CauldronAPINotImplementedWarning
-    local_client[keyword_name].write("10", wait=False)
-    w = recwarn.pop()
-    assert w.category == CauldronAPINotImplementedWarning
-
-def test_read_async(local_client, recwarn, keyword_name):
-    """Test local asynchronous read."""
-    warnings.filterwarnings('always')
-    from Cauldron.exc import CauldronAPINotImplementedWarning
-    local_client[keyword_name].read(wait=False)
-    w = recwarn.pop()
-    assert w.category == CauldronAPINotImplementedWarning
     
 @pytest.mark.xfail(raises=CauldronAPINotImplemented)
 def test_wait(local_client, keyword_name):

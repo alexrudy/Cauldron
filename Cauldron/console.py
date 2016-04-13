@@ -7,8 +7,9 @@ import argparse
 import collections
 import time
 import logging
+import sys
 
-from .exc import TimeoutError
+from .exc import TimeoutError, DispatcherError
 
 try:
     import lumberjack
@@ -101,29 +102,50 @@ def ktl_show(service, *keywords, **options):
     """Implement the KTL Show functionality."""
     from . import ktl
     binary = options.pop('binary', False)
+    outfile = options.pop('output', sys.stdout)
+    errfile = options.pop('error', sys.stderr if outfile == sys.stdout else outfile)
     
     svc = ktl.Service(service, populate=False)
     for keyword in keywords:
-        keyword = svc[keyword]
-        value = keyword.read(binary=binary)
+        
+        try:
+            keyword = svc[keyword]
+        except KeyError as e:
+            errfile.write("Can't find keyword '{0}' in service '{1}'\n{2!s}\n".format(
+                keyword.upper(), svc.name, e
+            ))
+            errfile.flush()
+            continue
+        
+        try:
+            value = keyword.read(binary=binary)
+        except DispatcherError as e:
+            errfile.write("Can't read from keyword '{0}'\n{1!s}".format(keyword.full_name, e))
+            errfile.flush()
+            continue
+        
         unit = keyword['units']
         if unit is None:
-            print("{0}: {1}".format(keyword.name, value))
+            outfile.write("{0}: {1}\n".format(keyword.name, value))
+            outfile.flush()
         else:
-            print("{0}: {1} {2}".format(keyword.name, value, unit))
+            outfile.write("{0}: {1} {2}\n".format(keyword.name, value, unit))
+            outfile.flush()
     return
 
-def parseModifyCommands(parser, commands, flags):
+def parseModifyCommands(commands, flags, verbose=False):
     """Parse modify commands, yielding values"""
     keyword, assignment = None, False
     
     for argument in commands:
-        
+        if verbose: print(argument, keyword, assignment)
         if keyword is None:
             if "=" in argument:
                 keyword, proposed_value = argument.split("=", 1)
                 if proposed_value.strip() != '':
                     yield keyword, proposed_value
+                    if verbose: print("y-1", keyword, proposed_value)
+                    
                     keyword, assignment = None, False
                 else:
                     assignment = True
@@ -134,44 +156,56 @@ def parseModifyCommands(parser, commands, flags):
         
         elif assignment is False:
             if argument[0] != "=":
-                parser.error("Expected an assignment for keyword '{0} {1}'".format(keyword, argument))
+                raise ValueError("Expected an assignment for keyword '{0} {1}'".format(keyword, argument))
             else:
-                yield keyword, argument
+                yield keyword, argument[1:]
+                if verbose: print("y-2", keyword, argument[1:])
                 keyword, assignment = None, False
         else:
             if argument[0] == "=":
                 # There was an '=' in the keyword value.
                 yield keyword, argument
+                if verbose: print("y-3", keyword, argument)
                 keyword, assignment = None, False
             elif "=" in argument:
                 yield keyword, ''
+                if verbose: print("y-4", keyword, '')
                 keyword, proposed_value = argument.split("=", 1)
                 if proposed_value.strip() != '':
                     yield keyword, proposed_value
+                    if verbose: print("y-5", keyword, proposed_value)
                     keyword, assignment = None, False
                 else:
                     assignment = True
             elif argument.lower() in flags:
                 flags[argument.lower()] = True
+            else:
+                yield keyword, argument
+                if verbose: print("y-6", keyword, argument)
+                keyword, assignment = None, False
         
     
     if assignment:
         yield keyword, ''
     elif keyword is not None:
-        parser.error("Incomplete assignment for keyword '{0}'".format(keyword))
+        raise ValueError("Incomplete assignment for keyword '{0}'".format(keyword))
             
                 
             
 
 def modify():
     """Argument parsing and actions for modify"""
-    parser = argparse.ArgumentParser(description="Show a single keyword value.")
+    epilog="""
+    For compatibility with the KROOT version of this script, flags may be passed without the prefix '-' in the list of regular command items. For example, to modify with nowait, you could write `modify -s SVC KWD=blah nowait`
+    
+    """
+    parser = argparse.ArgumentParser(description="Modify a keyword value or a series of keyword values on a given KTL service.", epilog=epilog)
     parser.add_argument('-c', '--configuration', action=ConfigureAction, 
-        help="The Cauldron configuration file.")
+        help="The Cauldron configuration file.", metavar='config.cfg')
     parser.add_argument('-k', '--backend', action=BackendAction, default='ktl',
         help="The Cauldron Backend to use.")
     parser.add_argument('-s', '--service', type=str, required=True,
-        help="Name of the KTL service containing the keyword(s) to display.")
+        help="Name of the KTL service containing the keyword(s) to modify.")
     parser.add_argument('-b', '--binary', action='store_true',
         help="Interpret an argument as.")
     parser.add_argument('-d', '--debug', action='store_true',
@@ -188,7 +222,10 @@ def modify():
     
     flags = {'binary' : opt.binary, 'debug': opt.debug, 'notify' : opt.parallel, 'nowait' : opt.nowait,
         'silent' : opt.silent}
-    commands = list(parseModifyCommands(parser, opt.commands, flags))
+    try:
+        commands = list(parseModifyCommands(opt.commands, flags))
+    except ValueError as e:
+        parser.error(str(e))
     for flag, value in flags.items():
         setattr(opt, flag, value)
     if opt.debug:
@@ -204,6 +241,8 @@ def modify():
 def ktl_modify(service, *commands, **options):
     """Modify a series of KTL keywords."""
     from . import ktl
+    
+    # Handle arguments
     binary = options.pop('binary', False)
     debug = options.pop('debug', False)
     parallel = options.pop('notify', False)
@@ -212,6 +251,9 @@ def ktl_modify(service, *commands, **options):
     verbose = not options.pop('silent', False)
     timeout = options.pop('timeout', None)
     waitfor = collections.deque()
+    outfile = options.pop('output', sys.stdout)
+    errfile = options.pop('error', sys.stderr if outfile == sys.stdout else outfile)
+    
     
     if parallel:
         mode = "(notify)"
@@ -220,26 +262,40 @@ def ktl_modify(service, *commands, **options):
     else:
         mode = "(nowait)"
     svc = ktl.Service(service, populate=False)
+    
+    # Initial write loop.
     for keyword, value in commands:
-        keyword = svc[keyword]
-        if verbose:
-            print("setting {0:s} = {1:s} {2:s}".format(keyword.name, value, mode))
-        sequence = keyword.write(value, binary=binary, wait=wait)
-        if parallel == True and nowait == False:
-            waitfor.append((keyword, sequence))
+        
+        try:
+            keyword = svc[keyword]
+        except KeyError as e:
+            errfile.write("Can't find keyword '{0}' in service '{1}'\n{2!s}\n".format(
+                keyword.upper(), svc.name, e
+            ))
+            errfile.flush()
+            continue
+        else:
+            if verbose:
+                outfile.write("setting {0:s} = {1:s} {2:s}\n".format(keyword.name, value, mode))
+                outfile.flush()
+            sequence = keyword.write(value, binary=binary, wait=wait)
+            if parallel == True and nowait == False:
+                waitfor.append((keyword, sequence))
         
     
+    # Wait for writes to complete loop.
     start = time.time()
     while len(waitfor):
         if timeout is not None:
             elapsed = time.time() - start
             if elapsed > timeout:
                 raise TimeoutError("Error setting keyword(s): Timeout waiting for write(s) to complete")
-        keyword, sequence = waitfor.popLeft()
+        keyword, sequence = waitfor.popleft()
         success = keyword.wait(sequence=sequence, timeout=0.1)
         if not success:
             waitfor.append((keyword, sequence))
         elif success and verbose:
-            print("{0:s} complete".format(keyword.name))
+            outfile.write("{0:s} complete\n".format(keyword.name))
+            outfile.flush()
     return
     

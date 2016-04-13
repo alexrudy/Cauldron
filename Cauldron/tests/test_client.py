@@ -7,6 +7,17 @@ import inspect
 import threading
 
 @pytest.fixture
+def slow_keyword(waittime):
+    from Cauldron.types import KeywordType
+    class SlowKeyword(KeywordType):
+        """A custom keyword type"""
+        def write(self, value):
+            """Slow down the write."""
+            time.sleep(10.0 * waittime)
+            return value
+    return SlowKeyword
+
+@pytest.fixture
 def service(request, dispatcher, keyword_name):
     """A service dispatch tool."""
     mykw = dispatcher[keyword_name]
@@ -22,18 +33,37 @@ def test_read_write(service, client, keyword_name):
     """Test a write method."""
     
     client[keyword_name].write("10")
+    assert client[keyword_name]['ascii'] == "10"
     assert client[keyword_name].read() == "10"
-    service.shutdown()
     
 def test_read_write_client(service, client, keyword_name):
     """Test a write/read via the client object."""
     client.write(keyword_name,"10")
     assert client.read(keyword_name) == "10"
-    service.shutdown()
     
-def test_read_write_asynchronous(service, client, keyword_name):
-    """docstring for test_read_write_asynchronous"""
-    client.write(keyword_name,"10", wait=False)
+def test_read_write_asynchronous(service, client, keyword_name, waittime):
+    """Test the the client can write in an asynchronous fashion."""
+    keyword = client[keyword_name]
+    sequence = keyword.write("10", wait=False)
+    keyword.wait(sequence=sequence, timeout=waittime)
+    sequence = keyword.read(wait=False)
+    keyword.wait(sequence=sequence, timeout=waittime)
+    
+def test_read_write_timeout(service, client, slow_keyword, keyword_name1, waittime):
+    """docstring for test_read_write_timeout"""
+    from ..exc import TimeoutError
+    slow_keyword(keyword_name1, service)
+    with pytest.raises(TimeoutError):
+        client[keyword_name1].write("blah", timeout=waittime)
+def test_history(service, client, keyword_name):
+    """Test history."""
+    keyword = client[keyword_name]
+    for i in range(6):
+        keyword.write(str(i))
+    assert keyword.history[-2].binary == '4'
+    assert len(keyword.history) == 5
+    assert keyword.history[0].ascii == '1'
+    assert all(h[3] == keyword_name for h in keyword.history)
     
 def test_monitored(service, client, keyword_name):
     """Check for clients which broadcast, should be true by default."""

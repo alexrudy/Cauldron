@@ -10,10 +10,12 @@ import time
 import weakref
 import contextlib
 import threading
+import logging
 
 from ..config import get_timeout
 from ..utils.callbacks import WeakMethod
 from ..utils.helpers import _inherited_docstring
+from ..exc import TimeoutError
 
 from astropy.utils.misc import InheritDocstrings
 
@@ -35,7 +37,12 @@ class Task(object):
         super(Task, self).__init__()
         self.request = message
         self.timeout = timeout
-        self.callback = WeakMethod(callback)
+        if six.callable(callback):
+            self.callback = WeakMethod(callback)
+        elif callback is None:
+            self.callback = lambda r : r
+        else:
+            raise TypeError("Expected callback to be callable or None, got {0!r}".format(callback))
         self.response = None
         self.result = None
         self.error = None
@@ -51,16 +58,25 @@ class Task(object):
         
     def wait(self, timeout=None):
         """Wait for this task to be finished."""
-        self.event.wait(timeout=get_timeout(timeout))
+        if not self.event.isSet():
+            self.event.wait(timeout=get_timeout(timeout))
         return self.event.isSet()
     
     def get(self, timeout=None):
         """Get the result."""
+        if self.error is not None:
+            raise self.error
         if not self.wait(timeout=timeout):
             raise TimeoutError("Task timed out.")
-        elif self.error is not None:
+        if self.error is not None:
             raise self.error
         return self.result
+        
+    def timedout(self, msg="Task timed out."):
+        """Cause a timeout."""
+        if not self.event.isSet():
+            self.error = TimeoutError(msg)
+            self.event.set()
 
 @six.add_metaclass(_CauldronBaseMeta)
 class _BaseService(object):
@@ -127,7 +143,6 @@ class _BaseKeyword(object):
         
     def _ktl_value(self):
         """Return the keyword value."""
-        self._maybe_read()
         return self._last_value
         
     def _ktl_name(self):
@@ -142,24 +157,14 @@ class _BaseKeyword(object):
         """Return the ascii value (String type.)"""
         return str(self._ktl_value())
     
-    def _maybe_read(self):
-        """Maybe perform a read operation, if one is not already in progress."""
-        if not self._reading and self._last_value is None:
-            self.read()
-            
-    @contextlib.contextmanager
-    def _read(self):
-        """Context manager for reading"""
-        _reading, self._reading = self._reading, True
-        yield
-        self._reading = _reading
-    
     def _current_value(self, both=False, binary=False):
         """Respond with the current value."""
-        with self._read():
-            if both:
-                return (self._ktl_binary(), self._ktl_ascii())
-            if binary:
-                return self._ktl_binary()
-            return self._ktl_ascii()
+        self.service.log.debug("{0!r}._current_value(both={1},binary={2}) = {3!r}".format(
+            self, both, binary, self._ktl_value()
+        ))
+        if both:
+            return (self._ktl_binary(), self._ktl_ascii())
+        if binary:
+            return self._ktl_binary()
+        return self._ktl_ascii()
     

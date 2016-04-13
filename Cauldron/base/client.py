@@ -17,12 +17,15 @@ import weakref
 import datetime
 import logging
 import warnings
+import collections
 from .core import _BaseKeyword, _BaseService
 from ..exc import CauldronWarning
 from ..utils.callbacks import Callbacks
 from ..utils.helpers import api_not_required, api_not_implemented, api_required, api_override
 
-__all__ = ['Keyword', 'Service']
+__all__ = ['Keyword', 'Service', 'HistorySlice']
+
+HistorySlice = collections.namedtuple("HistorySlice", ["time", "binary", "ascii", "name"])
 
 class Keyword(_BaseKeyword):
     """A client-side KTL keyword object.
@@ -63,6 +66,7 @@ class Keyword(_BaseKeyword):
     def __init__(self, service, name, type=None):
         super(Keyword, self).__init__(service, name, type)
         self._callbacks = Callbacks()
+        self.history = collections.deque(maxlen=5)
     
     @api_not_implemented
     def _ktl_broadcasts(self):
@@ -162,10 +166,11 @@ class Keyword(_BaseKeyword):
         
         This is an internal function, invoked after a Keyword instance successfully completes a :meth:`read` call, or a KTL broadcast event occurs.
         """
+        if self._acting:
+            return
         try:
             self._acting = True
-            for cb in self._callbacks:
-                cb(self)
+            self._callbacks(self)
         finally:
             self._acting = False
         
@@ -209,7 +214,9 @@ class Keyword(_BaseKeyword):
         """An internal callback to handle value updates."""
         self._last_read = datetime.datetime.now()
         if self._last_value != value:
+            self.service.log.debug("{0!r}._update({1!r})".format(self, value))
             self._last_value = value
+            self.history.append(HistorySlice(self._last_read.time(), self._ktl_binary(), self._ktl_ascii(), self.name))
             self.propagate()
         
 
@@ -230,6 +237,8 @@ class Service(_BaseService):
     Using dictionary indexing always returns a :class:`~Cauldron.base.keyword.Keyword` object.
     
     """
+    _DISPATCHER = False
+    
     def __init__(self, name, populate=False):
         super(Service, self).__init__(name=name)
         self._keywords = {}

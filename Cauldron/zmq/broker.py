@@ -54,7 +54,7 @@ class FanMessage(object):
     def __repr__(self):
         """A message representation."""
         return "<FanMessage {0:s} pending={1:d} lifetime={2:.0f} responses={3:d}>".format(
-            binascii.hexlify(self.id).decode('utf-8'), len(self.pending), self.timeout - time.time(), len(self.responses)
+            binascii.hexlify(self.id).decode('utf-8')[:6], len(self.pending), self.timeout - time.time(), len(self.responses)
         )
         
     @property
@@ -73,25 +73,30 @@ class FanMessage(object):
         
     def add(self, dispatcher, message):
         """Add item to the fan message."""
-        self.client.log.log(5, "{0!r}.add({1!r})".format(self, message))
+        self.pending.remove(dispatcher.id)
         if message.payload not in (FRAMEBLANK.decode('utf-8'), FRAMEFAIL.decode('utf-8')) and not DIRECTIONS.iserror(message.direction):
             self.responses[dispatcher.name] = message.payload
-        self.pending.remove(dispatcher.id)
+            self.client.log.log(5, "{0!r}.add({1!r}) success".format(self, message))
+        else:
+            self.client.log.log(5, "{0!r}.add({1!r}) ignore".format(self, message))
         
     def resolve(self):
         """Fan message responses."""
-        # self.client.log.log(5, "{0!r}.resolve()".format(self))
         if not self.valid:
             response = self.message.error_response("No dispatchers for '{0}'".format(self.message.service))
+            self.client.log.log(5, "{0!r}.resolve() no dispatcher".format(self))
             return response
         elif len(self.responses) == 1:
-            dispatcher, payload  = self.responses.popitem()
+            dispatcher, payload = next(iter(self.responses.items()))
             response = self.message.response(payload)
             response.dispatcher = dispatcher
+            self.client.log.log(5, "{0!r}.resolve() single response {1}".format(self, payload))
             return response
         elif len(self.responses):
+            self.client.log.log(5, "{0!r}.resolve() multiple response {1!r}".format(self, self.responses))
             return self.message.response(":".join(self.responses.values()))
         else:
+            self.client.log.log(5, "{0!r}.resolve() failure".format(self))
             return self.message.response(FRAMEFAIL)
         
     def send(self, socket):
@@ -178,8 +183,8 @@ class Client(Lifetime):
     def send(self, message, socket):
         """Send a message to this client."""
         message.prefix = [self.id, b""]
-        socket.send_multipart(message.data)
         self.log.log(5, "{0!r}.send({1!r})".format(self, message))
+        socket.send_multipart(message.data)
         self.deactivate(message)
         
 
@@ -197,8 +202,8 @@ class Dispatcher(Lifetime):
     def send(self, message, socket):
         """Send a message to this dispatcher."""
         message.prefix = [self.id, b""] + message.prefix
-        socket.send_multipart(message.data)
         self.log.log(5, "{0!r}.send({1!r})".format(self, message))
+        socket.send_multipart(message.data)
         self.activate(message)
         
 
@@ -244,6 +249,7 @@ class Service(object):
             except ValueError:
                 raise DispatcherError("No dispatcher available for {0}".format(message.dispatcher))
         if recv:
+            self.log.log(5, "{0!r}.recv({1})".format(dispatcher_object, message))
             dispatcher_object.deactivate(message)
         return dispatcher_object
         
@@ -253,6 +259,8 @@ class Service(object):
             client_object = self.clients[message.client_id]
         except KeyError:
             client_object = self.clients[message.client_id] = Client(message.client_id, self)
+        if recv:
+            self.log.log(5, "{0!r}.recv({1})".format(client_object, message))
         return client_object
         
     def scrape(self, message):
@@ -385,11 +393,12 @@ class Service(object):
             else:
                 raise KeyError
         except KeyError:
-            fmessage = FanMessage(self, client, message)        
+            fmessage = FanMessage(self, client, message)
             self._fans[fmessage.id] = fmessage
         
             for dispatcher in self.dispatchers.values():
                 dispatcher.send(fmessage.generate_message(dispatcher), socket)
+            self.log.log(5, "{0!r}.fan()".format(fmessage))
         else:
             response = message.response(ktl_type)
             response.dispatcher = dispatcher_name
@@ -431,7 +440,7 @@ class Service(object):
         client.activate(message)
         if message.command == "lookup":
             # The client has asked for the subscription address, we should send that to them.
-            response = message.response(self.broker._pub_address)
+            response = message.response(self.broker._mon_address)
         elif message.command == "locate":
             # The client has asked us if a service is locatable.
             response = message.response("yes" if len(self.dispatchers) else "no")
@@ -444,7 +453,7 @@ class Service(object):
 
 class ZMQBroker(threading.Thread):
     """A broker object for handling ZMQ Messaging patterns"""
-    def __init__(self, name, address, pub_address, sub_address, context=None, timeout=1.0):
+    def __init__(self, name, address, pub_address, sub_address, mon_address, context=None, timeout=1.0):
         super(ZMQBroker, self).__init__(name=name)
         import zmq
         self.context = context or zmq.Context.instance()
@@ -453,6 +462,7 @@ class ZMQBroker(threading.Thread):
         self._address = address
         self._pub_address = pub_address
         self._sub_address = sub_address
+        self._mon_address = mon_address
         self.timeout = float(timeout)
         self._local = threading.local()
         self._error = None
@@ -465,8 +475,9 @@ class ZMQBroker(threading.Thread):
         address = zmq_get_address(config, "broker", bind=True)
         sub_address = zmq_get_address(config, "publish", bind=True)
         pub_address = zmq_get_address(config, "subscribe", bind=True)
+        mon_address = zmq_get_address(config, "subscribe", bind=False)
         timeout = config.getfloat("zmq", "timeout")
-        return cls(name, address, pub_address, sub_address, timeout=timeout)
+        return cls(name, address, pub_address, sub_address, mon_address, timeout=timeout)
         
     @classmethod
     def serve(cls, config, name="ServerBroker"):
@@ -519,7 +530,7 @@ class ZMQBroker(threading.Thread):
         
         message = ZMQCauldronMessage(command="check", direction="UBQ")
         socket.send_multipart(message.data)
-        if socket.poll(timeout):
+        if socket.poll(timeout * 1e3):
             response = ZMQCauldronMessage.parse(socket.recv_multipart())
             print(response)
             if response.payload == "Broker Alive":
@@ -570,7 +581,7 @@ class ZMQBroker(threading.Thread):
         socket = self._local.socket = self.connect(self._address)
         xpub = self._local.xpub = self.connect(self._pub_address, 'XPUB')
         xsub = self._local.xsub = self.connect(self._sub_address, 'XSUB')
-        signal = self._local.signal = self.connect("inproc://{0}".format(hex(id(self))), "PAIR")
+        signal = self._local.signal = self.connect("inproc://{0}".format(hex(id(self))), "PULL")
         self._local.poller = zmq.Poller()
         self._local.poller.register(socket, zmq.POLLIN)
         self._local.poller.register(xsub, zmq.POLLIN)
@@ -648,7 +659,7 @@ class ZMQBroker(threading.Thread):
             return
         
         if self.running.is_set() and not self.context.closed:
-            signal = self.context.socket(zmq.PAIR)
+            signal = self.context.socket(zmq.PUSH)
         
             signal.connect("inproc://{0:s}".format(hex(id(self))))
             self.running.clear()

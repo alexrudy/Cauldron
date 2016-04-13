@@ -4,8 +4,10 @@ from __future__ import absolute_import
 
 import weakref
 import warnings
+import logging
 import threading
 
+from six.moves import queue
 from .dispatcher import Service as Dispatcher
 from ..base import ClientService, ClientKeyword
 from ..base.core import Task as _BaseTask
@@ -14,13 +16,45 @@ from .. import registry
 
 __all__ = ['Service', 'Keyword']
 
-def _local_task_callback(arg):
-    return arg
 
 class LocalTask(_BaseTask):
     """A simple object to mock asynchronous operations."""
-    def __init__(self, result, timeout=None):
-        super(LocalTask, self).__init__(result, callback=_local_task_callback, timeout=timeout)
+    
+    def __call__(self):
+        """Make sure that errors are properly set."""
+        super(LocalTask, self).__call__()
+        if self.error is not None:
+            self.error = DispatcherError(str(self.error))
+    
+class LocalTaskQueue(threading.Thread):
+    
+    def __init__(self, name, log=None):
+        super(LocalTaskQueue, self).__init__(name="Task Queue for {0:s}".format(name))
+        self.queue = queue.Queue()
+        self.log = log or logging.getLogger("ktl.local.TaskQueue.{0:s}".format(name))
+        self.daemon = True
+        self.shutdown = threading.Event()
+    
+    def run(self):
+        """Run the task queue thread."""
+        while not self.shutdown.isSet():
+            try:
+                task = self.queue.get()
+                if task is None:
+                    raise queue.Empty
+                task()
+                self.queue.task_done()
+            except queue.Empty:
+                pass
+        
+    def stop(self):
+        """Stop the task-queue thread."""
+        self.shutdown.set()
+        try:
+            self.queue.put(None, block=False)
+        except queue.Full:
+            pass
+        self.join()
 
 @registry.client.keyword_for("local")
 class Keyword(ClientKeyword):
@@ -50,29 +84,31 @@ class Keyword(ClientKeyword):
         else:
             self.source._consumers.discard(self._update)
         
+    def _read_task(self, unused):
+        result = self.source.update()
+        self._update(result)
+        
     def read(self, binary=False, both=False, wait=True, timeout=None):
-        """Read a value, synchronously, always."""
         
         if not self['reads']:
             raise ValueError("Keyword '{0}' does not support reads, it is write-only.".format(self.name))
         
-        try:
-            new_value = self.source.update()
-        except Exception as e:
-            raise DispatcherError("Error in Dispatcher: {0}".format(str(e)))
+        task = LocalTask(None, self._read_task, timeout)
+        self.service._thread.queue.put(task)
+        if wait:
+            result = task.get(timeout=timeout)
+            return self._current_value(binary=binary, both=both)
         else:
-            self._update(new_value)
-            
-        if not wait:
-            warnings.warn("Cauldron.local doesn't support asynchronous reads. Returning a fake task object.", CauldronAPINotImplementedWarning)
-            task = LocalTask(self._current_value(binary=binary, both=both), timeout=timeout)
-            task()
             return task
-            
-        return self._current_value(binary=binary, both=both)
+        
+    def _write_task(self, value):
+        self.source.modify(value)
+        self._update(self.source.value)
+        return self._current_value()
         
     def write(self, value, wait=True, binary=False, timeout=None):
-        """Write a value"""
+        _call_msg = lambda : "{0!r}.write({1}, wait={2}, timeout={3})".format(self, value, wait, timeout)
+        
         if not self['writes']:
             raise ValueError("Keyword '{0}' does not support writes, it is read-only.".format(self.name))
         
@@ -82,17 +118,15 @@ class Keyword(ClientKeyword):
         except (TypeError, ValueError): #pragma: no cover
             pass
         
-        try:
-            self.source.modify(value)
-        except Exception as e:
-            raise DispatcherError("Error in Dispatcher: {0}".format(str(e)))
-        
-        if not wait:
-            warnings.warn("Cauldron.local doesn't support asynchronous writes. Returning a fake task object.", CauldronAPINotImplementedWarning)
-            task = LocalTask(None, timeout=timeout)
-            task()
+        task = LocalTask(value, self._write_task, timeout)
+        self.service._thread.queue.put(task)
+        if wait:
+            self.service.log.debug("{0} waiting.".format(_call_msg()))
+            result = task.get(timeout=timeout)
+            self.service.log.debug("{0} complete.".format(_call_msg()))
+            return
+        else:
             return task
-        
         
     def wait(self, timeout=None, operator=None, value=None, sequence=None, reset=False, case=False):
         if sequence is not None:
@@ -108,6 +142,14 @@ class Service(ClientService):
         except KeyError:
             raise ServiceNotStarted("Service '{0!s}' is not started.".format(name))
         super(Service, self).__init__(name, populate)
+        self._thread = LocalTaskQueue(name, self.log)
+        self._thread.start()
+    
+    def shutdown(self):
+        """Shutdown this client."""
+        if hasattr(self, '_thread'):
+            self._thread.stop()
+        super(Service, self).shutdown()
     
     def has_keyword(self, name):
         """Check for the existence of a keyword."""

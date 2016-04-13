@@ -3,11 +3,81 @@
 Cauldron KTL API
 ****************
 
-The KTL API is defined in :mod:`Cauldron` by four abstract base classes, :class:`~client.ClientService`, :class:`~client.ClientKeyword`, :class:`~dispatcher.DispatcherService` and :class:`~dispatcher.DispatcherKeyword`. These base classes are used with a concrete backend implementation, and are available in :mod:`Cauldron.ktl` and :mod:`Cauldron.DFW` at runtime.
+The Cauldron KTL API mimics the real KTL API for clients and DFW API for server-side components. A brief introduction to using each component is below.
 
-These classes are designed to provide a consistent API for KTL services and keywords, irrespective of the KTL backend. They require that various user-facing functions and private functions are implemented, and they specify which functions are not required by the Cauldron KTL API.
+Using a Cauldron KTL Client
+===========================
 
-.. note:: Not all KTL API features are implemented in Cauldron, and not all KTL python API functions are available. It is relatively trivial to implement new python API functions (e.g. the procedural KTL interface) using the existing Cauldron modules. Implementing new API features is more difficult.
+To use a client, you must first select a backend via :func:`use`::
+
+    import Cauldron
+    Cauldron.use("mock")
+
+
+In this example, we use the "mock" backend, as it doesn't require a dispatcher to be running. All dispatchers will be filled in with caching dispatchers at runtime.
+
+Then, import the ktl library and create a service clinet::
+
+    from Cauldron import ktl
+    service = ktl.Service("MYSERVICENAME")
+
+
+To access a keyword, you can index the service object like a dictionary::
+
+    keyword = service["AKEYWORD"]
+    keyword.write("some value")
+    value = keyword.read()
+
+
+Using a Cauldron DFW dispatcher
+===============================
+
+Dispatchers are little more tricky in real-world use, as they respond to arbitrary requests from ktl clients. In the simplest implementation, you only need a dispatcher (instance of :class:`~Cauldron.DFW.Service`), from which you can access keyword objects, and attach callbacks to them. For example::
+    
+    import Cauldron
+    Cauldron.use("mock")
+    from Cauldron import DFW
+    service = DFW.Service("MYSERVICENAME", config=None)
+    keyword = service["AKEYWORD"]
+    keyword.callback(lambda kwd : print("Hello"))
+    
+
+A more sophisticated (and correct) use of a dispatcher is to provide custom implementation for keywords which can validate keyword values as they are written, and which can respond with proper values as they are read. Imagine that you have a hardware widget with two functions and you wish to expose the widget via the keyword system::
+    
+    def get_widget_value():
+        return 5
+    
+    def set_widget_value(value):
+        print("Widget set to {0}".format(value))
+    
+Lets pretend that the widget only accepts integer values, and that negative numbers will cause an error for the widget. We can implement a custom keyword class for this widget using the following::
+    
+    from Cauldron.types import DispatcherKeywordType
+    
+    class WidgetKeyword(DispatcherKeywordType):
+        
+        def __init__(self, service):
+            super(WidgetKeyword, self).__init__(service=service, name="MYWIDGET", initial=5)
+            
+        def read(self):
+            return get_widget_value()
+        
+        def write(self, value):
+            value = int(value)
+            if value < 0:
+                raise ValueError("Widget can't be less than zero.")
+            set_widget_value(value)
+            return str(value)
+        
+    
+    
+Now we'd normally set up the keyword during the service's setup function (see :class:`~Cauldron.DFW.Service`)::
+    
+    def setup(service):
+        WidgetKeyword(service)
+    
+    service = DFW.Service("WIDGETSERVICE", setup=setup, config=None)
+    
 
 API Implementation Status
 =========================
@@ -17,21 +87,24 @@ A brief summary of major KTL API features is provided in the table below. API fe
 ======================== =================== ========
 Feature                  Status              Comments
 ======================== =================== ========
-Synchronous read/write   Implemented         
+Synchronous read/write   Implemented
 Asynchronous read/write  *Implemented*       KTL calls are still serial on most backends.
-Heartbeats               *Planned*           
-Callbacks                Implemented         
-Polling                  Not Implemented     
-Scheduling               Not Implemented     
-Expressions              Not Implemented     
-XML Keyword Validation   Implemented         
-Operator Overloading     Not Implemented     
+Heartbeats               *Planned*
+Callbacks                Implemented
+Polling                  Not Implemented
+Scheduling               Not Implemented
+Expressions              Not Implemented
+XML Keyword Validation   Implemented
+Operator Overloading     Not Implemented
 ======================== =================== ========
 
 When Cauldron does not implement a feature, using that feature will raise an :exc:`~Cauldron.exc.CauldronAPINotImplemented` error, which is a subclass of :exc:`NotImplementedError`.
 
 ktl Reference/API
 =================
+
+.. automodapi:: Cauldron.ktl
+    :skip: Service
 
 .. automodapi:: Cauldron.ktl.Keyword
 
@@ -41,6 +114,9 @@ ktl Reference/API
 
 DFW Reference/API
 =================
+
+.. automodapi:: Cauldron.DFW
+    :skip: Service
 
 .. automodapi:: Cauldron.DFW.Service
 

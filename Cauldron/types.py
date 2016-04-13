@@ -18,13 +18,13 @@ import abc
 import six
 import logging
 from .exc import CauldronAPINotImplementedWarning, CauldronXMLWarning
-from .api import guard_use, STRICT_KTL_XML, BASENAME
+from .api import guard_use, STRICT_KTL_XML, BASENAME, CAULDRON_SETUP
 from .base.core import _CauldronBaseMeta
 from .bundled import ktlxml
 from . import registry
 from .utils.helpers import _inherited_docstring, _prepend_to_docstring
 
-__all__ = ['KeywordType', 'Basic', 'Keyword', 'Boolean', 'Double', 'Float', 'Integer', 'Enumerated', 'Mask', 'String', 'IntegerArray', 'FloatArray', 'DoubleArray', 'dispatcher_keyword', 'client_keyword']
+__all__ = ['KeywordType', 'Basic', 'Keyword', 'Boolean', 'Double', 'Float', 'Integer', 'Enumerated', 'Mask', 'String', 'IntegerArray', 'FloatArray', 'DoubleArray', 'dispatcher_keyword', 'client_keyword', 'ClientKeywordType', 'DispatcherKeywordType']
 
 log = logging.getLogger(__name__)
 
@@ -40,17 +40,21 @@ def client_keyword(cls):
     _client.add(cls)
     return cls
     
+def _generate_keyword_subclass(basecls, subclass, module):
+    """Generate a single keyword subclass."""
+    if getattr(subclass, '__doc__', None) is not None:
+        doc = _prepend_to_docstring(_inherited_docstring(basecls), subclass.__doc__)
+    else:
+        doc = _inherited_docstring(basecls)
+    cls = type(subclass.__name__, (subclass, basecls),
+        {'__module__':module, '__doc__':doc})
+    subclass._subcls = cls
+    return cls
+    
 def generate_keyword_subclasses(basecls, subclasses, module):
     """Given a base class, generate keyword subclasses."""
     for subclass in subclasses:
-        if getattr(subclass, '__doc__', None) is not None:
-            doc = _prepend_to_docstring(_inherited_docstring(basecls), subclass.__doc__)
-        else:
-            doc = _inherited_docstring(basecls)
-        cls = type(subclass.__name__, (subclass, basecls),
-            {'__module__':module, '__doc__':doc})
-        subclass.cls = cls
-        yield cls
+        yield _generate_keyword_subclass(basecls, subclass, module)
 
 def _setup_keyword_class(kwcls, module):
     """Set up a keyword class on a module."""
@@ -97,10 +101,75 @@ class KeywordType(object):
     KTL_ALIASES = ()
     """A list of additional KTL-API type names that can be used with this class."""
     
-    cls = None
+    _subcls = None
+    
+    @classmethod
+    def _is_dispatcher(cls, args, kwargs):
+        """Get the service argument."""
+        if "service" in kwargs:
+            return getattr(kwargs["service"],'_DISPATCHER', None)
+        for i,arg in enumerate(args):
+            if i > 1:
+                break
+            if not isinstance(arg, six.string_types):
+                return getattr(arg, '_DISPATCHER', None)
+        return None
+    
+    @classmethod
+    def _get_cauldron_basecls(cls, dispatcher=None):
+        """Get the Cauldron basecls."""
+        if dispatcher is None:
+            raise RuntimeError("Generic KeywordType shouldn't try to subclass itself.")
+        elif dispatcher is True:
+            registry.dispatcher.guard("initializing any keyword objects.")
+            return registry.dispatcher.Keyword
+        else:
+            registry.client.guard("initializing any keyword objects.")
+            return registry.client.Keyword
+        
+    @classmethod
+    def _make_subclass(cls, basecls):
+        """Make a Cauldron subclass."""
+        if cls.__dict__.get('_subcls',None) is None or not issubclass(cls._subcls, basecls):
+            cls._subcls = type(cls.__name__, (cls, basecls), {'__module__':cls.__module__, '__doc__':cls.__doc__})
+        return cls._subcls
+    
+    def __new__(cls, *args, **kwargs):
+        if cls.KTL_TYPE is None:
+            dispatcher = cls._is_dispatcher(args, kwargs)
+            basecls = cls._get_cauldron_basecls(dispatcher)
+            if not issubclass(cls, basecls):
+                newcls = cls._make_subclass(basecls)
+                return newcls.__new__(newcls, *args, **kwargs)
+        
+        # See http://stackoverflow.com/questions/19277399/why-does-object-new-work-differently-in-these-three-cases for why this is necessary.
+        # Basically, because some child may override __new__, we must override it here to never pass arguments to the object.__new__ method.
+        if super(KeywordType, cls).__new__ is object.__new__:
+            return super(KeywordType, cls).__new__(cls)
+        return super(KeywordType, cls).__new__(cls, *args, **kwargs)
     
     def __init__(self, *args, **kwargs):
         super(KeywordType, self).__init__(*args, **kwargs)
+
+class DispatcherKeywordType(KeywordType):
+    """Keyword type for dispatchers."""
+    
+    @classmethod
+    def _get_cauldron_basecls(cls, dispatcher):
+        """Get the Cauldron basecls."""
+        assert dispatcher in (None, True)
+        registry.dispatcher.guard("initializing any keyword objects.")
+        return registry.dispatcher.Keyword
+    
+class ClientKeywordType(KeywordType):
+    """Keyword type for ktl clients."""
+    
+    @classmethod
+    def _get_cauldron_basecls(self, dispatcher):
+        """Get the Cauldron basecls."""
+        assert dispatcher in (None, False)
+        registry.client.guard("initializing any keyword objects.")
+        return registry.client.Keyword
 
 class _NotImplemented(KeywordType):
     """An initializer for not-yet implemented keywords which emits a warning."""

@@ -183,6 +183,10 @@ def decode(str_or_bytes):
         result = str_or_bytes.decode('utf-8')
     else:
         result = six.text_type(str_or_bytes)
+    for special in [FRAMEBLANK, FRAMEFAIL]:
+        if result.startswith(special.decode('utf-8')):
+            if len(result) != len(special.decode('utf-8')):
+                result = result[len(special.decode('utf-8')):]
     return result
 
 class ZMQCauldronMessage(object):
@@ -376,6 +380,12 @@ class ZMQMicroservice(threading.Thread):
         self.address = address
         self.use_broker = bool(use_broker)
         
+    def __repr__(self):
+        repr = "<{0}({1})".format(self.__class__.__name__, self.name)
+        if hasattr(self, 'identity'):
+            repr += " id={0}".format(binascii.hexlify(self.identity))
+        repr += ">"
+        return repr
         
     def handle(self, message):
         """Handle a message, raising an error if appropriate."""
@@ -385,25 +395,23 @@ class ZMQMicroservice(threading.Thread):
                 message.raise_error_response("Bad command '{0:s}'!".format(message.command))
             response_payload = getattr(self, method_name)(message)
         except ZMQCauldronErrorResponse as e:
-            self.log.log(5, "{0!r}.send({1!r})".format(self, e.message))
             return e.message
         except Exception as e:
             self.log.exception("Error handling '{0}': {1!r}".format(message.command, e))
             return message.error_response("{0!r}".format(e))
         else:
             response = message.response(response_payload)
-            self.log.log(5, "{0!r}.send({1!r})".format(self, response))
             return response
             
     def connect(self):
         """Connect to the address and return a socket."""
         import zmq
         if self.use_broker:
-            socket = self.ctx.socket(zmq.REQ)
+            socket = self.ctx.socket(zmq.DEALER)
         else:
             socket = self.ctx.socket(zmq.REP)
         
-        signal = self.ctx.socket(zmq.PAIR)
+        signal = self.ctx.socket(zmq.PULL)
         signal.bind("inproc://{0:s}".format(hex(id(self))))
         try:
             if self.use_broker:
@@ -420,6 +428,8 @@ class ZMQMicroservice(threading.Thread):
         if self.use_broker:
             # Ready sentinel for broker.
             self.greet_broker(socket, signal)
+        self.identity = socket.get(zmq.IDENTITY)
+        self.log.log(5,"{0!r}.connect() hwm={1} id={2}".format(self, socket.getsockopt(zmq.RCVHWM), socket.getsockopt(zmq.IDENTITY)))
         return socket, signal
         
     def greet_broker(self, socket, signal):
@@ -442,10 +452,18 @@ class ZMQMicroservice(threading.Thread):
             self.log.log(5, "Starting responder loop.")
             while self.running.is_set():
                 ready = dict(poller.poll(timeout=self.timeout*1e3))
-                if ready.get(socket) == zmq.POLLIN:
-                    response = self.handle(ZMQCauldronMessage.parse(socket.recv_multipart()))
-                    self.log.log(5, "Responds {0!r}".format(response))
-                    socket.send_multipart(response.data)
+                if socket in ready:
+                    msgs = 0
+                    while socket.poll(timeout=0):
+                        data = socket.recv_multipart()
+                        message = ZMQCauldronMessage.parse(data)
+                        self.log.log(5, "{0!r}.recv({1})".format(self, message))
+                        response = self.handle(message)
+                        self.log.log(5, "{0!r}.send({1!r})".format(self, response))
+                        socket.send_multipart(response.data)
+                        msgs += 1
+                    self.log.log(5, "{0!r}.loop(n={1}) events={2}".format(self, msgs, socket.getsockopt(zmq.EVENTS)))
+                    
                 
         except (zmq.ContextTerminated, zmq.ZMQError) as e:
             self.log.log(5, "Service shutdown because '{0!r}'.".format(e))
@@ -496,7 +514,7 @@ class ZMQMicroservice(threading.Thread):
         
         if self.running.is_set() and (not self.ctx.closed):
             self.running.clear()
-            signal = self.ctx.socket(zmq.PAIR)
+            signal = self.ctx.socket(zmq.PUSH)
             signal.connect("inproc://{0:s}".format(hex(id(self))))
             signal.send(b"", flags=zmq.NOBLOCK)
             signal.close(linger=0)

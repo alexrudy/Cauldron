@@ -20,12 +20,10 @@ def _make_cached_service_method(method):
     """Return a cached method slot-in for the procedural mode."""
     method = getattr(Service.Service, method)
     @functools.wraps(method)
-    def _cached_service_method(service, keyword, *args, **kwargs):
+    def _cached_service_method(service, *args, **kwargs):
         if not isinstance(service, str):
             raise TypeError("Service must be a string.")
-        if not isinstance(keyword, str):
-            raise TypeError("Keyword must be a string.")
-        return method(cached(service), keyword, *args, **kwargs)
+        return method(cached(service), *args, **kwargs)
     _cached_service_method.__module__ = __name__
     return _cached_service_method
     

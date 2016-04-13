@@ -238,11 +238,12 @@ class Keyword(_BaseKeyword):
     
     def _propogate(self):
         """Propagate the change to any waiting callbacks."""
-        try:
-            self._acting = True
-            self._callbacks(self)
-        finally:
-            self._acting = False
+        if not self._acting:
+            try:
+                self._acting = True
+                self._callbacks(self)
+            finally:
+                self._acting = False
         
     @api_override
     def postwrite(self, value):
@@ -298,6 +299,7 @@ class Service(_BaseService):
     """
     
     name = None
+    _DISPATCHER = True
     
     def __init__(self, name, config, setup=None, dispatcher=None):
         super(Service, self).__init__(name=name)

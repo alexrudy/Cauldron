@@ -8,6 +8,7 @@ Cauldron has a few backends implemented, and it is easy to implement additional 
 .. toctree::
     :maxdepth: 2
     
+    bases
     local
     zmq
 

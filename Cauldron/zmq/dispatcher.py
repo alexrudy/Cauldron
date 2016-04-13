@@ -39,7 +39,7 @@ class _ZMQResponder(ZMQMicroservice):
         zmq = check_zmq()
         
         welcome = ZMQCauldronMessage(command="welcome", service=self.service.name, dispatcher=self.service.dispatcher, direction="DBQ")
-        socket.send_multipart(welcome.data)
+        socket.send_multipart([b""]+welcome.data)
         self.log.log(5, "Sent broker a welcome message: {0!s}.".format(welcome))
         
         poller = zmq.Poller()
@@ -71,7 +71,7 @@ class _ZMQResponder(ZMQMicroservice):
             raise TimeoutError("Can't connect to broker after {0:d} attempts.".format(attempts))
         
         ready = ZMQCauldronMessage(command="ready", service=self.service.name, dispatcher=self.service.dispatcher, direction="DBQ")
-        socket.send_multipart(ready.data)
+        socket.send_multipart([b""]+ready.data)
         self.log.log(5, "Sent broker a ready message: {0!s}.".format(ready))
         
     
@@ -117,13 +117,13 @@ class _ZMQResponder(ZMQMicroservice):
         message.verify(self.service)
         message = ZMQCauldronMessage(command="broadcast", service=self.service.name, dispatcher=self.service.dispatcher, keyword=message.keyword, payload=message.payload, direction="CDB")
         socket = self._get_broadcaster()
-        self.log.log(5, "Broadcast {0!s}".format(message))
+        self.log.log(5, "{0!r}.broadcast({1!s})".format(self, message))
         socket.send_multipart(message.data)
         return "success"
         
     def handle_heartbeat(self, message):
         """Heartbeat command does pretty much nothing."""
-        self.log.log(5, "Heartbeat {0!s}".format(message))
+        self.log.log(5, "{0!r}.beat({1!s})".format(self, message))
         return "{0:.1f}".format(time.time())
         
         
@@ -205,13 +205,13 @@ class Service(DispatcherService):
         message = ZMQCauldronMessage(command, service=self.name, dispatcher=self.dispatcher,
             keyword=keyword.name if keyword else FRAMEBLANK, payload=payload, direction="CDQ")
         if not self._thread.running.is_set():
-            self.log.log(5, "Queue {0!s}".format(message))
+            self.log.log(5, "{0!r}.queue({1!s})".format(self, message))
             return self._message_queue.append(message)
         elif threading.current_thread() == self._thread:
-            self.log.log(5, "Request-local {0!s}".format(message))
+            self.log.log(5, "{0!r}.handle({1!s})".format(self, message))
             response = self._thread.handle(message)
         else:
-            self.log.log(5, "Request {0!s}".format(message))
+            self.log.log(5, "{0!r}.send({0!s})".format(message))
             self.socket.send_multipart(message.data)
             if timeout:
                 if not self.socket.poll(timeout * 1e3):

@@ -63,6 +63,13 @@ def fail_if_not_teardown():
     else:
         raise ValueError("Shouldn't be able to import ktl now!")
     
+    # Check for cycles.
+    import gc
+    gc.collect()
+    if len(gc.garbage):
+        print(gc.garbage)
+        raise ValueError("There is garbage: {0!r}".format(gc.garbage))
+    
     # Check for zombie threads.
     import threading, time
     if threading.active_count() > 1:
@@ -75,6 +82,6 @@ def fail_if_not_teardown():
             
     # If there are new, non-daemon threads, cause an error.
     if count > 1:
-        threads_str = "\n".join([repr(thread) for thread in threading.enumerate()])
+        threads_str = "\n".join(["{0}:{1}".format(repr(thread), gc.get_referrers(thread)) for thread in threading.enumerate()])
         raise ValueError("{0:d} non-deamon thread{1:s} left alive!\n{2!s}".format(
             count-1, "s" if (count-1)>1 else "", threads_str))
