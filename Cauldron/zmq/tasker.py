@@ -6,9 +6,8 @@ A queue to handle ZMQ messages asynchronously from the client.
 from six.moves import queue
 import threading
 import time
-import zmq
-from .common import zmq_connect_socket
-from .microservice import ZMQCauldronMessage
+from .common import zmq_connect_socket, check_zmq
+from .protocol import ZMQCauldronMessage
 from ..utils.callbacks import WeakMethod
 from ..exc import TimeoutError
 from ..config import get_configuration, get_timeout
@@ -32,6 +31,7 @@ class TaskQueue(threading.Thread):
     """A client task queue"""
     def __init__(self, name, ctx=None, log=None, timeout=None):
         super(TaskQueue, self).__init__(name="ktl.Service.{0:s}.Tasks".format(name))
+        zmq = check_zmq()
         self._pending = {}
         self._task_timeout = ((get_timeout(timeout) or 1.0) * 1e3) * 1e3 # Wait 1000x the normal timeout, then clear old stuff.
         self.ctx = ctx or zmq.Context.instance()
@@ -64,6 +64,7 @@ class TaskQueue(threading.Thread):
     @property
     def frontend(self):
         """Retrieve the thread-local frontend socket."""
+        zmq = check_zmq()
         if hasattr(self._local, 'frontend'):
             return self._local.frontend
         
@@ -80,6 +81,7 @@ class TaskQueue(threading.Thread):
         
     def run(self):
         """Run the task queue thread."""
+        zmq = check_zmq()
         backend = self.ctx.socket(zmq.DEALER)
         zmq_connect_socket(backend, get_configuration(), "broker", log=self.log, label='client')
         
@@ -108,7 +110,7 @@ class TaskQueue(threading.Thread):
             if backend in ready:
                 try:
                     message = ZMQCauldronMessage.parse(backend.recv_multipart())
-                    self.log.debug("{0!r}.recv({1!r})".format(self, message))
+                    self.log.debug("{0!r}.recv({1})".format(self, message))
                 except Exception as e:
                     # un-parseable message, discard it.
                     self.log.exception("Discarding {0}".format(str(e)))
@@ -120,7 +122,7 @@ class TaskQueue(threading.Thread):
             if frontend in ready:
                 identifier = frontend.recv()
                 starttime, task = self._pending[identifier]
-                self.log.debug("{0!r}.send({1!r})".format(self, task.request))
+                self.log.debug("{0!r}.send({1})".format(self, task.request))
                 backend.send(b"", flags=zmq.SNDMORE)
                 backend.send_multipart(task.request.data)
             
@@ -129,6 +131,7 @@ class TaskQueue(threading.Thread):
         
     def stop(self):
         """Stop the task-queue thread."""
+        zmq = check_zmq()
         self.shutdown.set()
         signal = self.ctx.socket(zmq.PUSH)
         signal.connect(self.signal_address)

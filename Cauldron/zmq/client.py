@@ -9,7 +9,7 @@ import weakref
 from ..base import ClientService, ClientKeyword
 from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented, DispatcherError, TimeoutError
 from .common import zmq_get_address, check_zmq, teardown, zmq_connect_socket
-from .microservice import ZMQCauldronMessage, ZMQCauldronErrorResponse, FRAMEBLANK, FRAMEFAIL
+from .protocol import ZMQCauldronMessage, ZMQCauldronErrorResponse, FRAMEBLANK, FRAMEFAIL
 from .tasker import Task, TaskQueue
 from .. import registry
 from ..config import get_configuration, get_timeout

@@ -12,7 +12,7 @@ import binascii
 import weakref
 
 from ..config import read_configuration
-from .microservice import ZMQCauldronMessage, ZMQCauldronErrorResponse, FRAMEBLANK, FRAMEFAIL, DIRECTIONS
+from .protocol import ZMQCauldronMessage, ZMQCauldronErrorResponse, FRAMEBLANK, FRAMEFAIL, DIRECTIONS
 from .common import zmq_get_address, check_zmq, teardown, zmq_connect_socket
 from ..exc import DispatcherError
 
@@ -663,11 +663,12 @@ class ZMQBroker(threading.Thread):
         
             signal.connect("inproc://{0:s}".format(hex(id(self))))
             self.running.clear()
-            signal.send(b"", flags=zmq.NOBLOCK)
-            signal.close(linger=0)
+            signal.send(b"")
+            signal.close()
         else:
             self.running.clear()
         
+        self.log.debug("Signaled to stop broker.")
         self.join()
         self.log.debug("Joined Broker")
         
