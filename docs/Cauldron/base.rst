@@ -34,12 +34,12 @@ Using a Cauldron DFW dispatcher
 
 Dispatchers are little more tricky in real-world use, as they respond to arbitrary requests from ktl clients. In the simplest implementation, you only need a dispatcher (instance of :class:`~Cauldron.DFW.Service`), from which you can access keyword objects, and attach callbacks to them. For example::
     
-    import Cauldron
+    import Cauldron, sys
     Cauldron.use("mock")
     from Cauldron import DFW
     service = DFW.Service("MYSERVICENAME", config=None)
     keyword = service["AKEYWORD"]
-    keyword.callback(lambda kwd : print("Hello"))
+    keyword.callback(lambda kwd : sys.stdout.write("Hello\n"))
     
 
 A more sophisticated (and correct) use of a dispatcher is to provide custom implementation for keywords which can validate keyword values as they are written, and which can respond with proper values as they are read. Imagine that you have a hardware widget with two functions and you wish to expose the widget via the keyword system::
