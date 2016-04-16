@@ -8,4 +8,7 @@ try:
 except ImportError as e:
     from . import ktlxml
 
-
+try:
+    import GUI
+except ImportError as e:
+    from . import GUI
