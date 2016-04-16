@@ -41,6 +41,7 @@ class TaskQueue(threading.Thread):
         self.daemon = True
         self.shutdown = threading.Event()
         self._local = threading.local()
+        self._frontend_sockets = []
         
     def _check_timeout(self):
         """Check timeouts for tasks."""
@@ -71,8 +72,13 @@ class TaskQueue(threading.Thread):
         frontend = self.ctx.socket(zmq.PUSH)
         frontend.connect(self.frontend_address)
         self._local.frontend = frontend
+        self._frontend_sockets.append(frontend)
         return frontend
         
+    def __del__(self):
+        """When deleting this object, make sure all of the sockets are closed."""
+        for socket in self._frontend_sockets:
+            socket.close()
         
     def put(self, task):
         """Add a task to the queue."""
