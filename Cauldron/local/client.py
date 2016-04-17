@@ -11,7 +11,7 @@ from six.moves import queue
 from .dispatcher import Service as Dispatcher
 from ..base import ClientService, ClientKeyword
 from ..base.core import Task as _BaseTask
-from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented, ServiceNotStarted, DispatcherError
+from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented, ServiceNotStarted, DispatcherError, TimeoutError
 from .. import registry
 
 __all__ = ['Service', 'Keyword']
@@ -89,6 +89,7 @@ class Keyword(ClientKeyword):
         self._update(result)
         
     def read(self, binary=False, both=False, wait=True, timeout=None):
+        _call_msg = lambda : "{0!r}.read(wait={1}, timeout={2})".format(self, wait, timeout)
         
         if not self['reads']:
             raise ValueError("Keyword '{0}' does not support reads, it is write-only.".format(self.name))
@@ -96,7 +97,12 @@ class Keyword(ClientKeyword):
         task = LocalTask(None, self._read_task, timeout)
         self.service._thread.queue.put(task)
         if wait:
-            result = task.get(timeout=timeout)
+            try:
+                result = task.get(timeout=timeout)
+            except TimeoutError:
+                raise TimeoutError("{0} timed out.".format(_call_msg()))
+            else:
+                self.service.log.debug("{0} complete.".format(_call_msg()))
             return self._current_value(binary=binary, both=both)
         else:
             return task
@@ -122,7 +128,12 @@ class Keyword(ClientKeyword):
         self.service._thread.queue.put(task)
         if wait:
             self.service.log.debug("{0} waiting.".format(_call_msg()))
-            result = task.get(timeout=timeout)
+            try:
+                result = task.get(timeout=timeout)
+            except TimeoutError:
+                raise TimeoutError("{0} timed out.".format(_call_msg()))
+            else:
+                self.service.log.debug("{0} complete.".format(_call_msg()))
             self.service.log.debug("{0} complete.".format(_call_msg()))
             return
         else:
