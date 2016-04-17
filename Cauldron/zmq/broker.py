@@ -127,7 +127,8 @@ class Lifetime(object):
         
     def beat(self):
         """Mark a heartbeat"""
-        self._expiration = time.time() + self.service.broker.timeout
+        self._expiration = time.time() + self.service.broker.timeout        
+        self._next_beat = time.time() + self.service.broker.timeout
         
     @property
     def alive(self):
@@ -137,7 +138,7 @@ class Lifetime(object):
     @property
     def shouldbeat(self):
         """Should this thing ask for a heartbeat."""
-        return time.time() > self._expiration
+        return time.time() > self._next_beat
         
     @property
     def lifetime(self):
@@ -170,7 +171,7 @@ class Lifetime(object):
         self._message_pool.clear()
     
     def __repr__(self):
-        return "<{0} name='{1}' lifetime={2:.0f} open={3:d}>".format(self.__class__.__name__, self.name, self.lifetime, self.active)
+        return "<{0} name='{1}' lifetime={2:.2f} open={3:d}>".format(self.__class__.__name__, self.name, self.lifetime, self.active)
 
 class Client(Lifetime):
     """A simple representation of a client connection."""
@@ -205,6 +206,18 @@ class Dispatcher(Lifetime):
         self.log.log(5, "{0!r}.send({1!r})".format(self, message))
         socket.send_multipart(message.data)
         self.activate(message)
+        
+    def send_beat(self, socket):
+        """Send a beat."""
+        if self.message is not None:
+            msg = ZMQCauldronMessage(command='heartbeat', direction="DBP",
+                service=self.service.name, dispatcher=self.name, payload="beat")
+            msg.prefix = [self.id, b""]
+            self._next_beat = time.time() + self.service.broker.timeout
+            self.log.log(5, "{0!r}.beat({1!r})".format(self, msg))
+            socket.send_multipart(msg.data)
+            self.activate(msg)
+        
         
 
 
@@ -317,12 +330,8 @@ class Service(object):
         """Start heartbeat messages where necssary."""
         for name in self.dispatchers.keys():
             dispatcher = self.dispatchers[name]
-            if not dispatcher.shouldbeat:
-                continue
-            if dispatcher.message is not None:
-                msg = dispatcher.message.response("beat")
-                msg.command = "heartbeat"
-                dispatcher.send(msg, socket)
+            if dispatcher.shouldbeat:
+                dispatcher.send_beat(socket)
         
     def handle(self, message, socket):
         """Handle"""
