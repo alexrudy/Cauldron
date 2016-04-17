@@ -33,7 +33,7 @@ class TaskQueue(threading.Thread):
         super(TaskQueue, self).__init__(name="ktl.Service.{0:s}.Tasks".format(name))
         zmq = check_zmq()
         self._pending = {}
-        self._task_timeout = ((get_timeout(timeout) or 1.0) * 1e3) * 1e3 # Wait 1000x the normal timeout, then clear old stuff.
+        self._task_timeout = ((get_timeout(timeout) or 1.0) * 60) # Wait 60x the normal timeout, then clear old stuff.
         self.ctx = ctx or zmq.Context.instance()
         self.frontend_address = "inproc://{0:s}-frontend".format(hex(id(self)))
         self.signal_address = "inproc://{0:s}-signal".format(hex(id(self)))
@@ -46,16 +46,17 @@ class TaskQueue(threading.Thread):
     def _check_timeout(self):
         """Check timeouts for tasks."""
         now = time.time()
-        timeout = self._task_timeout
+        timeout = 5.0
         for starttime, task in list(self._pending.values()):
             if task.timeout is None:
                 if (starttime + self._task_timeout) < now:
-                    self.log.debug("Task {0} took way too long. Orphaning.".format())
+                    self.log.debug("Task {0} took way too long. Orphaning.".format(task))
                     task.timedout("Orphaned task stuck in queue.")
                     self._pending.pop(task.request.identifier)
                 continue
             dur = starttime + task.timeout
             if dur < now:
+                self.log.debug("{0!r}.timeout({1})".format(self, task.request))
                 task.timedout()
                 self._pending.pop(task.request.identifier)
             elif (timeout > (task.timeout * 1e3)):
@@ -121,8 +122,13 @@ class TaskQueue(threading.Thread):
                     # un-parseable message, discard it.
                     self.log.exception("Discarding {0}".format(str(e)))
                 else:
-                    starttime, task = self._pending.pop(message.identifier)
-                    task(message)
+                    try:
+                        starttime, task = self._pending.pop(message.identifier)
+                    except KeyError:
+                        # This task had probably timed out.
+                        self.log.debug("{0!r}.recv({1}) missing".format(self, message))
+                    else:
+                        task(message)
                 
             # We need to ask for something new.
             if frontend in ready:
@@ -134,6 +140,10 @@ class TaskQueue(threading.Thread):
             
             timeout = self._check_timeout()
             
+        backend.close()
+        frontend.close()
+        signal.close()
+        self.log.debug("{0!r} done.".format(self))
         
     def stop(self):
         """Stop the task-queue thread."""
