@@ -54,7 +54,8 @@ def test_read_write_timeout(service, client, slow_keyword, keyword_name1, waitti
     from ..exc import TimeoutError
     slow_keyword(keyword_name1, service)
     with pytest.raises(TimeoutError):
-        client[keyword_name1].write("blah", timeout=waittime)
+        client[keyword_name1].write("blah", timeout=waittime/10.0)
+
 def test_history(service, client, keyword_name):
     """Test history."""
     keyword = client[keyword_name]
