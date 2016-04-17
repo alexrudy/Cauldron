@@ -75,8 +75,9 @@ def fail_if_not_teardown():
     if threading.active_count() > 1:
         time.sleep(0.1) #Allow zombies to die!
     count = 0
+    ignore_daemons = False
     for thread in threading.enumerate():
-        if not thread.daemon and thread not in SEEN_THREADS:
+        if ((not thread.daemon) and ignore_daemons) and thread not in SEEN_THREADS:
             count += 1
             SEEN_THREADS.add(thread)
             
