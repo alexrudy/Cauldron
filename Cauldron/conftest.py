@@ -45,36 +45,13 @@ available_backends = get_available_backends()
 if "zmq" in available_backends:
     PYTEST_HEADER_MODULES['zmq'] = 'zmq'
 
-def _pytest_get_option(config, name, default):
-    """Get pytest options in a version independent way, with allowed defaults."""
-    
-    try:
-        value = config.getoption(name, default=default)
-    except Exception:
-        try:
-            value = config.getvalue(name)
-        except Exception:
-            return default
-    return value
-    
-
 def pytest_configure(config):
     """Activate log capturing if appropriate."""
-
-    if (not _pytest_get_option(config, 'capturelog', default=True)) or (_pytest_get_option(config, 'capture', default="no") == "no"):
-        try:
-            import lumberjack
-            lumberjack.setup_logging("", mode='stream', level=1)
-            lumberjack.setup_warnings_logger("")
-        except:
-            pass
-    else:
-        try:
-            import lumberjack
-            lumberjack.setup_logging("", mode='none', level=1)
-            lumberjack.setup_warnings_logger("")
-        except:
-            pass
+    try:
+        config.getini('log_format')
+    except ValueError:
+        from lumberjack.config import configure
+        configure("stream")
 
 def pytest_report_header(config):
     import astropy.tests.pytest_plugins as astropy_pytest_plugins
