@@ -69,6 +69,7 @@ class Service(DispatcherService):
     def shutdown(self):
         if hasattr(self, '_thread') and self._thread.is_alive():
             self._thread.stop()
+            self._thread.join()
         
     def _synchronous_command(self, command, payload, keyword=None, timeout=None):
         """Execute a synchronous command."""

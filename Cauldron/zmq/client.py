@@ -127,11 +127,16 @@ class Service(ClientService):
         """On delete, try to shutdown."""
         self.shutdown()
         
-    def shutdown(self):
-        if hasattr(self, '_monitor'):
+    def shutdown(self, join=False):
+        if hasattr(self, '_monitor') and self._monitor.isAlive():
             self._monitor.stop()
-        if hasattr(self, '_tasker'):
+        if hasattr(self, '_tasker') and self._tasker.isAlive():
             self._tasker.stop()
+        if join:
+            if hasattr(self, '_monitor') and self._monitor.isAlive():
+                self._monitor.join()
+            if hasattr(self, '_tasker') and self._tasker.isAlive():
+                self._tasker.join()
         
     def _has_keyword(self, name):
         name = name.upper()
