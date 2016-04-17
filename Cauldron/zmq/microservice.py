@@ -8,7 +8,6 @@ import logging
 import threading
 import six
 import binascii
-import atexit
 import collections
 import uuid
 
@@ -19,13 +18,6 @@ FRAMEBLANK = six.binary_type(b"\x01")
 FRAMEFAIL = six.binary_type(b"\x02")
 FRAMEDELIMITER = six.binary_type(b"")
 
-def _exit_handler(thread_ref):
-    """Exit handler"""
-    thread = thread_ref()
-    if thread is not None:
-        thread.stop()
-    
-    
 class ZMQThread(threading.Thread):
     """A ZMQ Thread control object."""
     def __init__(self, name, context=None):
@@ -33,6 +25,7 @@ class ZMQThread(threading.Thread):
         import zmq
         self.ctx = weakref.proxy(context or zmq.Context.instance())
         self.running = threading.Event()
+        self.starting = threading.Event()
         self.log = logging.getLogger(name)
         self._error = None
         self._signal_address = "inproc://signal-{0:s}-{1:s}".format(hex(id(self)), name)
@@ -54,7 +47,7 @@ class ZMQThread(threading.Thread):
         """Create and return the signal socket for the thread."""
         import zmq
         signal = self.ctx.socket(zmq.PULL)
-        self.connect(signal, "inproc://{0:s}".format(hex(id(self))), 'bind')
+        self.connect(signal, self._signal_address, 'bind')
         return signal
         
     def check(self, timeout=1.0):
@@ -68,21 +61,26 @@ class ZMQThread(threading.Thread):
                 msg += " No error was reported."
             raise DispatcherError(msg)
         
-    def stop(self):
+    def stop(self, join=False):
         """Stop the responder thread."""
         import zmq
         if not self.isAlive():
             return
-        
+        if self.starting.isSet():
+            self.running.wait(timeout=0.1)
+        self.log.debug("{0} stopping".format(self))
         if self.running.is_set() and (not self.ctx.closed):
             self.running.clear()
+            if not self.isAlive():
+                return
             signal = self.ctx.socket(zmq.PUSH)
             signal.connect(self._signal_address)
             signal.send(b"", flags=zmq.NOBLOCK)
-            signal.close(linger=0)
+            signal.close()
         self.running.clear()
-        self.join()
-        self.log.debug("Joined microservice {0}".format(self.name))
+        if join or (not self.daemon):
+            self.join()
+        self.log.debug("Stopped microservice {0}".format(self.name))
 
 class ZMQMicroservice(ZMQThread):
     """A ZMQ Responder tool."""
@@ -111,8 +109,8 @@ class ZMQMicroservice(ZMQThread):
     def run(self):
         """Run the thread."""
         import zmq
-        atexit.register(_exit_handler, weakref.ref(self))
         try:
+            self.starting.set()
             self.log.debug("{0} starting".format(self))
             self.respond()
         except (zmq.ContextTerminated, zmq.ZMQError) as e:
