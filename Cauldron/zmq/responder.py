@@ -78,13 +78,15 @@ def _register_dispatcher(service, socket, poller=None, log=None, timeout=1.0):
 
 class ZMQPooler(ZMQThread):
     """A thread object for handling pools of ZMQ workers."""
-    def __init__(self, service, frontend_address, pool_size=8, timeout=1):
+    def __init__(self, service, frontend_address, pool_size=None, timeout=1):
         super(ZMQPooler, self).__init__(name="DFW.Service.{0}.Pool".format(service.name), context=service.ctx)
         self.service = weakref.proxy(service)
         self._backend_address = "inproc://{0}-backend".format(hex(id(self)))
         self._frontend_address = frontend_address
         self._worker_queue = collections.deque()
         self._workers = set()
+        if pool_size is None:
+            pool_size = self.service._config.getint("zmq", "pool")
         self._pool_size = pool_size
         self.timeout = timeout
         self.daemon = True
