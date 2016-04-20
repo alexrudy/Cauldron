@@ -50,6 +50,16 @@ class ZMQThread(threading.Thread):
         self.connect(signal, self._signal_address, 'bind')
         return signal
         
+    def send_signal(self, message=b""):
+        """Get a socket to signal to the underlying thread."""
+        import zmq
+        signal = self.ctx.socket(zmq.PUSH)
+        try:
+            signal.connect(self._signal_address)
+            signal.send(message)
+        finally:
+            signal.close()
+        
     def check(self, timeout=1.0):
         """Check that the thread is actually alive."""
         self.running.wait(timeout)
@@ -73,10 +83,7 @@ class ZMQThread(threading.Thread):
             self.running.clear()
             if not self.isAlive():
                 return
-            signal = self.ctx.socket(zmq.PUSH)
-            signal.connect(self._signal_address)
-            signal.send(b"", flags=zmq.NOBLOCK)
-            signal.close()
+            self.send_signal()
         self.running.clear()
         if join or (not self.daemon):
             self.join()

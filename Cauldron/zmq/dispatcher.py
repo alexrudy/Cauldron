@@ -8,6 +8,7 @@ from .common import zmq_get_address, check_zmq, teardown, zmq_connect_socket
 from .protocol import ZMQCauldronMessage, FRAMEFAIL, FRAMEBLANK
 from .responder import ZMQPooler
 from .broker import ZMQBroker
+from .schedule import Scheduler
 from ..base import DispatcherService, DispatcherKeyword
 from .. import registry
 from ..exc import DispatcherError, WrongDispatcher, TimeoutError
@@ -31,6 +32,7 @@ class Service(DispatcherService):
         zmq = check_zmq()
         self.ctx = zmq.Context.instance()
         self._sockets = threading.local()
+        self._sockets_to_close = set()
         super(Service, self).__init__(name, config, setup, dispatcher)
         
     @property
@@ -45,11 +47,13 @@ class Service(DispatcherService):
         
         zmq_connect_socket(socket, self._config, "broker", log=self.log, label='dispatcher')
         self._sockets.socket = socket
+        self._sockets_to_close.add(socket)
         return socket
         
     def _prepare(self):
         """Begin this service."""
         self._thread = ZMQPooler(self, zmq_get_address(self._config, "broker", bind=False))
+        self._scheduler = Scheduler(self.log.name + ".Scheduler", self.ctx)
         self._message_queue = []
     
     def _begin(self):
@@ -59,7 +63,12 @@ class Service(DispatcherService):
             self._thread.start()
             self.log.debug("Started ZMQ Responder Thread.")
             
+        if not self._scheduler.is_alive():
+            self._scheduler.start()
+            self.log.debug("Started ZMQ Scheduler Thread.")
+            
         self._thread.check(timeout=10)
+        self._scheduler.check(timeout=10)
         
         while len(self._message_queue):
             self.socket.send_multipart(self._message_queue.pop().data)
@@ -67,9 +76,16 @@ class Service(DispatcherService):
             response.verify(self)
         
     def shutdown(self):
+        if hasattr(self, '_scheduler') and self._scheduler.is_alive():
+            self._scheduler.stop()
+            self._scheduler.join()
+        
         if hasattr(self, '_thread') and self._thread.is_alive():
             self._thread.stop()
             self._thread.join()
+        
+        for socket in self._sockets_to_close:
+            socket.close()
         
     def _synchronous_command(self, command, payload, keyword=None, timeout=None):
         """Execute a synchronous command."""
@@ -100,4 +116,16 @@ class Keyword(DispatcherKeyword):
     def _broadcast(self, value):
         """Broadcast this keyword value."""
         self.service._synchronous_command("broadcast", value, self)
+    
+    def schedule(self, appointment=None, cancel=False):
+        """Schedule an update."""
+        if cancel:
+            self.service._scheduler.cancel_appointment(appointment, self)
+        else:
+            self.service._scheduler.appointment(appointment, self)
+    
+    
+    def period(self, period):
+        """How often a keyword should be updated."""
+        self.service._scheduler.period(period, self)
         
