@@ -111,7 +111,7 @@ class ZMQPooler(ZMQThread):
             _ = backend.recv()
             msg = backend.recv_multipart()
             self._worker_queue.append(identifier)
-            if len(msg) == 1 and msg[0] == "ready":
+            if len(msg) == 1 and msg[0] == b"ready":
                 self.log.log(5, "{0}.recv() worker {1} ready".format(self, binascii.hexlify(identifier)))
             else:
                 self.log.log(5, "{0}.broker() B2F {1}".format(self, binascii.hexlify(identifier)))
@@ -264,7 +264,7 @@ class ZMQWorker(ZMQMicroservice):
         poller.register(backend, zmq.POLLIN)
         poller.register(signal, zmq.POLLIN)
         
-        backend.send_multipart([b"", "ready"])
+        backend.send_multipart([b"", b"ready"])
         
         self.running.set()
         self.starting.clear()
