@@ -148,9 +148,10 @@ class TaskQueue(threading.Thread):
     def stop(self):
         """Stop the task-queue thread."""
         zmq = check_zmq()
-        self.shutdown.set()
-        signal = self.ctx.socket(zmq.PUSH)
-        signal.connect(self.signal_address)
-        signal.send(b"SENTINEL")
-        signal.close()
-        self.join()
+        if not self.shutdown.isSet():
+            self.shutdown.set()
+            signal = self.ctx.socket(zmq.PUSH)
+            signal.connect(self.signal_address)
+            signal.send(b"SENTINEL")
+            signal.close()
+            self.join()
