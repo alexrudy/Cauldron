@@ -76,8 +76,8 @@ class ZMQThread(threading.Thread):
         import zmq
         if not self.isAlive():
             return
-        if self.starting.isSet():
-            self.running.wait(timeout=0.1)
+        if self.starting.isSet() and not self.running.isSet():
+            self.running.wait()
         self.log.debug("{0} stopping".format(self))
         if self.running.is_set() and (not self.ctx.closed):
             self.running.clear()
