@@ -9,7 +9,7 @@ import weakref
 from ..base import ClientService, ClientKeyword
 from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented, DispatcherError, TimeoutError
 from .common import zmq_get_address, check_zmq, teardown, zmq_connect_socket
-from .microservice import ZMQThread
+from .thread import ZMQThread
 from .protocol import ZMQCauldronMessage, ZMQCauldronErrorResponse, FRAMEBLANK, FRAMEFAIL
 from .tasker import Task, TaskQueue
 from .. import registry
@@ -33,28 +33,7 @@ class _ZMQMonitorThread(ZMQThread):
         self.daemon = True
         self.address = None
         
-    def run(self):
-        """Run the thread"""
-        import zmq
-        try:
-            self.starting.set()
-            self.log.debug("{0} starting".format(self))
-            self.respond()
-        except (zmq.ContextTerminated, zmq.ZMQError) as e:
-            self.log.log(5, "Monitor shutdown because '{0!r}'.".format(e))
-            self._error = e
-        except Exception as e:
-            self._error = e
-            self.log.log(5, "Monitor shutdown because '{0!r}'.".format(e))
-            raise
-        else:
-            self.log.log(5, "Shutting down the monitor cleanly.")
-        finally:
-            self.log.log(5, "Monitor thread finished.")
-            self.starting.clear()
-            self.running.clear()
-        
-    def respond(self):
+    def main(self):
         """Run the monitoring thread."""
         zmq = check_zmq()
         try:

@@ -6,7 +6,7 @@ import time
 import weakref
 
 from .common import check_zmq
-from .microservice import ZMQThread
+from .thread import ZMQThread
 
 Appointment = collections.namedtuple("Appointment", ["next", "keywords"])
 
@@ -129,7 +129,7 @@ class Scheduler(ZMQThread):
         
     def period(self, interval, keyword):
         """An interval"""
-        interval = round(10 * interval) / 10.0
+        interval = round(interval, 1)
         interval = max([interval, 0.1])
         with self._periods.locked:
             try:
@@ -140,7 +140,7 @@ class Scheduler(ZMQThread):
             collection.append(weakref.ref(keyword))
             self.send_signal()
         
-    def run(self):
+    def main(self):
         """Run the thread."""
         self.starting.set()
         signal = self.get_signal_socket()

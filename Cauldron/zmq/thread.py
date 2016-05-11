@@ -1,0 +1,119 @@
+# -*- coding: utf-8 -*-
+
+import weakref
+import logging
+import threading
+import six
+import collections
+
+try:
+    import zmq
+except ImportError:
+    pass
+    
+
+__all__ = ['ZMQThreadError', 'ZMQThread']
+
+class ZMQThreadError(Exception):
+    """Child exception"""
+    def __init__(self, msg, exc):
+        super(ZMQThreadError, self).__init__()
+        self.msg = msg
+        self.exc = exc
+        
+
+class ZMQThread(threading.Thread):
+    """A ZMQ Thread control object."""
+    def __init__(self, name, context=None):
+        super(ZMQThread, self).__init__(name=six.text_type(name))
+        self.ctx = weakref.proxy(context or zmq.Context.instance())
+        self.running = threading.Event()
+        self.starting = threading.Event()
+        self.finished = threading.Event()
+        self.log = logging.getLogger(name)
+        self._error = None
+        self._signal_address = "inproc://signal-{0:s}-{1:s}".format(hex(id(self)), name)
+        
+    def connect(self, socket, address, method='connect'):
+        """Connect to the address."""
+        try:
+            getattr(socket, method)(address)
+        except zmq.ZMQError as e:
+            self.log.error("{0} can't {1} to address '{1}' because {2}".format(self, method, address, e))
+            self._error = e
+            raise
+        else:
+            self.log.debug("{0} {1} to address '{2}'".format(self, method, address))
+        return
+        
+    def get_signal_socket(self):
+        """Create and return the signal socket for the thread."""
+        signal = self.ctx.socket(zmq.PULL)
+        self.connect(signal, self._signal_address, 'bind')
+        return signal
+        
+    def send_signal(self, message=b""):
+        """Get a socket to signal to the underlying thread."""
+        signal = self.ctx.socket(zmq.PUSH)
+        try:
+            signal.connect(self._signal_address)
+            signal.send(message)
+        finally:
+            signal.close()
+        
+    def run(self):
+        """Run the thread."""
+        try:
+            self.starting.set()
+            self.log.debug("[{0}] starting".format(self.name))
+            self.main()
+        except (zmq.ContextTerminated, zmq.ZMQError) as exc:
+            self.log.log(5, "[{0}] ZMQ shutdown because '{1!r}'.".format(self.name, exc))
+            self._error = exc
+        except Exception as exc:
+            self.log.log(5, "[{0}] shutdown because '{1!r}'.".format(self.name, exc))
+            self._error = exc
+            raise
+        else:
+            self.log.log(5, "[{0}] shutdown cleanly.".format(self.name))
+        finally:
+            self.finished.set()
+            self.starting.clear()
+            self.running.clear()
+            self.log.log(5, "[{0}] finished.".format(self.name))
+        
+    def check(self, timeout=1.0):
+        """Check that the thread is actually alive."""
+        self.running.wait(timeout)
+        if not self.running.is_set():
+            msg = "[{0}] is not alive.".format(self.name)
+            if self._error is not None:
+                msg += " Thread Error: {0}".format(repr(self._error))
+            else:
+                msg += " No error was reported."
+            raise ZMQThreadError(msg, self._error)
+        
+    def stop(self, join=False):
+        """Stop the responder thread."""
+        # If the thread is not alive, do nothing.
+        if not self.isAlive():
+            return
+        
+        # If the thread is starting, wait
+        if not self.finished.is_set():
+            self.log.debug("{0} waiting for .running event.".format(self))
+            self.running.wait()
+            
+            self.log.debug("{0} clearing .running event.".format(self))
+            self.running.clear()
+            
+            if self.isAlive():
+                self.log.debug("{0} sending wakeup signal.".format(self))
+                self.send_signal()
+        
+        if join or (not self.daemon):
+            self.log.debug("{0} joining.".format(self))
+            self.join()
+            self.log.debug("{0} joined.".format(self))
+            
+        self.log.debug("{0} stopped.".format(self.name))

@@ -8,7 +8,7 @@ import threading
 import time
 from .common import zmq_connect_socket, check_zmq
 from .protocol import ZMQCauldronMessage
-from .microservice import ZMQThread
+from .thread import ZMQThread
 from ..utils.callbacks import WeakMethod
 from ..exc import TimeoutError
 from ..config import get_configuration, get_timeout
@@ -83,28 +83,7 @@ class TaskQueue(ZMQThread):
         self._pending[task.request.identifier] = (time.time(), task)
         self.frontend.send(task.request.identifier)
         
-    def run(self):
-        """Run the thread."""
-        import zmq
-        try:
-            self.starting.set()
-            self.log.debug("{0} starting".format(self))
-            self.respond()
-        except (zmq.ContextTerminated, zmq.ZMQError) as e:
-            self.log.log(5, "TaskQueue shutdown because '{0!r}'.".format(e))
-            self._error = e
-        except Exception as e:
-            self._error = e
-            self.log.log(5, "TaskQueue shutdown because '{0!r}'.".format(e))
-            raise
-        else:
-            self.log.log(5, "Shutting down the TaskQueue cleanly.")
-        finally:
-            self.log.log(5, "TaskQueue thread finished.")
-            self.running.clear()
-            self.starting.clear()
-        
-    def respond(self):
+    def main(self):
         """Run the task queue thread."""
         zmq = check_zmq()
         backend = self.ctx.socket(zmq.DEALER)
