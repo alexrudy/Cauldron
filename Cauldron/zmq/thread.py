@@ -67,14 +67,24 @@ class ZMQThread(threading.Thread):
         self.connect(signal, self._signal_address, 'bind')
         return signal
         
-    def send_signal(self, message=b""):
+    def send_signal(self, message=b"", timeout=100):
         """Get a socket to signal to the underlying thread."""
         signal = self.ctx.socket(zmq.PUSH)
         try:
+            self.log.debug("{0} sending wakeup signal.".format(self))
             signal.connect(self._signal_address)
-            signal.send(message)
+            if signal.poll(timeout=timeout, flags=zmq.POLLOUT):
+                try:
+                    signal.send(message, flags=zmq.NOBLOCK)
+                except zmq.Again as exc:
+                    self.log.debug("Signalling may have failed, socket would block. finished = {0}".format(self.finished.is_set()))
+                    pass
+            elif not self.finished.is_set():
+                # We might have missed something.
+                self.log.debug("Signalling may have failed. finished = {0} but socket wasn't ready.".format(self.finished.is_set()))
         finally:
             signal.close(linger=10)
+            self.log.debug("{0} sent wakeup signal.".format(self))
         
     def run(self):
         """Run the thread."""
@@ -123,9 +133,7 @@ class ZMQThread(threading.Thread):
             self.started.wait()
             
             if self.isAlive() and self.started.is_set():
-                self.log.debug("{0} sending wakeup signal.".format(self))
                 self.send_signal()
-                self.log.debug("{0} sent wakeup signal.".format(self))
                 
         
         if join or (not self.daemon):
