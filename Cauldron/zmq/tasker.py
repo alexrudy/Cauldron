@@ -8,6 +8,7 @@ import threading
 import time
 from .common import zmq_connect_socket, check_zmq
 from .protocol import ZMQCauldronMessage
+from .microservice import ZMQThread
 from ..utils.callbacks import WeakMethod
 from ..exc import TimeoutError
 from ..config import get_configuration, get_timeout
@@ -27,19 +28,15 @@ class Task(_BaseTask):
         
     
 
-class TaskQueue(threading.Thread):
+class TaskQueue(ZMQThread):
     """A client task queue"""
     def __init__(self, name, ctx=None, log=None, timeout=None):
-        super(TaskQueue, self).__init__(name="ktl.Service.{0:s}.Tasks".format(name))
+        super(TaskQueue, self).__init__(name="ktl.Service.{0:s}.Tasks".format(name), context=ctx)
         zmq = check_zmq()
         self._pending = {}
         self._task_timeout = ((get_timeout(timeout) or 1.0) * 60) # Wait 60x the normal timeout, then clear old stuff.
-        self.ctx = ctx or zmq.Context.instance()
         self.frontend_address = "inproc://{0:s}-frontend".format(hex(id(self)))
-        self.signal_address = "inproc://{0:s}-signal".format(hex(id(self)))
-        self.log = log or logging.getLogger("ktl.zmq.TaskQueue.{0:s}".format(name))
         self.daemon = True
-        self.shutdown = threading.Event()
         self._local = threading.local()
         self._frontend_sockets = []
         
@@ -87,6 +84,27 @@ class TaskQueue(threading.Thread):
         self.frontend.send(task.request.identifier)
         
     def run(self):
+        """Run the thread."""
+        import zmq
+        try:
+            self.starting.set()
+            self.log.debug("{0} starting".format(self))
+            self.respond()
+        except (zmq.ContextTerminated, zmq.ZMQError) as e:
+            self.log.log(5, "TaskQueue shutdown because '{0!r}'.".format(e))
+            self._error = e
+        except Exception as e:
+            self._error = e
+            self.log.log(5, "TaskQueue shutdown because '{0!r}'.".format(e))
+            raise
+        else:
+            self.log.log(5, "Shutting down the TaskQueue cleanly.")
+        finally:
+            self.log.log(5, "TaskQueue thread finished.")
+            self.running.clear()
+            self.starting.clear()
+        
+    def respond(self):
         """Run the task queue thread."""
         zmq = check_zmq()
         backend = self.ctx.socket(zmq.DEALER)
@@ -95,8 +113,7 @@ class TaskQueue(threading.Thread):
         frontend = self.ctx.socket(zmq.PULL)
         frontend.bind(self.frontend_address)
         
-        signal = self.ctx.socket(zmq.PULL)
-        signal.bind(self.signal_address)
+        signal = self.get_signal_socket()
         
         poller = zmq.Poller()
         poller.register(backend, zmq.POLLIN)
@@ -105,7 +122,9 @@ class TaskQueue(threading.Thread):
         
         timeout = self._check_timeout()
         
-        while not self.shutdown.isSet():
+        self.running.set()
+        self.starting.clear()
+        while self.running.is_set():
             ready = dict(poller.poll(timeout=timeout))
             
             # We got a signal!
@@ -145,13 +164,3 @@ class TaskQueue(threading.Thread):
         signal.close()
         self.log.debug("{0!r} done.".format(self))
         
-    def stop(self):
-        """Stop the task-queue thread."""
-        zmq = check_zmq()
-        if not self.shutdown.isSet():
-            self.shutdown.set()
-            signal = self.ctx.socket(zmq.PUSH)
-            signal.connect(self.signal_address)
-            signal.send(b"SENTINEL")
-            signal.close()
-            self.join()
