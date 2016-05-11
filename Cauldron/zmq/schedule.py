@@ -166,5 +166,5 @@ class Scheduler(ZMQThread):
                     for keyword in appointment.keywords:
                         _keyword_update(keyword)
         finally:
-            signal.close()
+            signal.close(linger=0)
                 

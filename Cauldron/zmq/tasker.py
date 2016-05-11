@@ -76,7 +76,7 @@ class TaskQueue(ZMQThread):
     def __del__(self):
         """When deleting this object, make sure all of the sockets are closed."""
         for socket in self._frontend_sockets:
-            socket.close()
+            socket.close(linger=0)
         
     def put(self, task):
         """Add a task to the queue."""
@@ -137,8 +137,9 @@ class TaskQueue(ZMQThread):
             
             timeout = self._check_timeout()
             
-        backend.close()
-        frontend.close()
-        signal.close()
+        timeout = self._check_timeout()
+        backend.close(linger=timeout)
+        frontend.close(linger=0)
+        signal.close(linger=0)
         self.log.debug("{0!r} done.".format(self))
         

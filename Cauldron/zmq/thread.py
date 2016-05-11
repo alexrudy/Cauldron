@@ -74,7 +74,7 @@ class ZMQThread(threading.Thread):
             signal.connect(self._signal_address)
             signal.send(message)
         finally:
-            signal.close(linger=1)
+            signal.close(linger=10)
         
     def run(self):
         """Run the thread."""

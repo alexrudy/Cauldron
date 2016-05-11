@@ -79,8 +79,7 @@ class _ZMQMonitorThread(ZMQThread):
             self.log.log(6, "Service shutdown and context terminated, closing broadcast thread. {0}".format(repr(e)))
         else:
             try:
-                socket.setsockopt(zmq.LINGER, 0)
-                socket.close()
+                socket.close(linger=0)
             except:
                 pass
         finally:
