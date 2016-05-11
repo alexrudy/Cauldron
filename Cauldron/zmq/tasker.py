@@ -141,5 +141,4 @@ class TaskQueue(ZMQThread):
         backend.close(linger=timeout)
         frontend.close(linger=0)
         signal.close(linger=0)
-        self.log.debug("{0!r} done.".format(self))
         

@@ -125,6 +125,8 @@ class ZMQThread(threading.Thread):
             if self.isAlive() and self.started.is_set():
                 self.log.debug("{0} sending wakeup signal.".format(self))
                 self.send_signal()
+                self.log.debug("{0} sent wakeup signal.".format(self))
+                
         
         if join or (not self.daemon):
             self.log.debug("{0} joining.".format(self))
