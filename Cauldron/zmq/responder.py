@@ -91,14 +91,6 @@ class ZMQPooler(ZMQThread):
         self.timeout = timeout
         self.daemon = True
     
-    def run(self):
-        """Run the thread."""
-        try:
-            self.broker()
-        except Exception as e:
-            self._error = e
-            raise
-    
     def _poll_and_respond(self, poller, frontend, backend, signal):
         """Poll for messages, handle them."""
         zmq = check_zmq()
@@ -138,9 +130,8 @@ class ZMQPooler(ZMQThread):
                     frontend.send_multipart(response.data)
         return True
     
-    def broker(self):
+    def main(self):
         """Run the thread worker"""
-        self.starting.set()
         zmq = check_zmq()
         signal = self.get_signal_socket()
         
@@ -163,10 +154,9 @@ class ZMQPooler(ZMQThread):
             worker.start()
         
         self.log.debug("{0}.running".format(self))
-        self.running.set()
-        self.starting.clear()
+        self.started.set()
         try:
-            while self.running.isSet():
+            while self.running.is_set():
                 if not self._poll_and_respond(poller, frontend, backend, signal):
                     break
         finally:
@@ -181,6 +171,7 @@ class ZMQPooler(ZMQThread):
         
     def __del__(self):
         """Stop workers when we delete this."""
+        self.running.clear()
         for worker in self._workers:
             worker.stop()
 
@@ -268,8 +259,7 @@ class ZMQWorker(ZMQMicroservice):
         
         backend.send_multipart([b"", b"ready"])
         
-        self.running.set()
-        self.starting.clear()
+        self.started.set()
         self.log.log(5, "Starting responder loop.")
         while self.running.is_set():
             ready = dict(poller.poll(timeout=self.timeout*1e3))

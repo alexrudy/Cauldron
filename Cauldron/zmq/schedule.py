@@ -142,11 +142,9 @@ class Scheduler(ZMQThread):
         
     def main(self):
         """Run the thread."""
-        self.starting.set()
         signal = self.get_signal_socket()
         
-        self.running.set()
-        self.starting.clear()
+        self.started.set()
         try:
             while self.running.isSet():
                 next_wake = min([self._periods.next, self._appointments.next])

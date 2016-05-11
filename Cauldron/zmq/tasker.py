@@ -101,8 +101,7 @@ class TaskQueue(ZMQThread):
         
         timeout = self._check_timeout()
         
-        self.running.set()
-        self.starting.clear()
+        self.started.set()
         while self.running.is_set():
             ready = dict(poller.poll(timeout=timeout))
             

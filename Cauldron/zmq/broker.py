@@ -499,7 +499,7 @@ class ZMQBroker(threading.Thread):
     def daemon(cls, config=None, daemon=True):
         """Serve in a process."""
         import multiprocessing as mp
-        proc = mp.Process(target=cls.serve, args=(config,), name="ZMQBroker")
+        proc = mp.Process(target=cls.serve, args=(config,), name="ProcessBroker")
         proc.daemon = daemon
         proc.start()
         return proc
@@ -507,7 +507,7 @@ class ZMQBroker(threading.Thread):
     @classmethod
     def thread(cls, config=None, daemon=True):
         """Serve in a thread."""
-        obj = cls.from_config(config)
+        obj = cls.from_config(config, name="ThreadBroker")
         obj.daemon = daemon
         obj.start()
         return obj

@@ -52,8 +52,7 @@ class _ZMQMonitorThread(ZMQThread):
             # Accept everything belonging to this service.
             socket.setsockopt_string(zmq.SUBSCRIBE, six.text_type(self.service.name))
             
-            self.running.set()
-            self.starting.clear()
+            self.started.set()
             while self.running.is_set():
                 ready = dict(poller.poll(timeout=1e3))
                 if signal in ready:
@@ -130,20 +129,15 @@ class Service(ClientService):
         """On delete, try to shutdown."""
         self.shutdown()
         
-    def shutdown(self, join=False):
+    def shutdown(self):
         if hasattr(self, '_monitor') and self._monitor.isAlive():
+            self.log.debug("Stopping monitor")
             self._monitor.stop()
             self.log.debug("Stopped monitor")
         if hasattr(self, '_tasker') and self._tasker.isAlive():
+            self.log.debug("Stopping tasker")
             self._tasker.stop()
             self.log.debug("Stopped tasker")
-        if join:
-            if hasattr(self, '_monitor') and self._monitor.isAlive():
-                self._monitor.join()
-                self.log.debug("Joined monitor")
-            if hasattr(self, '_tasker') and self._tasker.isAlive():
-                self.log.debug("Joined tasker")
-                self._tasker.join()
         
     def _has_keyword(self, name):
         name = name.upper()
