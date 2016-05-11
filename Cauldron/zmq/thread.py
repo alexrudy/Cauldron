@@ -118,7 +118,7 @@ class ZMQThread(threading.Thread):
             self.log.debug("{0} waiting for .started event.".format(self))
             self.started.wait()
             
-            if self.isAlive():
+            if self.isAlive() and self.started.is_set():
                 self.log.debug("{0} sending wakeup signal.".format(self))
                 self.send_signal()
         

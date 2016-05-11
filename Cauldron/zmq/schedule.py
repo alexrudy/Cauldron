@@ -151,6 +151,7 @@ class Scheduler(ZMQThread):
                 timeout = max([0.1, next_wake])
                 if signal.poll(timeout=timeout * 1e3):
                     _ = signal.recv()
+                    self.log.log(5, "Got a signal: .running = {0}".format(self.running.is_set()))
                     continue
                 
                 now = time.time()

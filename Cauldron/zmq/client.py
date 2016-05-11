@@ -57,6 +57,7 @@ class _ZMQMonitorThread(ZMQThread):
                 ready = dict(poller.poll(timeout=1e3))
                 if signal in ready:
                     _ = signal.recv()
+                    self.log.log(5, "Got a signal: .running = {0}".format(self.running.is_set()))
                     continue
                 if socket in ready:
                     try:

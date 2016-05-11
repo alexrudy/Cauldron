@@ -99,6 +99,7 @@ class ZMQPooler(ZMQThread):
             return False
         if signal in ready:
             _ = signal.recv()
+            self.log.log(5, "Got a signal: .running = {0}".format(self.running.is_set()))
             return True
         if backend in ready:
             identifier = backend.recv()
@@ -265,7 +266,7 @@ class ZMQWorker(ZMQMicroservice):
             ready = dict(poller.poll(timeout=self.timeout*1e3))
             if signal in ready:
                 _ = signal.recv()
-                self.log.log(5, "Got a signal!")
+                self.log.log(5, "Got a signal: .running = {0}".format(self.running.is_set()))
                 continue
             if backend in ready:
                 message = ZMQCauldronMessage.parse(backend.recv_multipart())
