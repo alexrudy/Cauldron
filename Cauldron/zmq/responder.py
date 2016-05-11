@@ -84,12 +84,50 @@ class ZMQPooler(ZMQThread):
         self._backend_address = "inproc://{0}-backend".format(hex(id(self)))
         self._frontend_address = frontend_address
         self._worker_queue = collections.deque()
+        self._worker_timeout = 1.0
+        self._active_workers = dict()
         self._workers = set()
         if pool_size is None:
             pool_size = self.service._config.getint("zmq", "pool")
         self._pool_size = pool_size
         self.timeout = timeout
         self.daemon = True
+    
+    def _handle_backend(self, frontend, backend):
+        """Handle a backend request."""
+        zmq = check_zmq()
+        identifier = backend.recv()
+        _ = backend.recv()
+        msg = backend.recv_multipart()
+        self._active_workers.pop(identifier, None)
+        if len(msg) == 1 and msg[0] == b"ready":
+            self.log.log(5, "{0}.recv() worker {1} ready".format(self, binascii.hexlify(identifier)))
+        else:
+            self.log.log(5, "{0}.broker() B2F {1}".format(self, binascii.hexlify(identifier)))
+            frontend.send(b"", flags=zmq.SNDMORE)
+            frontend.send_multipart(msg)
+        self._worker_queue.append(identifier)
+        
+    def _handle_frontend(self, frontend, backend):
+        """Handle a frontend request."""
+        zmq = check_zmq()
+        _ = frontend.recv()
+        msg = frontend.recv_multipart()
+        if self.running.isSet():
+            worker = self._worker_queue.popleft()
+            self.log.log(5, "{0}.broker() F2B {1}".format(self, binascii.hexlify(worker)))
+            backend.send(worker, flags=zmq.SNDMORE)
+            backend.send(b"", flags=zmq.SNDMORE)
+            backend.send_multipart(msg)
+            self._active_workers[worker] = time.time() + self._worker_timeout
+        else:
+            try:
+                response = ZMQCauldronMessage.parse(msg).error_response("Dispatcher shutdown.")
+            except Exception:
+                pass
+            else:
+                frontend.send(b"", flags=zmq.SNDMORE)
+                frontend.send_multipart(response.data)
     
     def _poll_and_respond(self, poller, frontend, backend, signal):
         """Poll for messages, handle them."""
@@ -102,34 +140,27 @@ class ZMQPooler(ZMQThread):
             self.log.log(5, "Got a signal: .running = {0}".format(self.running.is_set()))
             return True
         if backend in ready:
-            identifier = backend.recv()
-            _ = backend.recv()
-            msg = backend.recv_multipart()
-            self._worker_queue.append(identifier)
-            if len(msg) == 1 and msg[0] == b"ready":
-                self.log.log(5, "{0}.recv() worker {1} ready".format(self, binascii.hexlify(identifier)))
-            else:
-                self.log.log(5, "{0}.broker() B2F {1}".format(self, binascii.hexlify(identifier)))
-                frontend.send(b"", flags=zmq.SNDMORE)
-                frontend.send_multipart(msg)
+            self._handle_backend(frontend, backend)
         if frontend in ready and len(self._worker_queue):
-            _ = frontend.recv()
-            msg = frontend.recv_multipart()
-            if self.running.isSet():
-                worker = self._worker_queue.popleft()
-                self.log.log(5, "{0}.broker() F2B {1}".format(self, binascii.hexlify(worker)))
-                backend.send(worker, flags=zmq.SNDMORE)
-                backend.send(b"", flags=zmq.SNDMORE)
-                backend.send_multipart(msg)
-            else:
-                try:
-                    response = ZMQCauldronMessage.parse(msg).error_response("Dispatcher shutdown.")
-                except Exception:
-                    pass
-                else:
-                    frontend.send(b"", flags=zmq.SNDMORE)
-                    frontend.send_multipart(response.data)
+            self._handle_frontend(frontend, backend)
         return True
+    
+    def _shutdown_workers(self, backend, frontend):
+        """Shut down workers."""
+        for worker in self._workers:
+            worker.stop()
+        
+        while len(self._active_workers):
+            if backend.poll(timeout=min([self.timeout, self._worker_timeout])*1e3*0.1):
+                self._handle_backend(frontend, backend)
+            now = time.time()
+            for worker in list(self._active_workers.keys()):
+                if now > (self._active_workers[worker]):
+                    self._active_workers.pop(worker)
+        #
+        # for worker in self._workers:
+        #     worker.join()
+        self.log.debug("Done with workers.")
     
     def main(self):
         """Run the thread worker"""
@@ -161,14 +192,10 @@ class ZMQPooler(ZMQThread):
                 if not self._poll_and_respond(poller, frontend, backend, signal):
                     break
         finally:
-            for worker in self._workers:
-                worker.stop()
-            for worker in self._workers:
-                worker.join()
-            self.log.debug("Done with workers.")
-            backend.close()
-            frontend.close()
-            signal.close()
+            self._shutdown_workers(frontend, backend)
+            backend.close(linger=0)
+            frontend.close(linger=self.timeout*1e3)
+            signal.close(linger=0)
         
     def __del__(self):
         """Stop workers when we delete this."""
@@ -276,7 +303,7 @@ class ZMQWorker(ZMQMicroservice):
                 backend.send_multipart(response.data)
 
         
-        backend.close()
-        signal.close()
+        backend.close(linger=0)
+        signal.close(linger=0)
     
 

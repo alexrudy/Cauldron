@@ -115,7 +115,6 @@ def test_drop_instance_reference(my_class):
     assert wm.valid
     del my_instance
     my_instance = None
-    print(gc.get_referrers(wm.instance))
     assert not wm.valid
     with pytest.raises(ReferenceError):
         wm.get()

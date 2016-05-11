@@ -40,6 +40,11 @@ class ZMQThread(threading.Thread):
         self._error = None
         self._signal_address = "inproc://signal-{0:s}-{1:s}".format(hex(id(self)), name)
         
+    def start(self):
+        """Start the thread."""
+        self.running.set()
+        super(ZMQThread, self).start()
+        
     def __del__(self):
         """Clear the running variable."""
         self.running.clear()
@@ -74,7 +79,6 @@ class ZMQThread(threading.Thread):
     def run(self):
         """Run the thread."""
         try:
-            self.running.set()
             self.log.debug("[{0}] starting".format(self.name))
             self.main()
         except (zmq.ContextTerminated, zmq.ZMQError) as exc:
