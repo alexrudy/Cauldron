@@ -160,7 +160,7 @@ def client(backend, servicename):
 @pytest.fixture
 def xmldir(request):
     """XML Directory for testing."""
-    path = pkg_resources.resource_filename("Cauldron", "data/xml")
+    path = pkg_resources.resource_filename("Cauldron", "data/reldir")
     os.environ['RELDIR'] = "" # This must be set to some value. A key error is spuriously raised if RELDIR is not set.
     request.addfinalizer(xmlteardown)
     return os.path.abspath(path)

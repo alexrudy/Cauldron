@@ -104,7 +104,7 @@ ktl Reference/API
 =================
 
 .. automodapi:: Cauldron.ktl
-    :skip: Service
+    :skip: Service, Keyword
 
 .. automodapi:: Cauldron.ktl.Keyword
 

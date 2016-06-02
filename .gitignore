@@ -59,3 +59,5 @@ html/*
 .ipynb-checkpoints/*
 .cache/*
 .tm_properties
+ci-docker.sh
+

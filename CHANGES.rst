@@ -1,6 +1,10 @@
 Changes to Cauldron
 -------------------
 
+0.6.1
+=====
+- Add support for the KTL client GUI module in Cauldron.extern.GUI
+
 0.6.0
 =====
 - Better handling of asynchronous dispatcher requests. [zmq]

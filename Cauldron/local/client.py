@@ -151,7 +151,7 @@ class Service(ClientService):
             self._thread.stop()
         super(Service, self).shutdown()
     
-    def has_keyword(self, name):
+    def _has_keyword(self, name):
         """Check for the existence of a keyword."""
         return name in self._dispatcher._keywords
         

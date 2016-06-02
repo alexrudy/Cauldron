@@ -39,7 +39,6 @@ def test_dangling_imports():
     from Cauldron.api import use
     use("local")
     from Cauldron import ktl, DFW
-    assert hasattr(ktl.Keyword, 'Keyword')
     assert hasattr(DFW.Keyword, 'Keyword')
 
 def test_import_duplicates():
@@ -49,7 +48,7 @@ def test_import_duplicates():
     from Cauldron import ktl, DFW
     
     from Cauldron.base.client import Keyword
-    assert issubclass(ktl.Keyword.Keyword, Keyword)
+    assert issubclass(ktl.Keyword, Keyword)
     
     from Cauldron.base.dispatcher import Keyword
     assert issubclass(DFW.Keyword.Keyword, Keyword)

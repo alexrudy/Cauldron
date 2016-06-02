@@ -61,7 +61,7 @@ class Keyword(_BaseKeyword):
     
     """
     
-    _ALLOWED_KEYS = ['ascii', 'binary', 'broadcasts', 'name', 'monitored', 'monitor', 'populated', 'reads', 'writes', 'timestamp', 'units']
+    _ALLOWED_KEYS = ['ascii', 'binary', 'broadcasts', 'name', 'monitored', 'monitor', 'populated', 'reads', 'writes', 'timestamp', 'units', 'type']
     
     def __init__(self, service, name, type=None):
         super(Keyword, self).__init__(service, name, type)
@@ -287,7 +287,7 @@ class Service(_BaseService):
         else:
             self.log.warning("Using generic keyword for KTL_TYPE '{0}' for keyword '{1}'".format(ktl_type, key))
             self.log.debug("Available types: {0}".format(", ".join(ktl.Keyword.types)))
-            keyword = ktl.Keyword.Keyword(self, key)
+            keyword = ktl.Keyword(self, key)
         self._keywords[keyword.name] = keyword
         return keyword
     
@@ -298,12 +298,19 @@ class Service(_BaseService):
         
         
     @api_required
+    def _has_keyword(self, keyword):
+        """Determines if this service has a keyword.
+        
+        This should be the implementation of the fucntion below.
+        """
+        pass # pragma: no cover
+    
     def has_keyword(self, keyword):
         """Determines if this service has a keyword.
         
         ``keyword`` can be either a Keyword instance, or a case-insensitive string.
         """
-        pass # pragma: no cover
+        return self._has_keyword(str(keyword).upper())
         
     def has_key(self, keyword):
         """alias for :meth:`has_keyword`"""

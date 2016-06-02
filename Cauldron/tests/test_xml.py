@@ -12,12 +12,12 @@ def xmlpath(xmldir, servicename):
 
 def test_xml_index(xmlpath, servicename):
     """Test the XML index"""
-    from ..bundled import ktlxml
+    from ..extern import ktlxml
     index = ktlxml.index(servicename, directory=xmlpath)
     
 def test_xml_Service(xmlpath, servicename, keyword_name_ENUMERATED):
     """Test the XML service object."""
-    from ..bundled import ktlxml
+    from ..extern import ktlxml
     xml = ktlxml.Service(servicename, directory=xmlpath)
     assert keyword_name_ENUMERATED in xml
     

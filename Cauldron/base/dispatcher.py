@@ -19,7 +19,7 @@ from ..config import read_configuration
 from ..exc import CauldronAPINotImplemented, NoWriteNecessary, CauldronXMLWarning, WrongDispatcher, CauldronWarning
 from ..utils.helpers import api_not_required, api_not_implemented, api_required, api_override
 from ..utils.callbacks import Callbacks
-from ..bundled import ktlxml
+from ..extern import ktlxml
 from ..api import STRICT_KTL_XML
 from .. import registry
 
