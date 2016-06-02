@@ -697,9 +697,10 @@ def _setup_logging(verbose):
     """Try to use lumberjack to enable logging when in a subprocess."""
     try:
         import lumberjack
-        lumberjack.setup_logging("DFW.Broker", mode='stream', level=30 - 10 * verbose)
+        lumberjack.setup_logging(mode='stream', level=30 - 10 * verbose)
         lumberjack.setup_warnings_logger("DFW.Broker")
-    except:
+    except Exception as e:
+        print(e)
         pass
 
 def main():

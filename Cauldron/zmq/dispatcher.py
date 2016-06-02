@@ -68,7 +68,8 @@ class _ZMQResponder(ZMQMicroservice):
                 break
             self._b = ZMQBroker.daemon(config = self.service._config)
         else:
-            raise TimeoutError("Can't connect to broker after {0:d} attempts.".format(attempts))
+            raise TimeoutError("Can't connect to broker after {0:d} attempts. Broker should be at {1}".format(attempts,
+            zmq_get_address(self.service._config, "broker", bind=False)))
         
         ready = ZMQCauldronMessage(command="ready", service=self.service.name, dispatcher=self.service.dispatcher, direction="DBQ")
         socket.send_multipart([b""]+ready.data)
