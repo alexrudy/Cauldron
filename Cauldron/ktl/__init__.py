@@ -19,3 +19,6 @@ del client
 
 # From here on down we are doing things in the import order that KTL would do them.
 from . import procedural
+from .Keyword import Keyword, types
+Keyword.types = types
+from .Service import Service
