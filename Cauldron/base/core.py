@@ -137,8 +137,10 @@ class _BaseKeyword(object):
         
     def __getitem__(self, key):
         """Implement the (wacky?) KTL dictionary interface on keywords."""
-        if (self._ALLOWED_KEYS is not None and key not in self._ALLOWED_KEYS) or not hasattr(self, '_ktl_{0}'.format(key)):
-            raise KeyError("'{0}' has no key '{1}'".format(self, key))
+        if (self._ALLOWED_KEYS is not None and key not in self._ALLOWED_KEYS):
+            raise KeyError("'{0}' has no key '{1}', allowed: {2}".format(self, key, self._ALLOWED_KEYS))
+        if not hasattr(self, '_ktl_{0}'.format(key)):
+            raise KeyError("'{0}' has no key '{1}', {2} not implemented".format(self, key, '_ktl_{0}'.format(key)))
         return getattr(self, '_ktl_{0}'.format(key))()
         
     def _ktl_value(self):

@@ -75,10 +75,6 @@ def use(name):
     Cauldron = sys.modules[BASENAME]
     # Install the client side libraries.
     from Cauldron import ktl
-    from Cauldron.ktl.Service import Service
-    from Cauldron.ktl import Keyword
-    ktl.Service = Service
-    ktl.Keyword = Keyword
     
     # Install the dispatcher side libraries.
     from Cauldron import DFW
