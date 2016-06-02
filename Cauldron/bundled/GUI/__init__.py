@@ -45,7 +45,6 @@ else:
 # Done with the safety dance, clean up the module namespace.
 
 del reldir_lib_python
-del os
 del sys
 
 
@@ -76,4 +75,5 @@ import Value
 from version import version
 
 
-Images.initialize ('/opt/kroot/data/icons')
+Images.initialize (os.path.join (os.environ['RELDIR'], 'data', 'icons'))
+del os
