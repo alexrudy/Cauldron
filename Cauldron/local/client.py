@@ -20,11 +20,15 @@ __all__ = ['Service', 'Keyword']
 class LocalTask(_BaseTask):
     """A simple object to mock asynchronous operations."""
     
-    def __call__(self):
-        """Make sure that errors are properly set."""
-        super(LocalTask, self).__call__()
+    def get(self, timeout=None):
+        """Get the result."""
         if self.error is not None:
-            self.error = DispatcherError(str(self.error))
+            raise DispatcherError(str(self.error))
+        if not self.wait(timeout=timeout):
+            raise TimeoutError("Task timed out.")
+        if self.error is not None:
+            raise DispatcherError(str(self.error))
+        return self.result
     
 class LocalTaskQueue(threading.Thread):
     
