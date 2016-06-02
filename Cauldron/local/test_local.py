@@ -30,19 +30,29 @@ def local_client(local_service, servicename):
     from Cauldron import ktl
     return ktl.Service(servicename)
     
-def test_teardown(servicename, teardown_cauldron):
+@pytest.fixture(params=["yes", "no"])
+def cache_config(request, config):
+    from six.moves import configparser
+    configobj = configparser.ConfigParser()
+    configobj.read(config)
+    configobj.set("local", "enable-cache", request.param)
+    with open(config, 'w') as f:
+        configobj.write(f)
+    return config
+    
+def test_teardown(servicename, teardown_cauldron, cache_config):
     """Check that teardown really does tear things down, in local mode."""
     from Cauldron.api import teardown, use
     use("local")
     from Cauldron.DFW import Service
-    svc = Service(servicename+"2", None)
+    svc = Service(servicename+"2", cache_config)
     svc['MYKEYWORD'].modify('10')
     teardown()
     del svc
     
     use("local")
     from Cauldron.DFW import Service
-    svc2 = Service(servicename+"2", None)
+    svc2 = Service(servicename+"2", cache_config)
     if svc2._cache_enabled:
         assert svc2['MYKEYWORD'].read() == '10'
     else:
@@ -147,18 +157,3 @@ def test_writeonly(local_client, local_service, keyword_name4):
     with pytest.raises(ValueError):
         local_client[keyword_name4].read()
     
-
-def test_teardown(servicename, teardown_cauldron, keyword_name2, servicename2):
-    """Check that teardown really does tear things down, in local mode."""
-    from Cauldron.api import teardown, use
-    use("local")
-    from Cauldron.DFW import Service
-    svc = Service(servicename2, None)
-    svc[keyword_name2].modify('10')
-    teardown()
-    del svc
-    
-    use("local")
-    from Cauldron.DFW import Service
-    svc2 = Service(servicename2, None)
-    assert svc2[keyword_name2].read() == None

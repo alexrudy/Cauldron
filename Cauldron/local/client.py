@@ -11,7 +11,7 @@ from six.moves import queue
 from .dispatcher import Service as Dispatcher
 from ..base import ClientService, ClientKeyword
 from ..base.core import Task as _BaseTask
-from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented, ServiceNotStarted, DispatcherError
+from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented, ServiceNotStarted, DispatcherError, TimeoutError
 from .. import registry
 
 __all__ = ['Service', 'Keyword']
