@@ -133,8 +133,7 @@ class Service(ClientService):
         if hasattr(self, '_tasker'):
             self._tasker.stop()
         
-    def has_keyword(self, name):
-        assert name.upper() != self.name.upper()
+    def _has_keyword(self, name):
         name = name.upper()
         try:
             ktype = self._ktl_type(name)

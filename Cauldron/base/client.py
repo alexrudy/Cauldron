@@ -298,12 +298,19 @@ class Service(_BaseService):
         
         
     @api_required
+    def _has_keyword(self, keyword):
+        """Determines if this service has a keyword.
+        
+        This should be the implementation of the fucntion below.
+        """
+        pass # pragma: no cover
+    
     def has_keyword(self, keyword):
         """Determines if this service has a keyword.
         
         ``keyword`` can be either a Keyword instance, or a case-insensitive string.
         """
-        pass # pragma: no cover
+        return self._has_keyword(str(keyword).upper())
         
     def has_key(self, keyword):
         """alias for :meth:`has_keyword`"""
