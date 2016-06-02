@@ -20,7 +20,7 @@ import logging
 from .exc import CauldronAPINotImplementedWarning, CauldronXMLWarning
 from .api import guard_use, STRICT_KTL_XML, BASENAME, CAULDRON_SETUP
 from .base.core import _CauldronBaseMeta
-from .bundled import ktlxml
+from .extern import ktlxml
 from . import registry
 from .utils.helpers import _inherited_docstring, _prepend_to_docstring
 
@@ -153,7 +153,7 @@ class KeywordType(object):
     
     def _ktl_type(self):
         """Return the ktl type of this key."""
-        return self.KTL_TYPE
+        return "KTL_{0:s}".format(self.KTL_TYPE.upper())
 
 class DispatcherKeywordType(KeywordType):
     """Keyword type for dispatchers."""

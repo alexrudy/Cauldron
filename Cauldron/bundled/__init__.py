@@ -8,7 +8,18 @@ try:
 except ImportError as e:
     from . import ktlxml
 
-try:
-    import GUI
-except ImportError as e:
-    from . import GUI
+def get_gui():
+    """Function to delay import of GUI"""
+    try:
+        import GUI
+    except ImportError as e:
+        from . import GUI
+    return GUI
+
+def install_WeakRef():
+    """Install the weakref module."""
+    from . import WeakRef
+    import sys
+    sys.modules['WeakRef'] = WeakRef
+
+install_WeakRef()
