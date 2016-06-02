@@ -70,9 +70,9 @@ def check_client_type(keyword, client, update):
     from Cauldron import ktl
     if keyword.KTL_TYPE in ktl.Keyword.types:
         target = set([keyword.KTL_TYPE] + list(keyword.KTL_ALIASES))
-        assert any([t in target for t in set([cli_kwd.KTL_TYPE] + list(cli_kwd.KTL_ALIASES)) ])
+        assert any([t in target for t in set([cli_kwd['type']] + list(cli_kwd.KTL_ALIASES)) ])
     else:
-        assert cli_kwd.KTL_TYPE == 'basic'
+        assert cli_kwd['type'] == 'basic'
     if not (inspect.isclass(update) and issubclass(update, Exception)):
         cli_kwd.read()
         assert cli_kwd['binary'] == update

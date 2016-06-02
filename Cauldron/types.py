@@ -150,6 +150,10 @@ class KeywordType(object):
     
     def __init__(self, *args, **kwargs):
         super(KeywordType, self).__init__(*args, **kwargs)
+    
+    def _ktl_type(self):
+        """Return the ktl type of this key."""
+        return self.KTL_TYPE
 
 class DispatcherKeywordType(KeywordType):
     """Keyword type for dispatchers."""
