@@ -26,7 +26,7 @@ matrix:
           env:
             - SETUP_CMD='test'
             - NUMPY_VERSION=1.9.2 # The last version Conda supports with Numpy
-            - ASTROPY_VERSION=1.1.2
+            - ASTROPY_VERSION=1.0.3
         
         # Do a coverage test in Python 2.
         - python: 2.7
