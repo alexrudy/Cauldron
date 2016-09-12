@@ -84,7 +84,7 @@ def pytest_report_header(config):
     except ImportError:
         pass
     else:
-        s += 'libzmq: {:s}\n'.format(zmq.zmq_version())
+        s += 'libzmq: {0:s}\n'.format(zmq.zmq_version())
     return s
 
 @pytest.fixture
