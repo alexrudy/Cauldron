@@ -76,6 +76,17 @@ def pytest_configure(config):
         except:
             pass
 
+def pytest_report_header(config):
+    import astropy.tests.pytest_plugins as astropy_pytest_plugins
+    s = astropy_pytest_plugins.pytest_report_header(config)
+    try:
+        import zmq
+    except ImportError:
+        pass
+    else:
+        s += 'libzmq: {:s}\n'.format(zmq.zmq_version())
+    return s
+
 @pytest.fixture
 def servicename():
     """Get the service name."""
