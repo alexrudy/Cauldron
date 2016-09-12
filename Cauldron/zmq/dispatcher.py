@@ -66,7 +66,8 @@ class _ZMQResponder(ZMQMicroservice):
             checks -= 1
             if self.check_broker(socket, signal):
                 break
-            self._b = ZMQBroker.daemon(config = self.service._config)
+            elif self.service._config.getbool("zmq","autobroker"):
+                self._b = ZMQBroker.daemon(config = self.service._config)
         else:
             raise TimeoutError("Can't connect to broker after {0:d} attempts. Broker should be at {1}".format(attempts,
             zmq_get_address(self.service._config, "broker", bind=False)))
