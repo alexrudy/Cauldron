@@ -50,8 +50,11 @@ def pytest_configure(config):
     try:
         config.getini('log_format')
     except ValueError:
-        from lumberjack.config import configure
-        configure("stream")
+        try:
+            from lumberjack.config import configure
+            configure("stream")
+        except ImportError:
+            pass
 
 def pytest_report_header(config):
     import astropy.tests.pytest_plugins as astropy_pytest_plugins
