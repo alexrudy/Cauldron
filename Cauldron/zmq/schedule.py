@@ -140,7 +140,7 @@ class Scheduler(ZMQThread):
             collection.append(weakref.ref(keyword))
             self.send_signal()
         
-    def main(self):
+    def thread_target(self):
         """Run the thread."""
         signal = self.get_signal_socket()
         

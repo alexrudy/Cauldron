@@ -76,10 +76,10 @@ class ZMQThread(threading.Thread):
             if signal.poll(timeout=timeout, flags=zmq.POLLOUT):
                 try:
                     signal.send(message, flags=zmq.NOBLOCK)
-                except zmq.Again as exc:
+                except zmq.Again as exc: # pragma: no cover
                     self.log.debug("Signalling may have failed, socket would block. finished = {0}".format(self.finished.is_set()))
                     pass
-            elif not self.finished.is_set():
+            elif not self.finished.is_set(): # pragma: no cover
                 # We might have missed something.
                 self.log.debug("Signalling may have failed. finished = {0} but socket wasn't ready.".format(self.finished.is_set()))
         finally:
@@ -90,8 +90,8 @@ class ZMQThread(threading.Thread):
         """Run the thread."""
         try:
             self.log.debug("[{0}] starting".format(self.name))
-            self.main()
-        except (zmq.ContextTerminated, zmq.ZMQError) as exc:
+            self.thread_target()
+        except (zmq.ContextTerminated, zmq.ZMQError) as exc: # pragma: no cover
             self.log.log(5, "[{0}] ZMQ shutdown because '{1!r}'.".format(self.name, exc))
             self._error = exc
         except Exception as exc:

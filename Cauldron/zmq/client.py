@@ -33,7 +33,7 @@ class _ZMQMonitorThread(ZMQThread):
         self.daemon = True
         self.address = None
         
-    def main(self):
+    def thread_target(self):
         """Run the monitoring thread."""
         zmq = check_zmq()
         try:

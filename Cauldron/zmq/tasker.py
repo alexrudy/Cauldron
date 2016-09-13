@@ -83,7 +83,7 @@ class TaskQueue(ZMQThread):
         self._pending[task.request.identifier] = (time.time(), task)
         self.frontend.send(task.request.identifier)
         
-    def main(self):
+    def thread_target(self):
         """Run the task queue thread."""
         zmq = check_zmq()
         backend = self.ctx.socket(zmq.DEALER)

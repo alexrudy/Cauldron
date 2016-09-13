@@ -162,7 +162,7 @@ class ZMQPooler(ZMQThread):
         #     worker.join()
         self.log.debug("Done with workers.")
     
-    def main(self):
+    def thread_target(self):
         """Run the thread worker"""
         zmq = check_zmq()
         signal = self.get_signal_socket()

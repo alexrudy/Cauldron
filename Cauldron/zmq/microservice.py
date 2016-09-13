@@ -37,7 +37,7 @@ class ZMQMicroservice(ZMQThread):
             raise DispatcherError(exc.msg)
         
         
-    def main(self):
+    def thread_target(self):
         """Main function should call respond."""
         self.respond()
         
