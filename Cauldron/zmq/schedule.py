@@ -14,7 +14,7 @@ log = logging.getLogger(__name__)
 
 Appointment = collections.namedtuple("Appointment", ["next", "keywords"])
 
-_keyword_update_errors = collections.Counter()
+_keyword_update_errors = collections.defaultdict(lambda : 0)
 MAX_KEYWORD_UPDATE_ERRORS = 5
 
 def _keyword_update(keyword_ref):
