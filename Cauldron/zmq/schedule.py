@@ -4,44 +4,68 @@ import threading
 import heapq
 import time
 import weakref
+import logging
 
 from .common import check_zmq
 from .thread import ZMQThread
 
+now = time.time
+log = logging.getLogger(__name__)
+
 Appointment = collections.namedtuple("Appointment", ["next", "keywords"])
+
+_keyword_update_errors = collections.Counter()
+MAX_KEYWORD_UPDATE_ERRORS = 5
 
 def _keyword_update(keyword_ref):
     """Run the keyword update command."""
     keyword = keyword_ref()
     if keyword is None:
-        return
+        return False
     try:
         with keyword._lock:
             value = keyword.update()
     except Exception as e:
         keyword.service.log.exception("Exception during periodic update of {0!r}".format(e))
+        _keyword_update_errors[keyword.full_name] += 1
+        if _keyword_update_errors[keyword.full_name] > MAX_KEYWORD_UPDATE_ERRORS:
+            return False
+    return True
 
 class Collection(object):
     """A periodic collection"""
     def __init__(self, period):
         super(Collection, self).__init__()
         self.period = period
-        self.next = time.time() + self.period
+        self.next = now() + self.period
         self.keywords = []
         self._lock = threading.RLock()
         
+    def __len__(self):
+        """Number of keywords in the collection."""
+        with self._lock:
+            return len(self.keywords)
+        
     def append(self, keyword):
         """Add a keyword."""
-        self.keywords.append(keyword)
+        with self._lock:
+            self.keywords.append(keyword)
         
     def update(self):
         """Update the keywords."""
         with self._lock:
-            next_update = time.now() + self.period
+            to_remove = []
+            next_update = now() + self.period
             for keyword in self.keywords:
-                _keyword_update(keyword)
-            finished = time.time()
+                log.log(5, "Updating {0!r}".format(keyword))
+                alive = _keyword_update(keyword)
+                if not alive:
+                    to_remove.append(keyword)
+            for keyword in to_remove:
+                self.keywords.remove(keyword)
+            finished = now()
             if next_update <= finished:
+                log.log(5, "Update took too long, increasing waiting period.")
                 n = ((finished - next_update) // self.period) + 1
                 next_update = finished + (self.period * n)
             self.next = next_update
@@ -119,8 +143,8 @@ class Scheduler(ZMQThread):
         with self._appointments.locked:
             try:
                 appointment = self._appointments[time]
-            except KeyError:
-                return False
+            except KeyError: # pragma: no cover
+                log.warn("Appointment at {0!r} for keyword {1!r} has already been canceled.".format(time, keyword))
             else:
                 appointment.keywords.remove(weakref.ref(keyword))
                 if not len(appointment.keywords):
@@ -147,6 +171,7 @@ class Scheduler(ZMQThread):
         self.started.set()
         try:
             while self.running.isSet():
+                
                 next_wake = min([self._periods.next, self._appointments.next])
                 timeout = max([0.1, next_wake])
                 if signal.poll(timeout=timeout * 1e3):
@@ -154,13 +179,14 @@ class Scheduler(ZMQThread):
                     self.log.log(5, "Got a signal: .running = {0}".format(self.running.is_set()))
                     continue
                 
-                now = time.time()
-                while len(self._periods) and self._periods.next <= now:
+                thetime = now()
+                if len(self._periods) and self._periods.next <= thetime:
                     with self._periods.locked:
                         collection = self._periods.pop()
                         collection.update()
-                        self._periods.push(collection.period, collection)
-                while len(self._appointments) and self._appointments.next <= now:
+                        if len(collection):
+                            self._periods.push(collection.period, collection)
+                if len(self._appointments) and self._appointments.next <= thetime:
                     with self._appointments.locked:
                         appointment = self._appointments.pop()
                     for keyword in appointment.keywords:
