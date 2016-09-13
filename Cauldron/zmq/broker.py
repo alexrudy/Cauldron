@@ -513,10 +513,10 @@ class ZMQBroker(threading.Thread):
         return obj
         
     @classmethod
-    def setup(cls, config=None, timeout=2.0):
+    def setup(cls, config=None, timeout=2.0, daemon=True):
         """Ensure a broker is set up to start."""
         if not cls.check(timeout=timeout):
-            b = cls.thread(config=config, daemon=True)
+            b = cls.thread(config=config, daemon=daemon)
             b.running.wait(timeout=min([timeout, 2.0]))
             if not b.running.is_set():
                 msg = "Couldn't start ZMQ broker."
@@ -660,7 +660,7 @@ class ZMQBroker(threading.Thread):
             
         
     
-    def stop(self):
+    def stop(self, timeout=None):
         """Stop the responder."""
         import zmq
         
@@ -669,16 +669,15 @@ class ZMQBroker(threading.Thread):
         
         if self.running.is_set() and not self.context.closed:
             signal = self.context.socket(zmq.PUSH)
-        
             signal.connect("inproc://{0:s}".format(hex(id(self))))
             self.running.clear()
-            signal.send(b"")
+            signal.send(b"", flags=zmq.NOBLOCK)
             signal.close()
         else:
             self.running.clear()
         
         self.log.debug("Signaled to stop broker.")
-        self.join()
+        self.join(timeout=timeout)
         self.log.debug("Joined Broker")
         
         if self._error is not None:
