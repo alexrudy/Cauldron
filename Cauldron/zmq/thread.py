@@ -118,7 +118,7 @@ class ZMQThread(threading.Thread):
                 msg += " No error was reported."
             raise ZMQThreadError(msg, self._error)
         
-    def stop(self, join=False):
+    def stop(self, join=False, timeout=None):
         """Stop the responder thread."""
         # If the thread is not alive, do nothing.
         if not self.isAlive():
@@ -138,7 +138,7 @@ class ZMQThread(threading.Thread):
         
         if join or (not self.daemon):
             self.log.debug("{0} joining.".format(self))
-            self.join()
+            self.join(timeout=timeout)
             self.log.debug("{0} joined.".format(self))
             
         self.log.debug("{0} stopped.".format(self.name))
