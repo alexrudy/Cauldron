@@ -10,6 +10,7 @@ import logging
 import sys
 
 from .exc import TimeoutError, DispatcherError
+from .config import get_timeout
 
 try:
     import lumberjack
@@ -249,7 +250,7 @@ def ktl_modify(service, *commands, **options):
     nowait = options.pop('nowait', False)
     wait = not (nowait or parallel)
     verbose = not options.pop('silent', False)
-    timeout = options.pop('timeout', None)
+    timeout = get_timeout(options.pop('timeout', None))
     waitfor = collections.deque()
     outfile = options.pop('output', sys.stdout)
     errfile = options.pop('error', sys.stderr if outfile == sys.stdout else outfile)

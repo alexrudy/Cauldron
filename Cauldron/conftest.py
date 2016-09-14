@@ -100,6 +100,7 @@ def config(tmpdir):
     cauldron_configuration.set("zmq", "publish", "inproc://publish")
     cauldron_configuration.set("zmq", "subscribe", "inproc://subscribe")
     cauldron_configuration.set("zmq", "pool", "2")
+    cauldron_configuration.set("zmq", "timeout", "5")
     cauldron_configuration.set("core", "timeout", "5")
     return cauldron_configuration
     
