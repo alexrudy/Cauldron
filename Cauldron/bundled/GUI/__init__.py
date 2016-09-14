@@ -30,5 +30,5 @@ import Stage
 import Value
 from version import version
 
-path = pkg_resources.resource_filepath("Cauldron", "data/reldir/data/icons")
+path = pkg_resources.resource_filename("Cauldron", "data/reldir/data/icons")
 Images.initialize (path)
