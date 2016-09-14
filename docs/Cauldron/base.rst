@@ -79,6 +79,8 @@ Now we'd normally set up the keyword during the service's setup function (see :c
     service = DFW.Service("WIDGETSERVICE", setup=setup, config=None)
     
 
+Dispatchers are asynchronous, but keywords are internally synchronized. This means that multiple keywords can be modified simultaneously, but an individual keyword can only be modified by one thread at a time. Note that callbacks can be asynchronously called, and so they shouldn't depend on the state of a keyword at a given time.
+
 API Implementation Status
 =========================
 
@@ -88,11 +90,11 @@ A brief summary of major KTL API features is provided in the table below. API fe
 Feature                  Status              Comments
 ======================== =================== ========
 Synchronous read/write   Implemented
-Asynchronous read/write  *Implemented*       KTL calls are still serial on most backends.
-Heartbeats               *Planned*
+Asynchronous read/write  Implemented         KTL calls are still serial on local backends.
+Heartbeats               *Implemented*       Support for periods implemented.
 Callbacks                Implemented
 Polling                  Not Implemented
-Scheduling               Not Implemented
+Scheduling               Implemented
 Expressions              Not Implemented
 XML Keyword Validation   Implemented
 Operator Overloading     Not Implemented
