@@ -262,41 +262,44 @@ def ktl_modify(service, *commands, **options):
         mode = "(wait)"
     else:
         mode = "(nowait)"
-    svc = ktl.Service(service, populate=False)
+    try:
+        svc = ktl.Service(service, populate=False)
     
-    # Initial write loop.
-    for keyword, value in commands:
+        # Initial write loop.
+        for keyword, value in commands:
         
-        try:
-            keyword = svc[keyword]
-        except KeyError as e:
-            errfile.write("Can't find keyword '{0}' in service '{1}'\n{2!s}\n".format(
-                keyword.upper(), svc.name, e
-            ))
-            errfile.flush()
-            continue
-        else:
-            if verbose:
-                outfile.write("setting {0:s} = {1:s} {2:s}\n".format(keyword.name, value, mode))
-                outfile.flush()
-            sequence = keyword.write(value, binary=binary, wait=wait)
-            if parallel == True and nowait == False:
+            try:
+                keyword = svc[keyword]
+            except KeyError as e:
+                errfile.write("Can't find keyword '{0}' in service '{1}'\n{2!s}\n".format(
+                    keyword.upper(), svc.name, e
+                ))
+                errfile.flush()
+                continue
+            else:
+                if verbose:
+                    outfile.write("setting {0:s} = {1:s} {2:s}\n".format(keyword.name, value, mode))
+                    outfile.flush()
+                sequence = keyword.write(value, binary=binary, wait=wait)
+                if parallel == True and nowait == False:
+                    waitfor.append((keyword, sequence))
+        
+    
+        # Wait for writes to complete loop.
+        start = time.time()
+        while len(waitfor):
+            if timeout is not None:
+                elapsed = time.time() - start
+                if elapsed > timeout:
+                    raise TimeoutError("Error setting keyword(s): Timeout waiting for write(s) to complete")
+            keyword, sequence = waitfor.popleft()
+            success = keyword.wait(sequence=sequence, timeout=0.1)
+            if not success:
                 waitfor.append((keyword, sequence))
-        
-    
-    # Wait for writes to complete loop.
-    start = time.time()
-    while len(waitfor):
-        if timeout is not None:
-            elapsed = time.time() - start
-            if elapsed > timeout:
-                raise TimeoutError("Error setting keyword(s): Timeout waiting for write(s) to complete")
-        keyword, sequence = waitfor.popleft()
-        success = keyword.wait(sequence=sequence, timeout=0.1)
-        if not success:
-            waitfor.append((keyword, sequence))
-        elif success and verbose:
-            outfile.write("{0:s} complete\n".format(keyword.name))
-            outfile.flush()
+            elif success and verbose:
+                outfile.write("{0:s} complete\n".format(keyword.name))
+                outfile.flush()
+    finally:
+        svc.shutdown()
     return
     
