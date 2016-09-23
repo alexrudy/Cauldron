@@ -142,7 +142,10 @@ class Service(ClientService):
         except KeyError:
             raise ServiceNotStarted("Service '{0!s}' is not started.".format(name))
         super(Service, self).__init__(name, populate)
-        self._thread = LocalTaskQueue(name, self.log)
+        
+    def _prepare(self):
+        """Prepare the local client for action."""
+        self._thread = LocalTaskQueue(self.name, self.log)
         self._thread.start()
     
     def shutdown(self):
