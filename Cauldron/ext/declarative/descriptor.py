@@ -4,11 +4,12 @@ Implement the declarative descriptor.
 """
 from __future__ import absolute_import
 
+import warnings
 import weakref
 from .events import _DescriptorEvent, _KeywordEvent
 from .utils import descriptor__get__, hybridmethod
 from ...utils import ReferenceError
-from ...exc import CauldronException
+from ...exc import CauldronException, CauldronWarning
 
 __all__ = ['KeywordDescriptor', 'DescriptorBase', 'ServiceNotBound', 'ServiceAlreadyBound', 'IntegrityError']
 
@@ -19,6 +20,11 @@ class ServiceNotBound(CauldronException):
 class ServiceAlreadyBound(CauldronException):
     """Error raised when a service is already bound to a descriptor."""
     pass
+
+class ServiceAlradyBoundWarning(CauldronWarning):
+    """Warning when a service is already bound to a descriptor."""
+    pass
+        
 
 class IntegrityError(CauldronException):
     """Raised to indicate an instance has a differing initial value from the one in the keyword store."""
@@ -154,6 +160,7 @@ class KeywordDescriptor(object):
         self._attr = "_{0}_{1}".format(self.__class__.__name__, self.name)
         self._initial = initial
         self._orig_initial = initial
+        self._initial_keyword_values = {}
         self._bound = False
         
     @property
@@ -171,7 +178,7 @@ class KeywordDescriptor(object):
     def set_bound_name(self, obj, value):
         """Set a bound name."""
         if self._bound:
-            raise ServiceAlreadyBound("Can't change the name of the keyword after the service has bound to it.")
+            warnings.warn(ServiceAlradyBoundWarning("Name change won't take effect until the next time this keyword is bound."))
         
         # Set the new name value.
         setattr(obj, self._name_attr, str(value).upper())
@@ -184,9 +191,15 @@ class KeywordDescriptor(object):
             # If an initial value was set, then we want to raise this back to the user.
             if not (self._initial is None and not hasattr(obj, self._attr)):
                 raise
+        else:
+            attr = "_{0}_{1}".format(self.__class__.__name__, str(value).upper())
+            setattr(obj, attr, initial)
         
-        attr = "_{0}_{1}".format(self.__class__.__name__, str(value).upper())
-        setattr(obj, attr, initial)
+        if self._bound:
+            # Re-bind events to the right keyword.
+            #TODO: Need a way to unbind events from previous keyword.
+            for event in self._events:
+                _KeywordEvent(self.keyword(obj), obj, event)
     
     def __repr__(self):
         """Represent"""
@@ -229,7 +242,8 @@ class KeywordDescriptor(object):
         
         # Compute the initial value.
         try:
-            initial = str(self.type(getattr(obj, attr, self._initial)))
+            initial = self._initial_keyword_values.setdefault(keyword.name.upper(), 
+                                                              str(self.type(getattr(obj, attr, self._initial))))
         except TypeError:
             # We catch this error in case it was caused because no initial value was set.
             # If an initial value was set, then we want to raise this back to the user.
@@ -250,12 +264,12 @@ class KeywordDescriptor(object):
             
         
         # Clean up the instance initial values.
-        try:
-            delattr(obj, attr)
-        except AttributeError:
-            pass
-            
-        self._initial = None
+        # try:
+        #     delattr(obj, attr)
+        # except AttributeError:
+        #     pass
+        
+        # self._initial = None
         
         
     def bind(self, obj, service=None):
