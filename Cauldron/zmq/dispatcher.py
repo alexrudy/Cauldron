@@ -217,7 +217,7 @@ class Service(DispatcherService):
             self.socket.send_multipart(message.data)
             if timeout:
                 if not self.socket.poll(timeout * 1e3):
-                    raise TimeoutError("Dispatcher timed out.")
+                    raise TimeoutError("Dispatcher timed out performing a synchronous command. {0}: {1!r}".format(command, message))
             response = ZMQCauldronMessage.parse(self.socket.recv_multipart())
         response.verify(self)
         return response
