@@ -113,7 +113,10 @@ class Keyword(_BaseKeyword):
                 warnings.warn("XML setup for keyword '{0}' failed. {1}".format(name, e), CauldronXMLWarning)
         
         # Handle XML-specified initial values here.
-        self.initial = str(initial)
+        if initial is None:
+            self.initial = None
+        else:
+            self.initial = str(initial)
         
         if period is not None:
             self.period(period)
