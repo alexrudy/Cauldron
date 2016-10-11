@@ -3,6 +3,7 @@
 
 import pytest
 import time
+import threading
 
 from .broker import ZMQBroker
 from .thread import ZMQThread, ZMQThreadError
@@ -65,9 +66,14 @@ def test_setup(broker, backend, config, servicename):
 class DummyThread(ZMQThread):
     """A dummy thread, which does nothing, then ends."""
     
+    def __init__(self, *args, **kwargs):
+        super(DummyThread, self).__init__(*args, **kwargs)
+        self.shutdown = threading.Event()
+    
     def thread_target(self):
         self.running.set()
-        self.started.wait()
+        self.started.set()
+        self.shutdown.wait()
         
 
 class BadThread(ZMQThread):
@@ -90,7 +96,7 @@ def test_thread_success():
     t.start()
     assert not t.finished.is_set()
     t.check(timeout=0.1)
-    t.started.set()
+    t.shutdown.set()
     t.finished.wait(0.1)
     assert t.finished.is_set()
     with pytest.raises(ZMQThreadError):

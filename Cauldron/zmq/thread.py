@@ -110,8 +110,8 @@ class ZMQThread(threading.Thread):
     def check(self, timeout=1.0):
         """Check that the thread is actually alive."""
         if not self.finished.is_set():
-            self.running.wait(timeout)
-        if self.finished.is_set() or (not self.running.is_set()):
+            self.started.wait(timeout)
+        if self.finished.is_set() or (not self.started.is_set()):
             msg = "[{0}] is not alive.".format(self.name)
             if self._error is not None:
                 msg += " Thread Error: {0}".format(repr(self._error))
