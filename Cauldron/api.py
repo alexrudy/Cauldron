@@ -83,7 +83,7 @@ def use(name):
     DFW.Service = Service
     DFW.Keyword = Keyword
     
-def setup_ktl_backend(): # pragma: no cover
+def setup_ktl_backend():
     """Set up the KTL backend."""
     Cauldron = sys.modules[BASENAME]
     try:
@@ -97,6 +97,7 @@ def setup_ktl_backend(): # pragma: no cover
         registry.dispatcher.service_for("ktl", DFW.Service)
         registry.dispatcher.keyword_for("ktl", DFW.Keyword.Keyword)
     
+setup_ktl_backend()
     
 def _expunge_module(module_name):
     """Given a module name, expunge it from sys.modules."""
