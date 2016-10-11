@@ -98,6 +98,8 @@ KTL Dispatchers provide the source of values, and respond to requests to read an
     >>> kwd.modify("hello")
     
 
+Dispatchers spend most of their time responding to requests. Request responses happen in threads, and so actions taken by both :meth:`Keyword.modify <Cauldron.base.dispatcher.DispatcherKeyword.modify>` and :meth:`Keyword.update <Cauldron.base.dispatcher.DispatcherKeyword.update>` should be thread-safe.
+
 XML
 ===
 

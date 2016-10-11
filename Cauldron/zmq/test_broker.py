@@ -4,7 +4,7 @@
 import pytest
 import six
 from .broker import ZMQBroker
-from .microservice import ZMQCauldronMessage
+from .protocol import ZMQCauldronMessage
 from ..conftest import fail_if_not_teardown, available_backends
 
 import time

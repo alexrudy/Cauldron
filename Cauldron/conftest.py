@@ -45,35 +45,15 @@ available_backends = get_available_backends()
 if "zmq" in available_backends:
     PYTEST_HEADER_MODULES['zmq'] = 'zmq'
 
-def _pytest_get_option(config, name, default):
-    """Get pytest options in a version independent way, with allowed defaults."""
-    
-    try:
-        value = config.getoption(name, default=default)
-    except Exception:
-        try:
-            value = config.getvalue(name)
-        except Exception:
-            return default
-    return value
-    
-
 def pytest_configure(config):
     """Activate log capturing if appropriate."""
-
-    if (not _pytest_get_option(config, 'capturelog', default=True)) or (_pytest_get_option(config, 'capture', default="no") == "no"):
+    try:
+        config.getini('log_format')
+    except ValueError:
         try:
-            import lumberjack
-            lumberjack.setup_logging("", mode='stream', level=1)
-            lumberjack.setup_warnings_logger("")
-        except:
-            pass
-    else:
-        try:
-            import lumberjack
-            lumberjack.setup_logging("", mode='none', level=1)
-            lumberjack.setup_warnings_logger("")
-        except:
+            from lumberjack.config import configure
+            configure("stream")
+        except ImportError:
             pass
 
 def pytest_report_header(config):
@@ -119,6 +99,8 @@ def config(tmpdir):
     cauldron_configuration.set("zmq", "broker", "inproc://broker")
     cauldron_configuration.set("zmq", "publish", "inproc://publish")
     cauldron_configuration.set("zmq", "subscribe", "inproc://subscribe")
+    cauldron_configuration.set("zmq", "pool", "2")
+    cauldron_configuration.set("zmq", "timeout", "5")
     cauldron_configuration.set("core", "timeout", "5")
     return cauldron_configuration
     

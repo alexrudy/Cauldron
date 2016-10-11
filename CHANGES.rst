@@ -4,6 +4,8 @@ Changes to Cauldron
 0.6.1
 =====
 - Add support for the KTL client GUI module in Cauldron.extern.GUI
+- Asynchronous dispatchers, with a pool of workers [zmq]
+- Scheduled and periodic tasks [zmq]
 
 0.6.0
 =====

@@ -43,6 +43,15 @@ def zmq_get_address(config, name, bind=False, group="zmq"):
         return zmq_get_bind(config, name, group=group)
     else:
         return config.get(group, name)
+
+def zmq_check_nonlocal_address(config, name, group="zmq"):
+    """Check that a particular zmq address is nonlocal."""
+    from six.moves.urllib.parse import urlparse
+    url = urlparse(config.get(group, name))
+    if url.scheme in ('inproc'):
+        return False
+    return True
+    
         
 def zmq_connect_socket(socket, config, name, group="zmq", log=None, label=None, address=None):
     """Connect a ZMQ Cauldron socket."""

@@ -259,10 +259,6 @@ class Service(_BaseService):
         """Prepare for service."""
         pass
     
-    def __repr__(self):
-        """Represent this object"""
-        return "<Service name='{0}' at {1}>".format(self.name, hex(id(self)))
-    
     def __getitem__(self, key):
         """Return a keyword."""
         if key.upper() in self._keywords:

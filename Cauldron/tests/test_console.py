@@ -79,18 +79,18 @@ def test_parse_modify_commands():
         list(parseModifyCommands(["KEYWORD1="," ","bogus","KEYWORD2","=", "KEYWORD3"], flags))
     
     
-@pytest.fixture(params=[True, False])
+@pytest.fixture(params=[True, False], ids=['notify', 'no_notify'])
 def notify(request):
     return request.param
     
-@pytest.fixture(params=[True, False])
+@pytest.fixture(params=[True, False], ids=['wait', 'nowait'])
 def nowait(request):
     return request.param
 
 @pytest.fixture()
 def flags(notify, nowait):
     """Set various combinations of flags."""
-    return {'notify':notify, 'nowait':nowait}
+    return {'notify':notify, 'nowait':nowait, 'timeout': 0.1}
     
 def test_modify_success(dispatcher, keyword_name, keyword_name1, keyword_name2, outfile, errfile, flags):
     """Test a succsessful modify command."""
@@ -118,7 +118,7 @@ def test_modify_error(dispatcher, keyword_name, keyword_name1, keyword_name2, ou
     for i,keyword in enumerate(keywords):
         dispatcher[keyword].modify("Hello{0}".format(i))
     
-    ktl_modify(dispatcher.name, *((keyword_name, "Goodbye0"), (keyword_name1, "Goodbye2"), (keyword_name2, "Goodbye1")), output=outfile, error=errfile)    
+    ktl_modify(dispatcher.name, *((keyword_name, "Goodbye0"), (keyword_name1, "Goodbye2"), (keyword_name2, "Goodbye1")), output=outfile, error=errfile, timeout=0.1)    
     error = errfile.getvalue()
     assert error.splitlines()[0] == "Can't find keyword 'KEYWORD1' in service 'testsvc'"
     assert error.splitlines()[1].endswith("> has no key 'KEYWORD1'\"")

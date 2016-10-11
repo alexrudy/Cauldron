@@ -9,8 +9,11 @@ import weakref
 from ..base import ClientService, ClientKeyword
 from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented, DispatcherError, TimeoutError
 from .common import zmq_get_address, check_zmq, teardown, zmq_connect_socket
-from .microservice import ZMQCauldronMessage, ZMQCauldronErrorResponse, FRAMEBLANK, FRAMEFAIL
+from .thread import ZMQThread
+from .protocol import ZMQCauldronMessage, ZMQCauldronErrorResponse, FRAMEBLANK, FRAMEFAIL
 from .tasker import Task, TaskQueue
+from .broker import ZMQBroker
+from .responder import ZMQDispatcherError
 from .. import registry
 from ..config import get_configuration, get_timeout
 
@@ -23,26 +26,16 @@ __all__ = ["Service", "Keyword"]
 
 registry.client.teardown_for('zmq')(teardown)
 
-class _ZMQMonitorThread(threading.Thread):
+class _ZMQMonitorThread(ZMQThread):
     """A monitoring thread for ZMQ-powered Services which listens for broadcasts."""
     def __init__(self, service):
-        super(_ZMQMonitorThread, self).__init__(name="ktl.Service.{0}.Broadcasts".format(service.name))
+        super(_ZMQMonitorThread, self).__init__(name="ktl.Service.{0}.Broadcasts".format(service.name), context=service.ctx)
         self.service = weakref.proxy(service)
-        self.shutdown = threading.Event()
-        self.log = logging.getLogger(self.name)
         self.monitored = set()
         self.daemon = True
         self.address = None
         
-    def stop(self):
-        """Stop this thread."""
-        self.shutdown.set()
-        if not self.isAlive():
-            return
-        self.log.debug("Joining {0}".format(self.name))
-        self.join()
-        
-    def run(self):
+    def thread_target(self):
         """Run the monitoring thread."""
         zmq = check_zmq()
         try:
@@ -51,13 +44,24 @@ class _ZMQMonitorThread(threading.Thread):
             self.log.log(5, "Can't start ZMQ monitor, service has disappeared.")
             return
         socket = ctx.socket(zmq.SUB)
+        signal = self.get_signal_socket()
+        poller = zmq.Poller()
+        poller.register(signal, zmq.POLLIN)
+        poller.register(socket, zmq.POLLIN)
+        
         try:
             zmq_connect_socket(socket, get_configuration(), "subscribe", log=self.log, label='client-monitor', address=self.address)
             # Accept everything belonging to this service.
             socket.setsockopt_string(zmq.SUBSCRIBE, six.text_type(self.service.name))
             
-            while not self.shutdown.isSet():
-                if socket.poll(timeout=1):
+            self.started.set()
+            while self.running.is_set():
+                ready = dict(poller.poll(timeout=1e3))
+                if signal in ready:
+                    _ = signal.recv()
+                    self.log.log(5, "Got a signal: .running = {0}".format(self.running.is_set()))
+                    continue
+                if socket in ready:
                     try:
                         message = ZMQCauldronMessage.parse(socket.recv_multipart())
                         message.verify(self.service)
@@ -77,11 +81,11 @@ class _ZMQMonitorThread(threading.Thread):
             self.log.log(6, "Service shutdown and context terminated, closing broadcast thread. {0}".format(repr(e)))
         else:
             try:
-                socket.setsockopt(zmq.LINGER, 0)
-                socket.close()
+                socket.close(linger=0)
             except:
                 pass
         finally:
+            signal.close(linger=0)
             self.log.debug("Stopped Monitor Thread")
             
 
@@ -101,6 +105,8 @@ class Service(ClientService):
         
     def _prepare(self):
         """Prepare step."""
+        if not ZMQBroker.check(ctx=self.ctx):
+            raise ZMQDispatcherError("Can't locate a suitable dispatcher for {0}".format(self.name))
         self._monitor = _ZMQMonitorThread(self)
         self._tasker = TaskQueue(self.name, ctx=self.ctx, log=self.log)
         self._tasker.start()
@@ -128,10 +134,14 @@ class Service(ClientService):
         self.shutdown()
         
     def shutdown(self):
-        if hasattr(self, '_monitor'):
+        if hasattr(self, '_monitor') and self._monitor is not None and self._monitor.isAlive():
+            self.log.debug("Stopping monitor")
             self._monitor.stop()
-        if hasattr(self, '_tasker'):
+            self.log.debug("Stopped monitor")
+        if hasattr(self, '_tasker') and self._tasker is not None and self._tasker.isAlive():
+            self.log.debug("Stopping tasker")
             self._tasker.stop()
+            self.log.debug("Stopped tasker")
         
     def _has_keyword(self, name):
         name = name.upper()

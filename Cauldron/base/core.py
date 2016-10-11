@@ -90,7 +90,7 @@ class _BaseService(object):
         
     def __repr__(self):
         """Represent this object"""
-        return "<{0} name='{1}' at {2}>".format(self.__class__.__name__, self.name, hex(id(self)))
+        return "<{0} name='{1}' at {2}{3}>".format(self.__class__.__name__, self.name, hex(id(self)), ":d" if getattr(self, '_DISPATCHER', False) else ":c")
 
 @six.add_metaclass(_CauldronBaseMeta)
 class _BaseKeyword(object):

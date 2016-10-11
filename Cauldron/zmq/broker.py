@@ -12,8 +12,8 @@ import binascii
 import weakref
 
 from ..config import read_configuration
-from .microservice import ZMQCauldronMessage, ZMQCauldronErrorResponse, FRAMEBLANK, FRAMEFAIL, DIRECTIONS
-from .common import zmq_get_address, check_zmq, teardown, zmq_connect_socket
+from .protocol import ZMQCauldronMessage, ZMQCauldronErrorResponse, FRAMEBLANK, FRAMEFAIL, DIRECTIONS
+from .common import zmq_get_address, check_zmq, teardown, zmq_connect_socket, zmq_check_nonlocal_address
 from ..exc import DispatcherError
 
 __all__ = ['ZMQBroker', 'NoResponseNecessary', 'NoDispatcherAvailable', 'MultipleDispatchersFound']
@@ -127,7 +127,8 @@ class Lifetime(object):
         
     def beat(self):
         """Mark a heartbeat"""
-        self._expiration = time.time() + self.service.broker.timeout
+        self._expiration = time.time() + self.service.broker.timeout        
+        self._next_beat = time.time() + self.service.broker.timeout
         
     @property
     def alive(self):
@@ -137,7 +138,7 @@ class Lifetime(object):
     @property
     def shouldbeat(self):
         """Should this thing ask for a heartbeat."""
-        return time.time() > self._expiration
+        return time.time() > self._next_beat
         
     @property
     def lifetime(self):
@@ -170,7 +171,7 @@ class Lifetime(object):
         self._message_pool.clear()
     
     def __repr__(self):
-        return "<{0} name='{1}' lifetime={2:.0f} open={3:d}>".format(self.__class__.__name__, self.name, self.lifetime, self.active)
+        return "<{0} name='{1}' lifetime={2:.2f} open={3:d}>".format(self.__class__.__name__, self.name, self.lifetime, self.active)
 
 class Client(Lifetime):
     """A simple representation of a client connection."""
@@ -205,6 +206,18 @@ class Dispatcher(Lifetime):
         self.log.log(5, "{0!r}.send({1!r})".format(self, message))
         socket.send_multipart(message.data)
         self.activate(message)
+        
+    def send_beat(self, socket):
+        """Send a beat."""
+        if self.message is not None:
+            msg = ZMQCauldronMessage(command='heartbeat', direction="DBP",
+                service=self.service.name, dispatcher=self.name, payload="beat")
+            msg.prefix = [self.id, b""]
+            self._next_beat = time.time() + self.service.broker.timeout
+            self.log.log(5, "{0!r}.beat({1!r})".format(self, msg))
+            socket.send_multipart(msg.data)
+            self.activate(msg)
+        
         
 
 
@@ -317,12 +330,8 @@ class Service(object):
         """Start heartbeat messages where necssary."""
         for name in self.dispatchers.keys():
             dispatcher = self.dispatchers[name]
-            if not dispatcher.shouldbeat:
-                continue
-            if dispatcher.message is not None:
-                msg = dispatcher.message.response("beat")
-                msg.command = "heartbeat"
-                dispatcher.send(msg, socket)
+            if dispatcher.shouldbeat:
+                dispatcher.send_beat(socket)
         
     def handle(self, message, socket):
         """Handle"""
@@ -467,6 +476,7 @@ class ZMQBroker(threading.Thread):
         self._local = threading.local()
         self._error = None
         self.services = dict()
+        self.log.info("ZMQBroker.__init__")
         
     @classmethod
     def from_config(cls, config, name="ConfiguredBroker"):
@@ -490,24 +500,38 @@ class ZMQBroker(threading.Thread):
     def daemon(cls, config=None, daemon=True):
         """Serve in a process."""
         import multiprocessing as mp
-        proc = mp.Process(target=cls.serve, args=(config,), name="ZMQBroker")
+        cfg = read_configuration(config)
+        for name in ["broker", "publish", "subscribe"]:
+            if not zmq_check_nonlocal_address(cfg, name):
+                raise ValueError("Broker is trying to start in a daemon with a nonlocal address {0}='{1}'".format(name, zmq_get_address(config, name, bind=False)))
+        proc = mp.Process(target=cls.serve, args=(config,), name="ProcessBroker")
         proc.daemon = daemon
         proc.start()
         return proc
     
     @classmethod
+    def sub(cls, config=None, daemon=True):
+        """Serve in either a subprocess or thread."""
+        cfg = read_configuration(config)
+        if all(zmq_check_nonlocal_address(cfg, name) for name in ["broker", "publish", "subscribe"]):
+            return cls.daemon(config, daemon=daemon)
+        else:
+            return cls.thread(config, daemon=daemon)
+    
+    
+    @classmethod
     def thread(cls, config=None, daemon=True):
         """Serve in a thread."""
-        obj = cls.from_config(config)
+        obj = cls.from_config(config, name="ThreadBroker")
         obj.daemon = daemon
         obj.start()
         return obj
         
     @classmethod
-    def setup(cls, config=None, timeout=2.0):
+    def setup(cls, config=None, timeout=2.0, daemon=True):
         """Ensure a broker is set up to start."""
         if not cls.check(timeout=timeout):
-            b = cls.thread(config=config, daemon=True)
+            b = cls.thread(config=config, daemon=daemon)
             b.running.wait(timeout=min([timeout, 2.0]))
             if not b.running.is_set():
                 msg = "Couldn't start ZMQ broker."
@@ -532,7 +556,6 @@ class ZMQBroker(threading.Thread):
         socket.send_multipart(message.data)
         if socket.poll(timeout * 1e3):
             response = ZMQCauldronMessage.parse(socket.recv_multipart())
-            print(response)
             if response.payload == "Broker Alive":
                 return True
         return False
@@ -651,7 +674,7 @@ class ZMQBroker(threading.Thread):
             
         
     
-    def stop(self):
+    def stop(self, timeout=None):
         """Stop the responder."""
         import zmq
         
@@ -660,15 +683,15 @@ class ZMQBroker(threading.Thread):
         
         if self.running.is_set() and not self.context.closed:
             signal = self.context.socket(zmq.PUSH)
-        
             signal.connect("inproc://{0:s}".format(hex(id(self))))
             self.running.clear()
             signal.send(b"", flags=zmq.NOBLOCK)
-            signal.close(linger=0)
+            signal.close()
         else:
             self.running.clear()
         
-        self.join()
+        self.log.debug("Signaled to stop broker.")
+        self.join(timeout=timeout)
         self.log.debug("Joined Broker")
         
         if self._error is not None:

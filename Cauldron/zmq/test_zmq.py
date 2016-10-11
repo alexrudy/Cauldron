@@ -3,8 +3,10 @@
 
 import pytest
 import time
+import threading
 
 from .broker import ZMQBroker
+from .thread import ZMQThread, ZMQThreadError
 from ..conftest import fail_if_not_teardown, available_backends
 from ..api import use
 from ..config import cauldron_configuration
@@ -60,3 +62,57 @@ def test_setup(broker, backend, config, servicename):
     
     svc = DFW.Service(servicename, config=config, setup=setup)
     svc["KEYWORD"]
+
+class DummyThread(ZMQThread):
+    """A dummy thread, which does nothing, then ends."""
+    
+    def __init__(self, *args, **kwargs):
+        super(DummyThread, self).__init__(*args, **kwargs)
+        self.shutdown = threading.Event()
+    
+    def thread_target(self):
+        self.running.set()
+        self.started.set()
+        self.shutdown.wait()
+        
+
+class BadThread(ZMQThread):
+    """A misbehaving thread which errors."""
+    
+    def thread_target(self):
+        self.started.set()
+        self.running.set()
+        raise ValueError("This thread is bad!")
+
+
+def test_thread_success():
+    """Test the ZMQThread apparatus."""
+    t = DummyThread("DummyThread")
+    assert not t.running.is_set()
+    assert not t.started.is_set()
+    assert not t.finished.is_set()
+    with pytest.raises(ZMQThreadError):
+        t.check(timeout=0.1)
+    t.start()
+    assert not t.finished.is_set()
+    t.check(timeout=0.1)
+    t.shutdown.set()
+    t.finished.wait(0.1)
+    assert t.finished.is_set()
+    with pytest.raises(ZMQThreadError):
+        t.check(timeout=0.1)
+    
+def test_thread_bad():
+    """Test the ZMQThread apparatus."""
+    t = BadThread("BadThread")
+    assert not t.running.is_set()
+    assert not t.started.is_set()
+    assert not t.finished.is_set()
+    t.start()
+    t.finished.wait(0.1)
+    with pytest.raises(ZMQThreadError) as excinfo:
+        t.check(timeout=0.1)
+    assert str(excinfo.value).endswith("from ValueError('This thread is bad!',)")
+    assert t.finished.is_set()
+    with pytest.raises(ZMQThreadError):
+        t.check(timeout=0.1)
