@@ -322,5 +322,5 @@ class ZMQWorker(ZMQMicroservice):
         
         backend.close(linger=0)
         signal.close(linger=0)
-    
+        broadcaster.close(linger=0)
 
