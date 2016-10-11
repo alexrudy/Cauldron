@@ -161,7 +161,7 @@ class _BaseKeyword(object):
     
     def _current_value(self, both=False, binary=False):
         """Respond with the current value."""
-        self.service.log.debug("{0!r}._current_value(both={1},binary={2}) = {3!r}".format(
+        self.service.log.trace("{0!r}._current_value(both={1},binary={2}) = {3!r}".format(
             self, both, binary, self._ktl_value()
         ))
         if both:

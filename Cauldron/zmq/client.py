@@ -10,12 +10,13 @@ from ..base import ClientService, ClientKeyword
 from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented, DispatcherError, TimeoutError
 from .common import zmq_get_address, check_zmq, teardown, zmq_connect_socket
 from .thread import ZMQThread
-from .protocol import ZMQCauldronMessage, ZMQCauldronErrorResponse, FRAMEBLANK, FRAMEFAIL
+from .protocol import ZMQCauldronMessage, ZMQCauldronErrorResponse, FRAMEBLANK, FRAMEFAIL, PrefixMatchError
 from .tasker import Task, TaskQueue
 from .broker import ZMQBroker
 from .responder import ZMQDispatcherError
 from .. import registry
 from ..config import get_configuration, get_timeout
+from ..logger import KeywordMessageFilter
 
 import six
 import threading
@@ -41,7 +42,7 @@ class _ZMQMonitorThread(ZMQThread):
         try:
             ctx = self.service.ctx
         except weakref.ReferenceError:
-            self.log.log(5, "Can't start ZMQ monitor, service has disappeared.")
+            self.log.debug("Can't start ZMQ monitor, service has disappeared.")
             return
         socket = ctx.socket(zmq.SUB)
         signal = self.get_signal_socket()
@@ -59,26 +60,35 @@ class _ZMQMonitorThread(ZMQThread):
                 ready = dict(poller.poll(timeout=1e3))
                 if signal in ready:
                     _ = signal.recv()
-                    self.log.log(5, "Got a signal: .running = {0}".format(self.running.is_set()))
+                    self.log.trace("Got a signal: .running = {0}".format(self.running.is_set()))
                     continue
                 if socket in ready:
                     try:
                         message = ZMQCauldronMessage.parse(socket.recv_multipart())
                         message.verify(self.service)
                         keyword = self.service[message.keyword]
-                        if keyword.name in self.monitored:
-                            keyword._update(message.payload)
-                            self.log.log(5, "{0!r}.monitor({1}={2})".format(self, keyword.name, message.payload))
-                        else:
-                            self.log.log(5, "{0!r}.monitor({1}) ignored".format(self, keyword.name))
+                        f = KeywordMessageFilter(keyword)
+                        self.log.addFilter(f)
+                        try:
+                            if keyword.name in self.monitored:
+                                keyword._update(message.payload)
+                                self.log.trace("{0!r}.monitor({1}={2})".format(self, keyword.name, message.payload))
+                            else:
+                                self.log.trace("{0!r}.monitor({1}) ignored".format(self, keyword.name))
+                        except Exception as e:
+                            self.log.exception("{0!r}._update() error: {1!r}".format(keyword, e))
+                        finally:
+                            self.log.removeFilter(f)
+                    except PrefixMatchError as e:
+                        self.log.trace("{0!r}.monitor() ignored".format(self))
                     except ZMQCauldronErrorResponse as e:
                         self.log.error("Broadcast Message Error: {0!r}".format(e))
                     except (zmq.ContextTerminated, zmq.ZMQError):
                         raise
                     except Exception as e:
-                        self.log.error("Broadcast Error: {0!r}".format(e))
+                        self.log.exception("Broadcast error: {0!r}".format(e))
         except (zmq.ContextTerminated, zmq.ZMQError) as e:
-            self.log.log(6, "Service shutdown and context terminated, closing broadcast thread. {0}".format(repr(e)))
+            self.log.trace("Service shutdown and context terminated, closing broadcast thread. {0}".format(repr(e)))
         else:
             try:
                 socket.close(linger=0)
@@ -135,13 +145,13 @@ class Service(ClientService):
         
     def shutdown(self):
         if hasattr(self, '_monitor') and self._monitor is not None and self._monitor.isAlive():
-            self.log.debug("Stopping monitor")
+            self.log.trace("Stopping monitor")
             self._monitor.stop()
-            self.log.debug("Stopped monitor")
+            self.log.trace("Stopped monitor")
         if hasattr(self, '_tasker') and self._tasker is not None and self._tasker.isAlive():
-            self.log.debug("Stopping tasker")
+            self.log.trace("Stopping tasker")
             self._tasker.stop()
-            self.log.debug("Stopped tasker")
+            self.log.trace("Stopped tasker")
         
     def _has_keyword(self, name):
         name = name.upper()
@@ -158,7 +168,7 @@ class Service(ClientService):
         
     def _handle_response(self, message):
         """Handle a response, and return the payload."""
-        self.log.log(5, "{0!r}.recv({1!s})".format(self, message))
+        self.log.msg("{0!r}.recv({1!s})".format(self, message))
         if message.iserror:
             raise DispatcherError("Dispatcher error on command: {0}".format(message.payload))
         message.verify(self)
@@ -202,7 +212,7 @@ class Keyword(ClientKeyword):
         
     def _handle_response(self, message):
         """Handle a response, and return the payload."""
-        self.service.log.log(5, "{0!r}.recv({1!s})".format(self, message))
+        self.service.log.msg("{0!r}.recv({1!s})".format(self, message))
         if message.iserror:
             raise DispatcherError("Dispatcher error on command: {0}".format(message.payload))
         message.verify(self.service)
@@ -238,13 +248,13 @@ class Keyword(ClientKeyword):
         
         task = self._asynchronous_command("update", "", timeout=timeout)
         if wait:
-            self.service.log.debug("{0} waiting.".format(_call_msg()))
+            self.service.log.trace("{0} waiting.".format(_call_msg()))
             try:
                 task.get(timeout=timeout)
             except TimeoutError:
                 raise TimeoutError("{0} timed out.".format(_call_msg()))
             else:
-                self.service.log.debug("{0} complete.".format(_call_msg()))
+                self.service.log.trace("{0} complete.".format(_call_msg()))
             return self._current_value(binary=binary, both=both)
         else:
             return task
@@ -262,13 +272,13 @@ class Keyword(ClientKeyword):
             pass
         task = self._asynchronous_command("modify", value, timeout=timeout)
         if wait:
-            self.service.log.debug("{0} waiting.".format(_call_msg()))
+            self.service.log.trace("{0} waiting.".format(_call_msg()))
             try:
                 result = task.get(timeout=timeout)
             except TimeoutError:
                 raise TimeoutError("{0} timed out.".format(_call_msg()))
             else:
-                self.service.log.debug("{0} complete.".format(_call_msg()))
+                self.service.log.trace("{0} complete.".format(_call_msg()))
         else:
             return task
         

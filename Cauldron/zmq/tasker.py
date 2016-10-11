@@ -13,6 +13,7 @@ from ..utils.callbacks import WeakMethod
 from ..exc import TimeoutError
 from ..config import get_configuration, get_timeout
 from ..base.core import Task as _BaseTask
+from ..logger import KeywordMessageFilter
 
 class Task(_BaseTask):
     """A task container for the task queue."""
@@ -47,13 +48,13 @@ class TaskQueue(ZMQThread):
         for starttime, task in list(self._pending.values()):
             if task.timeout is None:
                 if (starttime + self._task_timeout) < now:
-                    self.log.debug("Task {0} took way too long. Orphaning.".format(task))
+                    self.log.debug("Task {0} took longer than {1}. Orphaning this task.".format(task, self._task_timeout))
                     task.timedout("Orphaned task stuck in queue.")
                     self._pending.pop(task.request.identifier)
                 continue
             dur = starttime + task.timeout
             if dur < now:
-                self.log.debug("{0!r}.timeout({1})".format(self, task.request))
+                self.log.trace("{0!r}.timeout({1})".format(self, task.request))
                 task.timedout()
                 self._pending.pop(task.request.identifier)
             elif (timeout > (task.timeout * 1e3)):
@@ -114,7 +115,7 @@ class TaskQueue(ZMQThread):
             if backend in ready:
                 try:
                     message = ZMQCauldronMessage.parse(backend.recv_multipart())
-                    self.log.debug("{0!r}.recv({1})".format(self, message))
+                    self.log.trace("{0!r}.recv({1})".format(self, message))
                 except Exception as e:
                     # un-parseable message, discard it.
                     self.log.exception("Discarding {0}".format(str(e)))
@@ -123,7 +124,7 @@ class TaskQueue(ZMQThread):
                         starttime, task = self._pending.pop(message.identifier)
                     except KeyError:
                         # This task had probably timed out.
-                        self.log.debug("{0!r}.recv({1}) missing".format(self, message))
+                        self.log.error("{0!r}.recv({1}) missing message identifier.".format(self, message))
                     else:
                         task(message)
                 
@@ -131,7 +132,7 @@ class TaskQueue(ZMQThread):
             if frontend in ready:
                 identifier = frontend.recv()
                 starttime, task = self._pending[identifier]
-                self.log.debug("{0!r}.send({1})".format(self, task.request))
+                self.log.trace("{0!r}.send({1})".format(self, task.request))
                 backend.send(b"", flags=zmq.SNDMORE)
                 backend.send_multipart(task.request.data)
             

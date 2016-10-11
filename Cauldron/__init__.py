@@ -17,7 +17,9 @@ def _init_log():
     """Set up some default logging options."""
     import logging
     from .utils.loggingcompat import NullHandler
+    from . import logger
     logging.addLevelName(5, "MSG")
+    logging.addLevelName(1, "TRACE")
     logging.getLogger("DFW").addHandler(NullHandler())
     logging.getLogger("ktl").addHandler(NullHandler())
     logging.getLogger("Cauldron").addHandler(NullHandler())
