@@ -101,7 +101,7 @@ def show():
     
 def ktl_show(service, *keywords, **options):
     """Implement the KTL Show functionality."""
-    from . import ktl
+    from Cauldron import ktl
     binary = options.pop('binary', False)
     outfile = options.pop('output', sys.stdout)
     errfile = options.pop('error', sys.stderr if outfile == sys.stdout else outfile)
@@ -139,6 +139,7 @@ def parseModifyCommands(commands, flags, verbose=False):
     keyword, assignment = None, False
     
     for argument in commands:
+        argument = str(argument)
         if verbose: print(argument, keyword, assignment)
         if keyword is None:
             if "=" in argument:
@@ -235,13 +236,17 @@ def modify():
     try:
         ktl_modify(opt.service, *commands, **flags)
     except TimeoutError as e:
-        parser.error(str(e))
+        parser.exit(status=2, message=str(e))
+    except Exception as e:
+        if opt.debug:
+            raise
+        parser.exit(status=1, message=str(e))
     return 0
     
     
 def ktl_modify(service, *commands, **options):
     """Modify a series of KTL keywords."""
-    from . import ktl
+    from Cauldron import ktl
     
     # Handle arguments
     binary = options.pop('binary', False)

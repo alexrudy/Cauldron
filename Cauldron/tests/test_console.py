@@ -79,11 +79,11 @@ def test_parse_modify_commands():
         list(parseModifyCommands(["KEYWORD1="," ","bogus","KEYWORD2","=", "KEYWORD3"], flags))
     
     
-@pytest.fixture(params=[True, False])
+@pytest.fixture(params=[True, False], ids=['notify', 'no_notify'])
 def notify(request):
     return request.param
     
-@pytest.fixture(params=[True, False])
+@pytest.fixture(params=[True, False], ids=['wait', 'nowait'])
 def nowait(request):
     return request.param
 
