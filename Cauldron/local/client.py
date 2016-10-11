@@ -54,7 +54,8 @@ class LocalTaskQueue(threading.Thread):
             self.queue.put(None, block=False)
         except queue.Full:
             pass
-        self.join()
+        else:
+            self.join()
 
 @registry.client.keyword_for("local")
 class Keyword(ClientKeyword):
