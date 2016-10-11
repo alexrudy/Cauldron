@@ -3,11 +3,12 @@
 Implements the ZMQ Dispatcher responder worker pool.
 """
 
-from .common import zmq_get_address, check_zmq, zmq_connect_socket
+from .common import zmq_get_address, check_zmq, zmq_connect_socket, zmq_check_nonlocal_address
 from .microservice import ZMQMicroservice, ZMQThread
 from .protocol import ZMQCauldronMessage, FRAMEFAIL, FRAMEBLANK
 from .broker import ZMQBroker
 from ..exc import DispatcherError, WrongDispatcher, TimeoutError
+from ..config import get_timeout
 
 import collections
 import threading
@@ -18,23 +19,21 @@ import time
 import sys, traceback
 import binascii
 
-__all__ = ['ZMQResponder', 'ZMQPooler']
+__all__ = ['ZMQResponder', 'ZMQPooler', 'ZMQDispatcherError']
 
-def register_dispatcher(service, socket, poller=None, log=None, timeout=1.0, address=None):
+class ZMQDispatcherError(DispatcherError):
+    """Dispatcher error specific to the ZMQ backend."""
+
+def register_dispatcher(service, socket, poller=None, log=None, timeout=None, address=None):
     """Register a dispatcher, and possibly start an automatic broker."""
     zmq = check_zmq()
+    timeout = get_timeout(timeout) or 5.0
     b = None
     if not _register_dispatcher(service, socket, poller=poller, log=log, timeout=timeout):
-        b = ZMQBroker.daemon(config = service._config)
-        time.sleep(1.0)
-        if address is None:
-            address = zmq_get_address(service._config, "broker", bind=False)
-        ZMQBroker.check(config = service._config)
-        socket.disconnect(address)
-        socket.connect(address)
-        if not _register_dispatcher(service, socket, poller=poller, log=log, timeout=timeout):
-            raise TimeoutError("Can't connect to broker in subprocess.")
-            
+       if service._config.getboolean("zmq", "autobroker"):
+           b = _auto_dispatcher(service, socket, poller=poller, log=log, timeout=timeout)
+       else:
+           raise ZMQDispatcherError("Can't locate a suitable dispatcher.")
     if log is None:
         log = logging.getLogger(__name__ + ".register_dispatcher")
     # Send a start of work message.
@@ -45,7 +44,21 @@ def register_dispatcher(service, socket, poller=None, log=None, timeout=1.0, add
     log.log(5, "Sent broker a ready message: {0!s}.".format(ready))
     return b
 
-def _register_dispatcher(service, socket, poller=None, log=None, timeout=1.0):
+def _auto_dispatcher(service, socket, poller=None, log=None, timeout=None):
+    """Use an automatic dispatcher."""
+    b = ZMQBroker.sub(config = service._config)
+    time.sleep(1.0)
+    ZMQBroker.check(config = service._config)
+    if not _check_for_registration(service, socket, poller=poller, log=log, timeout=timeout):
+        if address is None:
+            address = zmq_get_address(service._config, "broker", bind=False)
+        socket.disconnect(address)
+        socket.connect(address)
+        if not _register_dispatcher(service, socket, poller=poller, log=log, timeout=timeout):
+            raise TimeoutError("Can't connect to broker in subprocess. timeout={0}".format(timeout))
+    return b
+
+def _register_dispatcher(service, socket, poller=None, log=None, timeout=None):
     """Check broker"""
     zmq = check_zmq()
     
@@ -59,10 +72,14 @@ def _register_dispatcher(service, socket, poller=None, log=None, timeout=1.0):
     socket.send(b"", flags=zmq.SNDMORE)
     socket.send_multipart(welcome.data)
     log.log(5, "register.send({0!s})".format(welcome))
+    return _check_for_registration(service, socket, poller=poller, log=log, timeout=timeout)
     
+def _check_for_registration(service, socket, poller=None, log=None, timeout=None):
+    """Check for a ZMQ Registration"""
+    zmq = check_zmq()
     if poller is None:
         poller = zmq.Poller()
-        poller.register(socket, zmq.POLLIN)
+    poller.register(socket, zmq.POLLIN)
     
     # Check that we got the welcome message.
     ready = dict(poller.poll(timeout=timeout * 1e3))

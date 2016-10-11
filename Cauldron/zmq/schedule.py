@@ -134,6 +134,7 @@ class Scheduler(ZMQThread):
         super(Scheduler, self).__init__(name=name, context=context)
         self._appointments = TimingDictionary()
         self._periods = TimingDictionary()
+        self.daemon = True
         
     def appointment(self, time, keyword):
         """An appointment at a given time, with a given callback."""

@@ -55,7 +55,7 @@ for thread in threading.enumerate():
     print(repr(thread))
 
 log.info("Done!")
-svc.shutdown(join=True)
+svc.shutdown()
 disp.shutdown()
 log.info("Shutdown complete.")
 

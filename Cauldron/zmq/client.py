@@ -12,6 +12,8 @@ from .common import zmq_get_address, check_zmq, teardown, zmq_connect_socket
 from .thread import ZMQThread
 from .protocol import ZMQCauldronMessage, ZMQCauldronErrorResponse, FRAMEBLANK, FRAMEFAIL
 from .tasker import Task, TaskQueue
+from .broker import ZMQBroker
+from .responder import ZMQDispatcherError
 from .. import registry
 from ..config import get_configuration, get_timeout
 
@@ -103,6 +105,8 @@ class Service(ClientService):
         
     def _prepare(self):
         """Prepare step."""
+        if not ZMQBroker.check(ctx=self.ctx):
+            raise ZMQDispatcherError("Can't locate a suitable dispatcher for {0}".format(self.name))
         self._monitor = _ZMQMonitorThread(self)
         self._tasker = TaskQueue(self.name, ctx=self.ctx, log=self.log)
         self._tasker.start()
@@ -130,11 +134,11 @@ class Service(ClientService):
         self.shutdown()
         
     def shutdown(self):
-        if hasattr(self, '_monitor') and self._monitor.isAlive():
+        if hasattr(self, '_monitor') and self._monitor is not None and self._monitor.isAlive():
             self.log.debug("Stopping monitor")
             self._monitor.stop()
             self.log.debug("Stopped monitor")
-        if hasattr(self, '_tasker') and self._tasker.isAlive():
+        if hasattr(self, '_tasker') and self._tasker is not None and self._tasker.isAlive():
             self.log.debug("Stopping tasker")
             self._tasker.stop()
             self.log.debug("Stopped tasker")

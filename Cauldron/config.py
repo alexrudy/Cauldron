@@ -89,6 +89,7 @@ def reset_configuration():
     Cauldron = sys.modules[BASENAME]
     if hasattr(Cauldron, 'configuration'):
         del Cauldron.configuration
+    _timeouts.pop(id(cauldron_configuration), None)
     
 reset_configuration()
 

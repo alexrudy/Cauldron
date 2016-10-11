@@ -13,7 +13,7 @@ import weakref
 
 from ..config import read_configuration
 from .protocol import ZMQCauldronMessage, ZMQCauldronErrorResponse, FRAMEBLANK, FRAMEFAIL, DIRECTIONS
-from .common import zmq_get_address, check_zmq, teardown, zmq_connect_socket
+from .common import zmq_get_address, check_zmq, teardown, zmq_connect_socket, zmq_check_nonlocal_address
 from ..exc import DispatcherError
 
 __all__ = ['ZMQBroker', 'NoResponseNecessary', 'NoDispatcherAvailable', 'MultipleDispatchersFound']
@@ -476,6 +476,7 @@ class ZMQBroker(threading.Thread):
         self._local = threading.local()
         self._error = None
         self.services = dict()
+        self.log.info("ZMQBroker.__init__")
         
     @classmethod
     def from_config(cls, config, name="ConfiguredBroker"):
@@ -499,10 +500,24 @@ class ZMQBroker(threading.Thread):
     def daemon(cls, config=None, daemon=True):
         """Serve in a process."""
         import multiprocessing as mp
+        cfg = read_configuration(config)
+        for name in ["broker", "publish", "subscribe"]:
+            if not zmq_check_nonlocal_address(cfg, name):
+                raise ValueError("Broker is trying to start in a daemon with a nonlocal address {0}='{1}'".format(name, zmq_get_address(config, name, bind=False)))
         proc = mp.Process(target=cls.serve, args=(config,), name="ProcessBroker")
         proc.daemon = daemon
         proc.start()
         return proc
+    
+    @classmethod
+    def sub(cls, config=None, daemon=True):
+        """Serve in either a subprocess or thread."""
+        cfg = read_configuration(config)
+        if all(zmq_check_nonlocal_address(cfg, name) for name in ["broker", "publish", "subscribe"]):
+            return cls.daemon(config, daemon=daemon)
+        else:
+            return cls.thread(config, daemon=daemon)
+    
     
     @classmethod
     def thread(cls, config=None, daemon=True):
@@ -541,7 +556,6 @@ class ZMQBroker(threading.Thread):
         socket.send_multipart(message.data)
         if socket.poll(timeout * 1e3):
             response = ZMQCauldronMessage.parse(socket.recv_multipart())
-            print(response)
             if response.payload == "Broker Alive":
                 return True
         return False

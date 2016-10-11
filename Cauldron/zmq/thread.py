@@ -97,7 +97,8 @@ class ZMQThread(threading.Thread):
         except Exception as exc:
             self.log.log(5, "[{0}] shutdown because '{1!r}'.".format(self.name, exc))
             self._error = exc
-            raise
+            self.log.exception("[{0}] error:".format(self.name))
+            # raise
         else:
             self.log.log(5, "[{0}] shutdown cleanly.".format(self.name))
         finally:

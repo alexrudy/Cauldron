@@ -1,31 +1,44 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Demonstrate REDIS read-write ability.
+Demonstrate ZMQ read-write ability.
 """
 import time
-from lumberjack import setup_logging, setup_warnings_logger
+from lumberjack import setup_logging
 from logging import getLogger
 
-setup_logging(mode='stream', level=10)
-setup_warnings_logger("")
+setup_logging(mode='stream', level=5)
 log = getLogger("example.zmq")
 
-# Get ready!
+# Pick a backend.
 from Cauldron.api import use
 use("zmq")
 
-from Cauldron import DFW
-disp = DFW.Service("testsvc", config=None)
-dtest = disp["TEST"]
-log.info(dtest)
+# Get ready!
+from Cauldron.config import get_configuration
+config = get_configuration()
+config.set("zmq", "broker", "inproc://broker")
+config.set("zmq", "publish", "inproc://publish")
+config.set("zmq", "subscribe", "inproc://subscribe")
+# config.set("zmq", "pool", "2")
+# config.set("zmq", "autobroker", "yes")
+# config.set("core", "timeout", "5")
 
-VALUE = "SOMEVALUE"
+try:
 
-from Cauldron import ktl
-svc = ktl.Service("testsvc", populate=True)
-log.info(svc)
-log.info(svc.populated())
-log.info("Done!")
-disp.shutdown()
-log.info("Shutdown complete.")
+    from Cauldron import DFW
+    disp = DFW.Service("testsvc", config=None)
+    dtest = disp["TEST"]
+    log.info(dtest)
+
+    from Cauldron import ktl
+    svc = ktl.Service("testsvc", populate=True)
+    log.info(svc)
+    log.info(svc.populated())
+    log.info("Done!")
+    disp.shutdown()
+    log.info("Shutdown complete.")
+finally:
+    import threading
+    for thread in threading.enumerate():
+        print(thread)

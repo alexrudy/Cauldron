@@ -67,8 +67,13 @@ class Service(DispatcherService):
             self._scheduler.start()
             self.log.debug("Started ZMQ Scheduler Thread.")
             
-        self._thread.check(timeout=10)
-        self._scheduler.check(timeout=10)
+        try:
+            self._thread.check(timeout=10)
+            self._scheduler.check(timeout=10)
+        except:
+            self._thread.stop()
+            self._scheduler.stop()
+            raise
         
         while len(self._message_queue):
             self.socket.send_multipart(self._message_queue.pop().data)
@@ -76,11 +81,11 @@ class Service(DispatcherService):
             response.verify(self)
         
     def shutdown(self):
-        if hasattr(self, '_scheduler') and self._scheduler.is_alive():
+        if hasattr(self, '_scheduler') and self._scheduler is not None and self._scheduler.is_alive():
             self._scheduler.stop()
             self._scheduler.join()
         
-        if hasattr(self, '_thread') and self._thread.is_alive():
+        if hasattr(self, '_thread') and self._thread is not None and self._thread.is_alive():
             self._thread.stop()
             self._thread.join()
         
