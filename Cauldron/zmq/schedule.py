@@ -5,6 +5,7 @@ import heapq
 import time
 import weakref
 import logging
+import datetime
 
 from .common import check_zmq
 from .thread import ZMQThread
@@ -119,6 +120,14 @@ class TimingDictionary(object):
         _, key = heapq.heappop(self.__heap)
         return self.__data.pop(key)
 
+def _normalize_time(time):
+    """Normalize a time, truncating to seconds."""
+    if hasattr(time, 'year'):
+        # Truncate microseconds from appoitment times
+        return datetime.datetime(time.year, time.month, time.day, time.hour, time.minute, time.second)
+    else:
+        return datetime.datetime.fromtimestamp(round(float(time), 0))
+
 class Scheduler(ZMQThread):
     """A scheduler maintains appointments and periods, and responds with the next timeout."""
     def __init__(self, name="Scheduler", context=None):
@@ -128,32 +137,34 @@ class Scheduler(ZMQThread):
         
     def appointment(self, time, keyword):
         """An appointment at a given time, with a given callback."""
+        dt = _normalize_time(time)
         with self._appointments.locked:
             try:
-                appointment = self._appointments[time]
+                appointment = self._appointments[dt]
             except KeyError:
-                appointment = Appointment(time, [weakref.ref(keyword)])
-                self._appointments.push(time, appointment)
+                appointment = Appointment(dt, [weakref.ref(keyword)])
+                self._appointments.push(dt, appointment)
             else:
                 appointment.keywords.append(weakref.ref(keyword))
             self.send_signal()
         
     def cancel_appointment(self, time, keyword):
         """Cancel the appointment."""
+        dt = _normalize_time(time)
         with self._appointments.locked:
             try:
-                appointment = self._appointments[time]
+                appointment = self._appointments[dt]
             except KeyError: # pragma: no cover
                 log.warn("Appointment at {0!r} for keyword {1!r} has already been canceled.".format(time, keyword))
             else:
                 appointment.keywords.remove(weakref.ref(keyword))
                 if not len(appointment.keywords):
-                    self._appointments.remove(time)
+                    self._appointments.remove(dt)
             self.send_signal()
         
     def period(self, interval, keyword):
         """An interval"""
-        interval = round(interval, 1)
+        interval = round(float(interval), 1)
         interval = max([interval, 0.1])
         with self._periods.locked:
             try:
