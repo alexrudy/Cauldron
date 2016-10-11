@@ -19,11 +19,29 @@ import weakref
 import six
 import time
 import sys, traceback
+import atexit
 
 __all__ = ["Service", "Keyword"]
 
+def teardown():
+    """Teardown registered instances."""
+    _cleanup()
 
 registry.dispatcher.teardown_for('zmq')(teardown)
+
+_service_registry = set()
+
+def _cleanup(_registry=_service_registry):
+    """Cleanup a service instance at exit."""
+    while True:
+        try:
+            svc = _registry.pop()
+        except KeyError:
+            break
+        else:
+            svc.shutdown()
+
+atexit.register(_cleanup)
 
 @registry.dispatcher.service_for("zmq")
 class Service(DispatcherService):
@@ -33,6 +51,8 @@ class Service(DispatcherService):
         self.ctx = zmq.Context.instance()
         self._sockets = threading.local()
         self._sockets_to_close = set()
+        self._alive = False
+        _service_registry.add(self)
         super(Service, self).__init__(name, config, setup, dispatcher)
         
     @property
@@ -58,22 +78,21 @@ class Service(DispatcherService):
     
     def _begin(self):
         """Allow command responses to start."""
-        
-        if not self._thread.is_alive():
-            self._thread.start()
-            self.log.debug("Started ZMQ Responder Thread.")
-            
-        if not self._scheduler.is_alive():
-            self._scheduler.start()
-            self.log.debug("Started ZMQ Scheduler Thread.")
-            
         try:
+            if not self._thread.is_alive():
+                self._thread.start()
+                self.log.debug("Started ZMQ Responder Thread.")
+            if not self._scheduler.is_alive():
+                self._scheduler.start()
+                self.log.debug("Started ZMQ Scheduler Thread.")
             self._thread.check(timeout=10)
             self._scheduler.check(timeout=10)
         except:
             self._thread.stop()
             self._scheduler.stop()
             raise
+        else:
+            self._alive = True
         
         while len(self._message_queue):
             self.socket.send_multipart(self._message_queue.pop().data)
@@ -91,6 +110,12 @@ class Service(DispatcherService):
         
         for socket in self._sockets_to_close:
             socket.close()
+        try:
+            # Crazy things can happen atexit, so don't worry about this.
+            _service_registry.discard(self)
+        except:
+            pass
+        self._alive = False
         
     def _synchronous_command(self, command, payload, keyword=None, timeout=None):
         """Execute a synchronous command."""
