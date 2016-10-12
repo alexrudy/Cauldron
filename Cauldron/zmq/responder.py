@@ -118,9 +118,9 @@ class ZMQPooler(ZMQThread):
         msg = backend.recv_multipart()
         self._active_workers.pop(identifier, None)
         if len(msg) == 1 and msg[0] == b"ready":
-            self.log.log(5, "{0}.recv() worker {1} ready".format(self, binascii.hexlify(identifier)))
+            self.log.trace("{0}.recv() worker {1} ready".format(self, binascii.hexlify(identifier)))
         else:
-            self.log.log(5, "{0}.broker() B2F {1}".format(self, binascii.hexlify(identifier)))
+            self.log.trace("{0}.broker() B2F {1}".format(self, binascii.hexlify(identifier)))
             frontend.send(b"", flags=zmq.SNDMORE)
             frontend.send_multipart(msg)
         self._worker_queue.append(identifier)
@@ -132,7 +132,7 @@ class ZMQPooler(ZMQThread):
         msg = frontend.recv_multipart()
         if self.running.isSet():
             worker = self._worker_queue.popleft()
-            self.log.log(5, "{0}.broker() F2B {1}".format(self, binascii.hexlify(worker)))
+            self.log.trace("{0}.broker() F2B {1}".format(self, binascii.hexlify(worker)))
             backend.send(worker, flags=zmq.SNDMORE)
             backend.send(b"", flags=zmq.SNDMORE)
             backend.send_multipart(msg)
@@ -154,7 +154,7 @@ class ZMQPooler(ZMQThread):
             return False
         if signal in ready:
             _ = signal.recv()
-            self.log.log(5, "Got a signal: .running = {0}".format(self.running.is_set()))
+            self.log.trace("Got a signal: .running = {0}".format(self.running.is_set()))
             return True
         if backend in ready:
             self._handle_backend(frontend, backend)
@@ -252,14 +252,14 @@ class ZMQWorker(ZMQMicroservice):
         """Handle an identify command."""
         message.verify(self.service)
         if message.payload not in self.service:
-            self.log.log(5, "Not identifying b/c not in service.")
+            self.log.msg("Not identifying b/c not in service.")
             return FRAMEBLANK
         # This seems harsh, not using "CONTAINS", etc,
         # but it handles dispatchers correctly.
         try:
             kwd = self.service[message.payload]
         except WrongDispatcher:
-            self.log.log(5, "Not identifying b/c wrong dispatcher.")
+            self.log.msg("Not identifying b/c wrong dispatcher.")
             return FRAMEBLANK
         else:
             ktl_type = kwd.KTL_TYPE
@@ -276,13 +276,13 @@ class ZMQWorker(ZMQMicroservice):
         """Handle the broadcast command."""
         message.verify(self.service)
         message = ZMQCauldronMessage(command="broadcast", service=self.service.name, dispatcher=self.service.dispatcher, keyword=message.keyword, payload=message.payload, direction="CDB")
-        self.log.log(5, "{0!r}.broadcast({1!s})".format(self, message))
+        self.log.trace("{0!r}.broadcast({1!s})".format(self, message))
         self._broadcaster.send_multipart(message.data)
         return "success"
         
     def handle_heartbeat(self, message):
         """Heartbeat command does pretty much nothing."""
-        self.log.log(5, "{0!r}.beat({1!s})".format(self, message))
+        self.log.trace("{0!r}.beat({1!s})".format(self, message))
         return "{0:.1f}".format(time.time())
         
     def respond(self):

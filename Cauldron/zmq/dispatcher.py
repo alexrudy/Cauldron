@@ -81,10 +81,10 @@ class Service(DispatcherService):
         try:
             if not self._thread.is_alive():
                 self._thread.start()
-                self.log.debug("Started ZMQ Responder Thread.")
+                self.log.trace("Started ZMQ Responder Thread.")
             if not self._scheduler.is_alive():
                 self._scheduler.start()
-                self.log.debug("Started ZMQ Scheduler Thread.")
+                self.log.trace("Started ZMQ Scheduler Thread.")
             self._thread.check(timeout=10)
             self._scheduler.check(timeout=10)
         except:
@@ -122,10 +122,10 @@ class Service(DispatcherService):
         message = ZMQCauldronMessage(command, service=self.name, dispatcher=self.dispatcher,
             keyword=keyword.name if keyword else FRAMEBLANK, payload=payload, direction="CDQ")
         if not self._thread.running.is_set():
-            self.log.log(5, "{0!r}.queue({1!s})".format(self, message))
+            self.log.trace("{0!r}.queue({1!s})".format(self, message))
             return self._message_queue.append(message)
         else:
-            self.log.log(5, "{0!r}.send({0!s})".format(message))
+            self.log.trace("{0!r}.send({0!s})".format(message))
             self.socket.send_multipart(message.data)
             if timeout:
                 if not self.socket.poll(timeout * 1e3):

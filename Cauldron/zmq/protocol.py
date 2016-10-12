@@ -15,7 +15,7 @@ import uuid
 from ..exc import DispatcherError
 
 __all__ = ['MessageType', 'Directions', 'ZMQCauldronErrorResponse', 
-    'ZMQCauldronParserError', 'ZMQCauldronMessage']
+    'ZMQCauldronParserError', 'ZMQCauldronMessage', 'PrefixMatchError']
 
 FRAMEBLANK = six.binary_type(b"\x01")
 FRAMEFAIL = six.binary_type(b"\x02")
@@ -151,6 +151,10 @@ DIRECTIONS = Directions([
     MessageType("U", "B"),
 ])
 
+class PrefixMatchError(Exception):
+    """A prefix matching error."""
+    pass
+
 class MessageVerifyError(Exception):
     """Verify the message error."""
     pass
@@ -253,6 +257,8 @@ class ZMQCauldronMessage(object):
         """Given a service object, verify that it matches this message."""
         if self.service != FRAMEBLANK.decode('utf-8'):
             if self.service != service.name:
+                if self.service.startswith(service.name):
+                    raise PrefixMatchError("Message prefix false postive: Got {0} expected {1}".format(self.service, service.name))
                 raise MessageVerifyError("Message was sent to the wrong service! Got {0} expected {1}".format(self.service, service.name))
         else:
             self.service = service.name

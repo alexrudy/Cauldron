@@ -490,7 +490,7 @@ class ZMQBroker(threading.Thread):
         return cls(name, address, pub_address, sub_address, mon_address, timeout=timeout)
         
     @classmethod
-    def serve(cls, config, name="ServerBroker"):
+    def serve(cls, config=None, name="ServerBroker"):
         """Make a broker which serves."""
         obj = cls.from_config(config, name)
         obj.run()

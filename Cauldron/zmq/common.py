@@ -64,7 +64,7 @@ def zmq_connect_socket(socket, config, name, group="zmq", log=None, label=None, 
         log.exception("Service can't connect to {0} address '{1}' because {2}".format(label, address, e))
         raise
     else:
-        log.debug("Connected {0} to {1}".format(label, address))
+        log.msg("Connected {0} to {1}".format(label, address))
         return socket
 
 def teardown():

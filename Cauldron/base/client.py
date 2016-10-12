@@ -214,7 +214,7 @@ class Keyword(_BaseKeyword):
         """An internal callback to handle value updates."""
         self._last_read = datetime.datetime.now()
         if self._last_value != value:
-            self.service.log.debug("{0!r}._update({1!r})".format(self, value))
+            self.service.log.getChild(self.name).trace("{0}._update({1!r})".format(self.full_name, value))
             self._last_value = value
             self.history.append(HistorySlice(self._last_read.time(), self._ktl_binary(), self._ktl_ascii(), self.name))
             self.propagate()
