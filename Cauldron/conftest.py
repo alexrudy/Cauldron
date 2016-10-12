@@ -38,6 +38,8 @@ except NameError:   # Needed to support Astropy <= 1.0.0
 
 import pkg_resources
 import os
+import signal
+import traceback
 
 from .test_helpers import fail_if_not_teardown, get_available_backends
 
@@ -66,6 +68,25 @@ def pytest_report_header(config):
     else:
         s += 'libzmq: {0:s}\n'.format(zmq.zmq_version())
     return s
+    
+def _handle_zmq_sigabrt(signum, stackframe):
+    """Handle a ZMQ SIGABRT"""
+    print("Got a signal: {0}".format(signum))
+    if stackframe:
+        print(traceback.print_stack(stackframe))
+    pytest.xfail("Improperly failed a ZMQ assertion.")
+    
+def setup_zmq_sigabrt_handler():
+    """Handle SIGABRT from ZMQ."""
+    try:
+        import zmq
+    except ImportError:
+        pass
+    else:
+        #TODO: Version bound this, once the problem is fixed.
+        signal.signal(signal.SIGABRT, _handle_zmq_sigabrt)
+        
+setup_zmq_sigabrt_handler()
 
 @pytest.fixture
 def servicename():
