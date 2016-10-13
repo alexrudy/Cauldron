@@ -29,6 +29,14 @@ def default_configuration():
     config = configparser.ConfigParser()
     with open(pkg_resources.resource_filename(__name__, 'data/defaults.cfg')) as fp:
         config.readfp(fp)
+    try:
+        config.readfp(open(os.path.expanduser(os.path.join('~','cauldron.cfg'))))
+    except IOError:
+        pass
+    try:
+        config.readfp(open(os.path.abspath(os.path.join(os.path.curdir,'cauldron.cfg'))))
+    except IOError:
+        pass
     return config
 
 def read_configuration(configuration_location = None):
@@ -92,4 +100,3 @@ def reset_configuration():
     _timeouts.pop(id(cauldron_configuration), None)
     
 reset_configuration()
-

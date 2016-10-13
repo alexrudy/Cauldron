@@ -29,5 +29,7 @@ def _init_log():
 if not _ASTROPY_SETUP_:
     from .api import use, install
     from . import types
+    from .config import setup_configuration
+    setup_configuration()
     _init_log()
 
