@@ -201,3 +201,10 @@ def strictxml(xmlvar):
 def waittime():
     """Event wait time, in seconds."""
     return 0.1
+
+try:
+    import faulthandler
+except ImportError:
+    pass
+else:
+    faulthandler.enable()

@@ -681,6 +681,7 @@ class ZMQBroker(threading.Thread):
         if not self.isAlive():
             return
         
+        self.log.trace("stop(timeout={0!r}) Signalling to stop broker.".format(timeout))
         if self.running.is_set() and not self.context.closed:
             signal = self.context.socket(zmq.PUSH)
             signal.connect("inproc://{0:s}".format(hex(id(self))))
