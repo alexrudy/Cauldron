@@ -67,6 +67,8 @@ def pytest_report_header(config):
         pass
     else:
         s += 'libzmq: {0:s}\n'.format(zmq.zmq_version())
+    
+    s += "\n"+"Backends: "+",".join(available_backends)
     return s
     
 def _handle_zmq_sigabrt(signum, stackframe):
@@ -166,10 +168,12 @@ def dispatcher(request, backend, servicename, config, dispatcher_name):
     return svc
     
 @pytest.fixture
-def client(backend, servicename):
+def client(request, backend, servicename):
     """Test a client."""
     from Cauldron import ktl
-    return ktl.Service(servicename)
+    svc = ktl.Service(servicename)
+    request.addfinalizer(lambda : svc.shutdown())
+    return svc
 
 @pytest.fixture
 def xmldir(request):
