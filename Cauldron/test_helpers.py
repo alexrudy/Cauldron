@@ -77,7 +77,9 @@ def fail_if_not_teardown():
     count = 0
     ignore_daemons = False
     for thread in threading.enumerate():
-        if ((not thread.daemon) and ignore_daemons) and thread not in SEEN_THREADS:
+        if (ignore_daemons and thread.deamon):
+            continue
+        if thread not in SEEN_THREADS:
             count += 1
             SEEN_THREADS.add(thread)
             
