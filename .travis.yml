@@ -44,6 +44,9 @@ matrix:
         - python: 2.7
           env: CONDA_DEPENDENCIES=$CONDA_REQ_DEPENDENCIES
           
+        - python: 3.4
+          env: CONDA_DEPENDENCIES=$CONDA_REQ_DEPENDENCIES
+          
 
 # Setting sudo to false opts in to Travis-CI container-based builds.
 sudo: false

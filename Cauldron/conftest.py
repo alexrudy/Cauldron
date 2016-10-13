@@ -119,9 +119,9 @@ def pytest_generate_tests(metafunc):
 def config(tmpdir):
     """DFW configuration."""
     from .config import cauldron_configuration
-    cauldron_configuration.set("zmq", "broker", "inproc://broker")
-    cauldron_configuration.set("zmq", "publish", "inproc://publish")
-    cauldron_configuration.set("zmq", "subscribe", "inproc://subscribe")
+    cauldron_configuration.set("zmq", "broker", "tcp://localhost:9090")
+    cauldron_configuration.set("zmq", "publish", "tcp://localhost:9091")
+    cauldron_configuration.set("zmq", "subscribe", "tcp://localhost:9092")
     cauldron_configuration.set("zmq", "pool", "2")
     cauldron_configuration.set("zmq", "timeout", "5")
     cauldron_configuration.set("core", "timeout", "5")
