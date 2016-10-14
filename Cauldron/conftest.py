@@ -54,7 +54,9 @@ def pytest_configure(config):
     except ValueError:
         try:
             from lumberjack.config import configure
+            from lumberjack.warnings import captureWarnings
             configure("stream")
+            captureWarnings()
         except ImportError:
             pass
 
@@ -119,9 +121,9 @@ def pytest_generate_tests(metafunc):
 def config(tmpdir):
     """DFW configuration."""
     from .config import cauldron_configuration
-    cauldron_configuration.set("zmq", "broker", "tcp://localhost:9090")
-    cauldron_configuration.set("zmq", "publish", "tcp://localhost:9091")
-    cauldron_configuration.set("zmq", "subscribe", "tcp://localhost:9092")
+    cauldron_configuration.set("zmq", "broker", "inproc://broker")
+    cauldron_configuration.set("zmq", "publish", "inproc://publish")
+    cauldron_configuration.set("zmq", "subscribe", "inproc://subscribe")
     cauldron_configuration.set("zmq", "pool", "2")
     cauldron_configuration.set("zmq", "timeout", "5")
     cauldron_configuration.set("core", "timeout", "5")
@@ -158,12 +160,21 @@ def dispatcher_name2():
     """The dispatcher name"""
     return "+service+_dispatch_2"
 
+@pytest.fixture
+def dispatcher_setup():
+    """Return a list of dispatcher functions to be set up."""
+    return []
 
 @pytest.fixture
-def dispatcher(request, backend, servicename, config, dispatcher_name):
+def dispatcher(request, backend, servicename, config, dispatcher_name, dispatcher_setup, xmlvar):
     """Establish the dispatcher for a particular kind of service."""
+    def setup(service):
+        print("--SETUP--")
+        for func in dispatcher_setup:
+            print(func)
+            func(service)
     from Cauldron import DFW
-    svc = DFW.Service(servicename, config, dispatcher=dispatcher_name)
+    svc = DFW.Service(servicename, config, setup, dispatcher=dispatcher_name)
     request.addfinalizer(lambda : svc.shutdown())
     return svc
     
