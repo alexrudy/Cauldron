@@ -77,6 +77,12 @@ class Keyword(ClientKeyword):
         """Determine if this keyword is monitored."""
         return self._update in self.source._consumers
         
+    def _ktl_units(self):
+        """Units for this keyword."""
+        if getattr(self, '_units', None) is None:
+            self._units = self.source._get_units()
+        return '' if self._units is None else self._units
+        
     def monitor(self, start=True, prime=True, wait=True):
         if prime:
             self.read(wait=wait)

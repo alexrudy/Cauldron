@@ -8,8 +8,9 @@ import threading
 
 @pytest.fixture
 def slow_keyword(waittime):
-    from Cauldron.types import KeywordType
-    class SlowKeyword(KeywordType):
+    from Cauldron.types import Basic
+    
+    class SlowKeyword(Basic):
         """A custom keyword type"""
         def write(self, value):
             """Slow down the write."""
@@ -70,6 +71,13 @@ def test_monitored(service, client, keyword_name):
     """Check for clients which broadcast, should be true by default."""
     assert client[keyword_name]['monitored'] == False
     assert client[keyword_name]['monitor'] == False
+    
+def test_units(service, client, keyword_name):
+    """Test units for a keyword."""
+    dkw = service[keyword_name]
+    assert client[keyword_name]['units'] == ''
+    client[keyword_name]._units = "myunits"
+    assert client[keyword_name]['units'] == "myunits"
     
 def test_has_keyword(service, client, keyword_name, missing_keyword_name):
     """Has keyword."""

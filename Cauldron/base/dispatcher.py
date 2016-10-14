@@ -78,6 +78,19 @@ def get_initial_XML(xml, name):
             break
             
     return initial
+    
+def get_units_xml(xml, name):
+    """Get the keyword's units value from the XML configuration."""
+    keyword_xml = xml[name]
+    
+    units = None
+    
+    try:
+        units = ktlxml.getValue(keyword_xml, 'units')
+    except ValueError:
+        pass
+    
+    return units
 
 class Keyword(_BaseKeyword):
     """A dispatcher-based keyword, which should own its own values."""
@@ -95,6 +108,7 @@ class Keyword(_BaseKeyword):
         self.writeonly = False
         self.readonly = False
         self._period = None
+        self._units = None
         
         try:
             if service.xml is not None:
@@ -158,6 +172,12 @@ class Keyword(_BaseKeyword):
         """Translate a value into a standard representation."""
         return value
         
+    @api_override
+    def _get_units(self):
+        """Get units from XML"""
+        if self.service.xml is not None:
+            return get_units_xml(self.service.xml, self.name)
+    
     def set(self, value, force=False):
         """Set the keyword to the value provided, and broadcast changes.
         

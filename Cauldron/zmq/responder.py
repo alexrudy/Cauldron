@@ -272,6 +272,14 @@ class ZMQWorker(ZMQMicroservice):
         message.verify(self.service)
         return ":".join(self.service.keywords())
         
+    def handle_units(self, message):
+        """Handle the units command."""
+        message.verify(self.service)
+        keyword = self.service[message.keyword]
+        #TODO: Not sure if we need the lock here?
+        # Probably not, getting units should be *pretty* thread-safe.
+        return keyword._get_units()
+        
     def handle_broadcast(self, message):
         """Handle the broadcast command."""
         message.verify(self.service)

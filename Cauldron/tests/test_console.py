@@ -5,6 +5,7 @@ import pytest
 from six.moves import cStringIO as StringIO
 
 from ..console import ktl_show, ktl_modify, parseModifyCommands
+from ..conftest import dispatcher
 
 
 @pytest.fixture
@@ -16,6 +17,16 @@ def outfile():
 def errfile():
     """Error file."""
     return StringIO()
+    
+@pytest.fixture
+def config(config):
+    """Configuration fixture."""
+    config.set("zmq", "heartbeat", "no")
+    return config
+    
+def test_config(dispatcher):
+    """Test that the configuration propogated to the dispatcher."""
+    assert dispatcher._config.getboolean("zmq", "heartbeat") == False
     
 def test_show_basic(dispatcher, keyword_name, outfile, errfile):
     """Test a basic show command."""
