@@ -32,7 +32,7 @@ class KeywordMessageFilter(logging.Filter):
     
     def __init__(self, keyword):
         """Filter using a keyword."""
-        super(KeywordMessageFilter, self).__init__()
+        logging.Filter.__init__(self)
         self._keyword_name = keyword.full_name
         self._keyword = weakref.ref(keyword)
     

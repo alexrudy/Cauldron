@@ -77,12 +77,14 @@ def fail_if_not_teardown():
     count = 0
     ignore_daemons = False
     for thread in threading.enumerate():
-        if ((not thread.daemon) and ignore_daemons) and thread not in SEEN_THREADS:
+        if (ignore_daemons and thread.deamon):
+            continue
+        if thread not in SEEN_THREADS:
             count += 1
             SEEN_THREADS.add(thread)
             
     # If there are new, non-daemon threads, cause an error.
     if count > 1:
         threads_str = "\n".join(["{0}:{1}".format(repr(thread), gc.get_referrers(thread)) for thread in threading.enumerate()])
-        raise ValueError("{0:d} non-deamon thread{1:s} left alive!\n{2!s}".format(
-            count-1, "s" if (count-1)>1 else "", threads_str))
+        raise ValueError("{0:d} {3:s}thread{1:s} left alive!\n{2!s}".format(
+            count-1, "s" if (count-1)>1 else "", threads_str, "non-deamon " if ignore_daemons else ""))

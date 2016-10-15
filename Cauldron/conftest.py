@@ -38,6 +38,8 @@ except NameError:   # Needed to support Astropy <= 1.0.0
 
 import pkg_resources
 import os
+import signal
+import traceback
 
 from .test_helpers import fail_if_not_teardown, get_available_backends
 
@@ -65,7 +67,28 @@ def pytest_report_header(config):
         pass
     else:
         s += 'libzmq: {0:s}\n'.format(zmq.zmq_version())
+    
+    s += "\n"+"Backends: "+",".join(available_backends)
     return s
+    
+def _handle_zmq_sigabrt(signum, stackframe):
+    """Handle a ZMQ SIGABRT"""
+    print("Got a signal: {0}".format(signum))
+    if stackframe:
+        print(traceback.print_stack(stackframe))
+    pytest.xfail("Improperly failed a ZMQ assertion.")
+    
+def setup_zmq_sigabrt_handler():
+    """Handle SIGABRT from ZMQ."""
+    try:
+        import zmq
+    except ImportError:
+        pass
+    else:
+        #TODO: Version bound this, once the problem is fixed.
+        signal.signal(signal.SIGABRT, _handle_zmq_sigabrt)
+        
+setup_zmq_sigabrt_handler()
 
 @pytest.fixture
 def servicename():
@@ -96,9 +119,9 @@ def pytest_generate_tests(metafunc):
 def config(tmpdir):
     """DFW configuration."""
     from .config import cauldron_configuration
-    cauldron_configuration.set("zmq", "broker", "inproc://broker")
-    cauldron_configuration.set("zmq", "publish", "inproc://publish")
-    cauldron_configuration.set("zmq", "subscribe", "inproc://subscribe")
+    cauldron_configuration.set("zmq", "broker", "tcp://localhost:9090")
+    cauldron_configuration.set("zmq", "publish", "tcp://localhost:9091")
+    cauldron_configuration.set("zmq", "subscribe", "tcp://localhost:9092")
     cauldron_configuration.set("zmq", "pool", "2")
     cauldron_configuration.set("zmq", "timeout", "5")
     cauldron_configuration.set("core", "timeout", "5")
@@ -145,10 +168,12 @@ def dispatcher(request, backend, servicename, config, dispatcher_name):
     return svc
     
 @pytest.fixture
-def client(backend, servicename):
+def client(request, backend, servicename):
     """Test a client."""
     from Cauldron import ktl
-    return ktl.Service(servicename)
+    svc = ktl.Service(servicename)
+    request.addfinalizer(lambda : svc.shutdown())
+    return svc
 
 @pytest.fixture
 def xmldir(request):
@@ -180,3 +205,10 @@ def strictxml(xmlvar):
 def waittime():
     """Event wait time, in seconds."""
     return 0.1
+
+try:
+    import faulthandler
+except ImportError:
+    pass
+else:
+    faulthandler.enable()
