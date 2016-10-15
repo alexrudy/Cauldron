@@ -56,3 +56,5 @@ class ConfigurationMissing(CauldronWarning):
     """An exception raised when a configuration item is missing."""
     pass
     
+class CauldronTypeError(CauldronException):
+    """Exception raised when a keyword type is not set."""
