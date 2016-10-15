@@ -26,7 +26,7 @@ class LocalTask(_BaseTask):
         if self.error is not None:
             self.error = DispatcherError(str(self.error))
         if self.exc_info is not None:
-            self.exc_info = (DispatcherError(str(self.error)), None, self.exc_info[2])
+            self.exc_info = (DispatcherError, self.error, self.exc_info[2])
     
 class LocalTaskQueue(threading.Thread):
     
