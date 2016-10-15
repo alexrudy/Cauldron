@@ -399,7 +399,9 @@ class Service(_BaseService):
         except Exception as e:
             if STRICT_KTL_XML:
                 raise
-            warnings.warn(CauldronXMLWarning("XML setup for orphan keyword {0} failed: {1}".format(name, str(e))))
+            msg = "XML setup for orphan keyword {0} failed: {1}".format(name, str(e))
+            warnings.warn(CauldronXMLWarning(msg))
+            self.log.warning(msg)
             cls = DFW.Keyword.Keyword
         
         try:
@@ -407,9 +409,11 @@ class Service(_BaseService):
         except WrongDispatcher:
             pass
         else:
-            warnings.warn(CauldronWarning("Set up an orphaned keyword {0} for service {1} dispatcher {2}".format(
+            msg = "Set up an orphaned keyword {0} for service {1} dispatcher {2}".format(
                 name, self.name, self.dispatcher
-            )))
+            )
+            warnings.warn(CauldronWarning(msg))
+            self.log.warning(msg)
     
     @api_override
     def _prepare(self):
@@ -435,6 +439,8 @@ class Service(_BaseService):
                 except ValueError as e:
                     self.log.error("Bad initial value '%s' for '%s'", initial, keyword.name)
                     self.log.error(str(e))
+                else:
+                    self.log.trace("{0!r}.begin() {1}.initial = {2}".format(self, keyword, initial))
         
         self._begin()
         

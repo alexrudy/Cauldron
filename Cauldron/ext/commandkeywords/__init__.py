@@ -13,7 +13,9 @@ class CommandKeyword(Boolean, DispatcherKeywordType):
         Actions can then be performed in callbacks, etc., every time this keyword is triggered.
     """
     
-    KTL_TYPE = None
+    KTL_REGISTERED = False
+    
+    KTL_TYPE = 'boolean'
     
     def __init__(self, *args, **kwargs):
         kwargs['initial'] = '0'

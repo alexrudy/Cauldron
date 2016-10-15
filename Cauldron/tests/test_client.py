@@ -7,7 +7,7 @@ import inspect
 import threading
 
 @pytest.fixture
-def slow_keyword(waittime):
+def slow_keyword(dispatcher_setup, waittime, keyword_name1):
     from Cauldron.types import Basic
     
     class SlowKeyword(Basic):
@@ -16,7 +16,12 @@ def slow_keyword(waittime):
             """Slow down the write."""
             time.sleep(10.0 * waittime)
             return value
-    return SlowKeyword
+        
+    def setup(service):
+        kwd = SlowKeyword(keyword_name1, service)
+    dispatcher_setup.append(setup)
+    
+    return keyword_name1
 
 @pytest.fixture
 def service(request, dispatcher, keyword_name):
@@ -50,12 +55,11 @@ def test_read_write_asynchronous(service, client, keyword_name, waittime):
     sequence = keyword.read(wait=False)
     keyword.wait(sequence=sequence, timeout=waittime)
     
-def test_read_write_timeout(service, client, slow_keyword, keyword_name1, waittime):
+def test_read_write_timeout(slow_keyword, service, client, waittime):
     """docstring for test_read_write_timeout"""
     from ..exc import TimeoutError
-    slow_keyword(keyword_name1, service)
     with pytest.raises(TimeoutError):
-        client[keyword_name1].write("blah", timeout=waittime/10.0)
+        client[slow_keyword].write("blah", timeout=waittime/10.0)
 
 def test_history(service, client, keyword_name):
     """Test history."""

@@ -87,7 +87,7 @@ def test_check(dispatcher, client, keyword_name1):
         raise CheckFailed
     
     from Cauldron import DFW
-    kw = DFW.Keyword.Keyword(keyword_name1, dispatcher)
+    kw = dispatcher[keyword_name1]
     kw.check = fail_check 
     
     with pytest.raises(CheckFailed):
@@ -104,22 +104,20 @@ def test_modfiy(dispatcher, client, keyword_name):
     assert "16xTest" == dispatcher[keyword_name].read()
     
 def test_duplicate_keyword(dispatcher, keyword_name):
-    """Test creating a duplicate keyword"""
+    """Test creating a duplicate keyword after setup."""
     from Cauldron import DFW
-    DFW.Keyword.Keyword(keyword_name, dispatcher)
-    
     with pytest.raises(ValueError):
         otherkw = DFW.Keyword.Keyword(keyword_name, dispatcher)
         
-def test_contains(dispatcher, keyword_name):
+def test_contains(dispatcher, missing_keyword_name):
     """Test the 'in' for service"""
     from Cauldron import DFW
     
-    assert keyword_name not in dispatcher
-    assert keyword_name.lower() not in dispatcher
-    DFW.Keyword.Keyword(keyword_name, dispatcher)
-    assert keyword_name in dispatcher
-    assert keyword_name.lower() in dispatcher
+    assert missing_keyword_name not in dispatcher
+    assert missing_keyword_name.lower() not in dispatcher
+    DFW.Keyword.Keyword(missing_keyword_name, dispatcher)
+    assert missing_keyword_name in dispatcher
+    assert missing_keyword_name.lower() in dispatcher
     
 
 def test_keyword_contains(dispatcher, keyword_name):
@@ -136,11 +134,18 @@ def test_update_no_value(dispatcher, keyword_name):
     assert keyword.update() is None
 
 @pytest.mark.xfail(raises=CauldronAPINotImplemented)
-def test_initialize_with_period(dispatcher, keyword_name):
+def test_initialize_with_period(dispatcher_args, dispatcher_setup, keyword_name):
     """Test the dispatcher keyword's period argument."""
     from Cauldron import DFW
     from Cauldron.exc import CauldronAPINotImplemented
-    DFW.Keyword.Keyword(keyword_name, dispatcher, period=10)
+    
+    def setup(dispatcher):
+        DFW.Keyword.Keyword(keyword_name, dispatcher, period=10)
+    
+    del dispatcher_setup[:]
+    dispatcher_setup.append(setup)
+    from Cauldron import DFW
+    svc = DFW.Service(*dispatcher_args)
 
 @pytest.mark.xfail(raises=CauldronAPINotImplemented)
 def test_period(dispatcher, keyword_name):
@@ -182,19 +187,19 @@ def test_setup_function(backend, servicename, config, keyword_name):
     del service
     print("Service done.")
     
-def test_service_setitem(dispatcher, keyword_name, keyword_name1):
+def test_service_setitem(dispatcher, missing_keyword_name):
     """Test a dispatcher service's setitem."""
     from Cauldron import DFW
-    keyword = DFW.Keyword.Keyword(keyword_name, dispatcher)
+    with pytest.raises(TypeError):
+        dispatcher[missing_keyword_name] = 10
+    keyword = DFW.Keyword.Keyword(missing_keyword_name, dispatcher)
     with pytest.raises(ValueError):
-        DFW.Keyword.Keyword(keyword_name, dispatcher)
+        DFW.Keyword.Keyword(missing_keyword_name, dispatcher)
     with pytest.raises(RuntimeError):
-        dispatcher[keyword_name] = keyword
+        dispatcher[missing_keyword_name] = keyword
     
     with pytest.raises(TypeError):
-        dispatcher[keyword_name] = 10
-    with pytest.raises(TypeError):
-        dispatcher[keyword_name1] = 10
+        dispatcher[missing_keyword_name] = 10
 
 def test_async_read(dispatcher, servicename, keyword_name):
     """Aysnchronous writer"""
@@ -229,11 +234,11 @@ def test_set_statuskeyword(dispatcher, keyword_name, keyword_name1):
     assert not dispatcher.setStatusKeyword(keyword_name)
     assert dispatcher.setStatusKeyword(keyword_name1)
     
-def test_keyword_list(dispatcher, keyword_name):
+def test_keyword_list(dispatcher, keyword_name, missing_keyword_name):
     """Check the keyword list."""
-    assert dispatcher.keywords() == []
-    dispatcher[keyword_name].modify("10")
-    assert dispatcher.keywords() == [keyword_name]
+    assert keyword_name in dispatcher.keywords()
+    dispatcher[missing_keyword_name].modify("10")
+    assert missing_keyword_name in dispatcher.keywords()
     
 
 def test_bad_initial_value(backend, servicename, config, keyword_name, keyword_name1):
@@ -245,9 +250,12 @@ def test_bad_initial_value(backend, servicename, config, keyword_name, keyword_n
         DFW.Keyword.Integer(keyword_name, service, initial=100)
         
     service = DFW.Service(servicename, config, setup=setup)
-    assert keyword_name1 in service
-    assert service[keyword_name1]['value'] == None
-    assert int(service[keyword_name]['value']) == 100
+    try:
+        assert keyword_name1 in service
+        assert service[keyword_name1]['value'] == None
+        assert int(service[keyword_name]['value']) == 100
+    finally:
+        service.shutdown()
     
 def test_write_before_begin(backend, servicename, config, keyword_name):
     """Test a dispatcher setup function."""

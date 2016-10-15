@@ -4,23 +4,34 @@ import pytest
 import threading
 
 @pytest.fixture
-def command_keyword(dispatcher):
+def command_keyword(dispatcher_setup):
     """Make a command-keyword object."""
     from Cauldron.ext.commandkeywords import CommandKeyword
-    return CommandKeyword("COMMAND", dispatcher)
+    def setup(service):
+        kwd = CommandKeyword("COMMAND", service)
+    dispatcher_setup.append(setup)
+    return "COMMAND"
 
-def test_write_command_keyword(dispatcher, client, command_keyword):
+def test_setup_command_keyword(command_keyword, dispatcher, client):
+    """Test the setup."""
+    from Cauldron.ext.commandkeywords import CommandKeyword
+    assert not CommandKeyword.KTL_REGISTERED
+    assert isinstance(dispatcher[command_keyword], CommandKeyword)
+    assert dispatcher[command_keyword].KTL_TYPE == 'boolean'
+    assert client[command_keyword].KTL_TYPE == 'boolean'
+
+def test_write_command_keyword(command_keyword, dispatcher, client):
     """Write to a command keyword."""
-    command_keyword.modify('1')
-    assert client[command_keyword.name].read() == '0'
+    dispatcher[command_keyword].modify('1')
+    assert client[command_keyword].read() == '0'
     
-def test_callback(dispatcher, client, command_keyword, waittime):
+def test_callback(command_keyword, dispatcher, client, waittime):
     """Attach a callback to command keywords."""
     
-    name = command_keyword.name
+    name = dispatcher[command_keyword].name
     from Cauldron.exc import DispatcherError
     
-    print(command_keyword)
+    print(dispatcher[command_keyword])
     
     class CallbackRecieved(Exception): pass
     
