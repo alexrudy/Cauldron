@@ -357,7 +357,8 @@ class Service(_BaseService):
         if setup is not None:
             setup(self)
         
-        self.setupOrphans()
+        if self._config.getboolean("core","setupOrphans"):
+            self.setupOrphans()
         
         self.begin()
     
