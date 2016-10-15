@@ -4,6 +4,7 @@ import weakref
 import logging
 import threading
 import six
+import sys
 import collections
 
 try:
@@ -38,6 +39,7 @@ class ZMQThread(threading.Thread):
         self.finished = threading.Event()
         self.log = logging.getLogger(name)
         self._error = None
+        self._exc_tb = None
         self._signal_address = "inproc://signal-{0:s}-{1:s}".format(hex(id(self)), name)
         
     def start(self):
@@ -56,6 +58,7 @@ class ZMQThread(threading.Thread):
         except zmq.ZMQError as e:
             self.log.error("{0} can't {1} to address '{1}' because {2}".format(self, method, address, e))
             self._error = e
+            self._exc_tb = sys.exc_info()[2]
             raise
         else:
             self.log.trace("{0} {1} to address '{2}'".format(self, method, address))
@@ -97,6 +100,7 @@ class ZMQThread(threading.Thread):
         except Exception as exc:
             self.log.trace("{0} shutdown because '{1!r}'.".format(self, exc))
             self._error = exc
+            self._exc_tb = sys.exc_info()[2]
             self.log.exception("{0} error:".format(self))
             # raise
         else:
@@ -117,7 +121,7 @@ class ZMQThread(threading.Thread):
                 msg += " Thread Error: {0}".format(repr(self._error))
             else:
                 msg += " No error was reported."
-            raise ZMQThreadError(msg, self._error)
+            six.reraise(ZMQThreadError, ZMQThreadError(msg, self._error), self._exc_tb)
         
     def stop(self, join=False, timeout=None):
         """Stop the responder thread."""
