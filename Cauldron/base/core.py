@@ -5,6 +5,7 @@ Base classes relevant to all Cauldron tools.
 from __future__ import absolute_import
 
 import six
+import sys
 import abc
 import time
 import weakref
@@ -31,7 +32,7 @@ class _CauldronBaseMeta(InheritDocstrings, abc.ABCMeta):
 class Task(object):
     """A task container for the task queue."""
     
-    __slots__ = ('request', 'event', 'result', 'response', 'error', 'callback', 'timeout')
+    __slots__ = ('request', 'event', 'result', 'response', 'error', 'exc_info', 'callback', 'timeout')
     
     def __init__(self, message, callback, timeout=None):
         super(Task, self).__init__()
@@ -46,6 +47,7 @@ class Task(object):
         self.response = None
         self.result = None
         self.error = None
+        self.exc_info = None
         self.event = threading.Event()
         
     def __call__(self):
@@ -54,6 +56,7 @@ class Task(object):
             self.result = self.callback(self.request)
         except Exception as e:
             self.error = e
+            self.exc_info = sys.exc_info()
         self.event.set()
         
     def wait(self, timeout=None):
@@ -62,14 +65,19 @@ class Task(object):
             self.event.wait(timeout=get_timeout(timeout))
         return self.event.isSet()
     
+    def reraise(self):
+        """Re-raise the internal error."""
+        if self.exc_info is not None:
+            raise self.exc_info[0], self.exc_info[1], self.exc_info[2]
+        elif self.error is not None:
+            raise self.error
+    
     def get(self, timeout=None):
         """Get the result."""
-        if self.error is not None:
-            raise self.error
+        self.reraise()
         if not self.wait(timeout=timeout):
             raise TimeoutError("Task timed out.")
-        if self.error is not None:
-            raise self.error
+        self.reraise()
         return self.result
         
     def timedout(self, msg="Task timed out."):
