@@ -68,7 +68,7 @@ class Task(object):
     def reraise(self):
         """Re-raise the internal error."""
         if self.exc_info is not None:
-            raise self.exc_info[0], self.exc_info[1], self.exc_info[2]
+            six.reraise(*self.exc_info)
         elif self.error is not None:
             raise self.error
     
