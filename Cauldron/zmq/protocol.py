@@ -354,10 +354,10 @@ class ZMQCauldronMessage(object):
     
     def unwrap(self):
         """Unwrap the payload."""
-        if self.payload.decode('utf-8') == FRAMEBLANK:
+        if self.payload == FRAMEBLANK.decode('utf-8'):
             return None
-        elif self.payload.decode('utf-8') == FRAMEFAIL:
-            raise FrameFailureError("Frame failure: {!r}".format(self))
+        elif self.payload == FRAMEFAIL.decode('utf-8'):
+            raise FrameFailureError("Frame failure: {0!r}".format(self))
         return self.payload
     
     @classmethod
