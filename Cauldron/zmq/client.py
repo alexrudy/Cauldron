@@ -33,7 +33,6 @@ class _ZMQMonitorThread(ZMQThread):
         super(_ZMQMonitorThread, self).__init__(name="ktl.Service.{0}.Broadcasts".format(service.name), context=service.ctx)
         self.service = weakref.proxy(service)
         self.monitored = set()
-        self.daemon = True
         self.address = None
         
     def thread_target(self):

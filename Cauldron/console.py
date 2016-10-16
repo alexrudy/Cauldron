@@ -267,9 +267,9 @@ def ktl_modify(service, *commands, **options):
         mode = "(wait)"
     else:
         mode = "(nowait)"
-    try:
-        svc = ktl.Service(service, populate=False)
     
+    svc = ktl.Service(service, populate=False)
+    try:
         # Initial write loop.
         for keyword, value in commands:
         

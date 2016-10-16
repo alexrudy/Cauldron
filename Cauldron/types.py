@@ -12,6 +12,8 @@ to a python type.
 from __future__ import absolute_import
 
 import warnings
+import collections
+import itertools
 import types
 import sys
 import abc
@@ -310,21 +312,54 @@ class Integer(Basic):
         return super(Integer, self).postread(self.cast(value))
         
 
+class _EnumerationValues(collections.Mapping):
+    """A mapping goes both directions through a dictionary."""
+    def __init__(self, source):
+        super(_EnumerationValues, self).__init__()
+        self.source = source
+        
+    def __iter__(self):
+        return iter(self.source.enums)
+        
+    def __len__(self):
+        return len(self.source.enums)
+    
+    def __contains__(self, key):
+        return self.source.enums.__contains__(key)
+    
+    def __getitem__(self, key):
+        if key not in self.source.enums:
+            raise KeyError(key)
+        else:
+            return self.source[key]
+            
+    def __setitem__(self, key, value):
+        self.source[value] = key
+
 class Enumeration(dict):
     """The key-value pairs for enumeration"""
     def __init__(self, *args, **kwargs):
-        super(Enumeration, self).__init__(*args, **kwargs)
-        self.enums = set(self.values())
+        super(Enumeration, self).__init__()
+        self.enums = set()
+        self.bkeys = set()
+        for k, v in dict(*args, **kwargs).items():
+            self[k] = v
         
     def __setitem__(self, key, value):
         value = str(value)
-        super(Enumeration, self).__setitem__(str(key).lower(), value)
-        self.enums.add(value)
-        
-    def __getitem__(self, key):
-        return super(Enumeration, self).__getitem__(str(key).lower())
-        
-        
+        skey = str(key)
+        super(Enumeration, self).__setitem__(skey, value)
+        super(Enumeration, self).__setitem__(value, skey)
+        super(Enumeration, self).__setitem__(value.lower(), skey)
+        try:
+            key = int(key)
+        except (TypeError, ValueError) as e:
+            pass
+        else:
+            super(Enumeration, self).__setitem__(key, value)
+            self.bkeys.add(key)
+        self.enums.add(value.lower())
+    
     def load_from_xml(self, xml):
         """Load enumeration values from XML"""
         
@@ -339,10 +374,7 @@ class Enumeration(dict):
                 if entry.nodeName == 'entry':
                     key   = ktlxml.getValue (entry, 'key')
                     value = ktlxml.getValue (entry, 'value')
-                    
-                    lower = value.lower ()
-                    
-                    self[lower] = key
+                    self[key] = value
         
 
 @dispatcher_keyword
@@ -354,11 +386,12 @@ class Enumerated(Integer):
         # We override __init__ so we can set up 
         # the enumerated values.
         super(Enumerated, self).__init__(*args, **kwargs)
-        self.values = Enumeration()
+        self.mapping = Enumeration()
+        self.values = _EnumerationValues(self.mapping)
         
         try:
             xml = self.service.xml[self.name]
-            self.values.load_from_xml(xml)
+            self.mapping.load_from_xml(xml)
         except Exception as e:
             if STRICT_KTL_XML:
                 raise
@@ -367,7 +400,7 @@ class Enumerated(Integer):
     @property
     def keys(self):
         """The keys available."""
-        return self.values.enums
+        return self.mapping.enums
         
     def prewrite(self, value):
         return super(Enumerated, self).prewrite(self.translate(value))
@@ -376,10 +409,10 @@ class Enumerated(Integer):
         """Translate to the enumerated value"""
         if str(value).lower() in self.keys:
             value = str(value).lower()
-        elif str(value).lower() in self.values:
-            value = self.values[str(value).lower()]
+        elif str(value).lower() in self.mapping:
+            value = self.mapping[str(value).lower()]
         else:
-            raise ValueError("Bad value for enumerated: '{0}' not in {1!r}".format(value, self.values))
+            raise ValueError("Bad value for enumerated keyword {0}: '{1}' not in {2!r}".format(self.full_name, value, self.mapping))
         return value
 
 @dispatcher_keyword

@@ -7,7 +7,10 @@ It is also used internally in Cauldron to facilitate testing of the module itsel
 
 import sys
 import pkg_resources
+import logging
 from .utils._weakrefset import WeakSet
+
+log = logging.getLogger(__name__)
 
 def setup_entry_points_api():
     """Set up the entry points API if Cauldron isn't installed."""
@@ -75,16 +78,24 @@ def fail_if_not_teardown():
     if threading.active_count() > 1:
         time.sleep(0.1) #Allow zombies to die!
     count = 0
-    ignore_daemons = False
+    ignore_daemons = True
     for thread in threading.enumerate():
-        if (ignore_daemons and thread.deamon):
+        if not thread.isAlive():
+            continue
+        if (ignore_daemons and getattr(thread, 'daemon', False)):
             continue
         if thread not in SEEN_THREADS:
             count += 1
+            log.warning(repr(thread))
             SEEN_THREADS.add(thread)
             
     # If there are new, non-daemon threads, cause an error.
     if count > 1:
-        threads_str = "\n".join(["{0}:{1}".format(repr(thread), gc.get_referrers(thread)) for thread in threading.enumerate()])
+        threads_info = []
+        for thread in threading.enumerate():
+            # referers = ",".join(type(r).__name__ for r in gc.get_referrers(thread))
+            referers = "\n   ".join(repr(r) for r in gc.get_referrers(thread))
+            threads_info.append("{0}:\n   {1}".format(repr(thread), referers))
+        threads_str = "\n".join(threads_info)
         raise ValueError("{0:d} {3:s}thread{1:s} left alive!\n{2!s}".format(
             count-1, "s" if (count-1)>1 else "", threads_str, "non-deamon " if ignore_daemons else ""))
