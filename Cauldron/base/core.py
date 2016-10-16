@@ -109,6 +109,9 @@ class _BaseKeyword(object):
     service = None
     """The parent :class:`Service` object for this keyword."""
     
+    _name = "?name?"
+    """Default name for this class."""
+    
     def __init__(self, service, name, type=None):
         super(_BaseKeyword, self).__init__()
         name = str(name).upper()
@@ -128,7 +131,7 @@ class _BaseKeyword(object):
     def __repr__(self):
         """Represent this keyword"""
         repr_str = "<{0} service={1} name={2}".format(
-            self.__class__.__name__, self.service.name, self.name)
+            self.__class__.__name__, getattr(self.service, 'name', '?service?'), self.name)
         if getattr(self, '_last_value', None) is not None:
             repr_str += " value={value}".format(value=self._last_value)
         return repr_str + ">"

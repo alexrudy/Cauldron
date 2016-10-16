@@ -405,7 +405,7 @@ class Service(_BaseService):
             cls = DFW.Keyword.Keyword
         
         try:
-            cls(name, service=self)
+            cls(name=name, service=self)
         except WrongDispatcher:
             pass
         else:
