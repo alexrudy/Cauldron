@@ -323,7 +323,7 @@ class Service(_BaseService):
                 raise
             warning = CauldronXMLWarning("KTLXML was not loaded correctly. Keywords will not be validated against XML. Exception was {0!s}.".format(e))
             warnings.warn(warning)
-            self.log.warning(str(warning))
+            self.log.warning(str(warning), exc_info=True)
             self.xml = None
         else:
             # Implementors will be expected to assign Keyword instances
@@ -378,7 +378,7 @@ class Service(_BaseService):
         except Exception as e:
             if STRICT_KTL_XML:
                 raise
-            warnings.warn(CauldronXMLWarning("XML setup for orphan keyword {0} failed: {1}".format(name, str(e))))
+            warnings.warn(CauldronXMLWarning("XML setup for orphan keyword {0} failed: {1}".format(name, repr(e))))
             cls = DFW.Keyword.Keyword
         
         try:
@@ -412,8 +412,7 @@ class Service(_BaseService):
                 try:
                     keyword.set(initial)
                 except ValueError as e:
-                    self.log.error("Bad initial value '%s' for '%s'", initial, keyword.name)
-                    self.log.error(str(e))
+                    self.log.exception("Bad initial value '%s' for '%s'", initial, keyword.name)
         
         self._begin()
         
