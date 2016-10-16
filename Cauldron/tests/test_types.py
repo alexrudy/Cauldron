@@ -89,6 +89,7 @@ def keyword_enumerated(dispatcher):
     kwd.values["THREE"] = 3
     return kwd
 
+@pytest.mark.xfail
 @pytest.mark.parametrize("modify,update", [
     ("ONE", 1),
     ("TWO", 2),
