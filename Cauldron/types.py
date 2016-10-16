@@ -267,8 +267,11 @@ class Boolean(Basic):
         
     def prewrite(self, value):
         """Check value before writing."""
-        return super(Boolean, self).prewrite(self.translate(value))
+        value = str(int(self.translate(value)))
+        return super(Boolean, self).prewrite(value)
         
+
+
 @dispatcher_keyword
 class Double(Basic):
     """A numerical value keyword."""
@@ -327,53 +330,42 @@ class Integer(Basic):
         return super(Integer, self).postread(self.cast(value))
         
 
-class _EnumerationValues(collections.Mapping):
-    """A mapping goes both directions through a dictionary."""
-    def __init__(self, source):
-        super(_EnumerationValues, self).__init__()
-        self.source = source
-        
-    def __iter__(self):
-        return iter(self.source.enums)
-        
-    def __len__(self):
-        return len(self.source.enums)
-    
-    def __contains__(self, key):
-        return self.source.enums.__contains__(key)
-    
-    def __getitem__(self, key):
-        if key not in self.source.enums:
-            raise KeyError(key)
-        else:
-            return self.source[key]
-            
-    def __setitem__(self, key, value):
-        self.source[value] = key
-
-class Enumeration(dict):
+class Enumeration(collections.Mapping):
     """The key-value pairs for enumeration"""
     def __init__(self, *args, **kwargs):
         super(Enumeration, self).__init__()
-        self.enums = set()
-        self.bkeys = set()
+        self.enums = dict()
+        self.bkeys = dict()
         for k, v in dict(*args, **kwargs).items():
             self[k] = v
-        
+
     def __setitem__(self, key, value):
-        value = str(value)
-        skey = str(key)
-        super(Enumeration, self).__setitem__(skey, value)
-        super(Enumeration, self).__setitem__(value, skey)
-        super(Enumeration, self).__setitem__(value.lower(), skey)
-        try:
-            key = int(key)
-        except (TypeError, ValueError) as e:
-            pass
+        k = int(key)
+        v = str(value)
+        self.enums[k] = v
+        self.bkeys[v] = k
+        self.bkeys[v.lower()] = k
+        self.bkeys[str(k)] = k
+    
+    def __iter__(self):
+        return itertools.chain(self.enums.keys(), self.bkeys.keys())
+        
+    def __len__(self):
+        return len(self.enums) + len(self.bkeys)
+        
+    def __repr__(self):
+        return "Enumeration({0!r})".format(self.bkeys)
+    
+    def __contains__(self, key):
+        return (key in self.enums or key in self.bkeys)
+    
+    def __getitem__(self, key):
+        if key in self.enums:
+            return self.enums[key]
+        elif key in self.bkeys:
+            return self.bkeys[key]
         else:
-            super(Enumeration, self).__setitem__(key, value)
-            self.bkeys.add(key)
-        self.enums.add(value.lower())
+            raise KeyError(key)
     
     def load_from_xml(self, xml):
         """Load enumeration values from XML"""
@@ -402,7 +394,7 @@ class Enumerated(Integer):
         # the enumerated values.
         super(Enumerated, self).__init__(*args, **kwargs)
         self.mapping = Enumeration()
-        self.values = _EnumerationValues(self.mapping)
+        self.values = self.mapping.bkeys
         
         try:
             xml = self.service.xml[self.name]
@@ -415,20 +407,23 @@ class Enumerated(Integer):
     @property
     def keys(self):
         """The keys available."""
-        return self.mapping.enums
+        return self.mapping.enums.keys()
         
     def prewrite(self, value):
-        return super(Enumerated, self).prewrite(self.translate(value))
+        value = str(int(self.translate(value)))
+        return super(Enumerated, self).prewrite(value)
     
     def translate(self, value):
-        """Translate to the enumerated value"""
-        if str(value).lower() in self.keys:
-            value = str(value).lower()
-        elif str(value).lower() in self.mapping:
-            value = self.mapping[str(value).lower()]
-        else:
+        """Translate to the enumerated binary value"""
+        try:
+            if value in self.values:
+                value = self.values[value]
+            else:
+                value = int(float(value))
+            cannonical = self.mapping.enums[value]
+        except (TypeError, ValueError, KeyError) as e:
             raise ValueError("Bad value for enumerated keyword {0}: '{1}' not in {2!r}".format(self.full_name, value, self.mapping))
-        return value
+        return str(value)
 
 @dispatcher_keyword
 class Mask(Basic, _NotImplemented):

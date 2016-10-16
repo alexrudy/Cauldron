@@ -76,6 +76,24 @@
 		<name>MYENUMERATED</name>
 		<type>enumerated</type>
 		<units>myunit</units>
+		<values>
+			<entry>
+				<key>0</key>
+				<value>ZERO</value>
+			</entry>
+			<entry>
+				<key>1</key>
+				<value>ONE</value>
+			</entry>
+			<entry>
+				<key>2</key>
+				<value>TWO</value>
+			</entry>
+			<entry>
+				<key>3</key>
+				<value>THREE</value>
+			</entry>
+		</values>
 	</keyword>
 	<keyword>
 		<name>MYFLOAT</name>

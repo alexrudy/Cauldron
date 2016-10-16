@@ -85,9 +85,6 @@ def keyword_enumerated(backend, dispatcher_setup):
     from Cauldron import DFW
     def setup(dispatcher):
         kwd = DFW.Keyword.types["enumerated"]("MYENUMERATED", dispatcher)
-        kwd.values["ONE"] = 1
-        kwd.values["TWO"] = 2
-        kwd.values["THREE"] = 3
     dispatcher_setup.append(setup)
     return "MYENUMERATED"
 

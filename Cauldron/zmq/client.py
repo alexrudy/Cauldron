@@ -224,7 +224,6 @@ class Keyword(ClientKeyword):
         """Get KTL units."""
         if getattr(self, '_units', None) is None:
             self._units = self._synchronous_command('units', "")
-            self.service.log.info("{0!r}.units() = {1}".format(self, self._units))
         return '' if self._units is None else self._units
     
     def _handle_response(self, message):
