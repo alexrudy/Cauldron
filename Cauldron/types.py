@@ -44,22 +44,20 @@ def client_keyword(cls):
     
 _bases = set()
 
-def _generate_keyword_subclass(basecls, subclass, module):
+def _generate_keyword_subclass(basecls, subclass, module, dispatcher):
     """Generate a single keyword subclass."""
     if getattr(subclass, '__doc__', None) is not None:
         doc = _prepend_to_docstring(_inherited_docstring(basecls), subclass.__doc__)
     else:
         doc = _inherited_docstring(basecls)
-    cls = type(subclass.__name__, (subclass, basecls),
-        {'__module__':module, '__doc__':doc})
+    cls = subclass._make_subclass(basecls, dispatcher, doc, module)
     cls.KTL_REGISTERED = True
-    subclass._subcls = cls
     return cls
     
-def generate_keyword_subclasses(basecls, subclasses, module):
+def generate_keyword_subclasses(basecls, subclasses, module, dispatcher):
     """Given a base class, generate keyword subclasses."""
     for subclass in subclasses:
-        yield _generate_keyword_subclass(basecls, subclass, module)
+        yield _generate_keyword_subclass(basecls, subclass, module, dispatcher)
 
 def _setup_keyword_class(kwcls, module):
     """Set up a keyword class on a module."""
@@ -79,7 +77,7 @@ def setup_client_keyword_module():
     guard_use("setting up the ktl.Keyword module")
     basecls = registry.client.Keyword
     from .ktl import Keyword
-    for kwcls in generate_keyword_subclasses(basecls, _client, module="{0}.ktl.Keyword".format(BASENAME)):
+    for kwcls in generate_keyword_subclasses(basecls, _client, module="{0}.ktl.Keyword".format(BASENAME), dispatcher=False):
         _setup_keyword_class(kwcls, Keyword)
     Keyword.__all__ = list(set(Keyword.__all__))
     
@@ -89,7 +87,7 @@ def setup_dispatcher_keyword_module():
     guard_use("setting up the DFW.Keyword module")
     basecls = registry.dispatcher.Keyword
     from .DFW import Keyword
-    for kwcls in generate_keyword_subclasses(basecls, _dispatcher, module="{0}.DFW.Keyword".format(BASENAME)):
+    for kwcls in generate_keyword_subclasses(basecls, _dispatcher, module="{0}.DFW.Keyword".format(BASENAME),  dispatcher=True):
         _setup_keyword_class(kwcls, Keyword)
     Keyword.__all__ = list(set(Keyword.__all__))
     
@@ -117,6 +115,9 @@ class KeywordType(object):
     KTL_ALIASES = ()
     """A list of additional KTL-API type names that can be used with this class."""
     
+    KTL_DISPATCHER = None
+    """Flag describing whether this is a dispatcher or client keyword."""
+    
     _subcls = None
     
     @classmethod
@@ -143,20 +144,34 @@ class KeywordType(object):
             registry.client.guard("initializing any keyword objects.")
             return registry.client.Keyword
         
+        
     @classmethod
-    def _make_subclass(cls, basecls):
-        """Make a Cauldron subclass."""
+    def _get_subclass(cls, basecls, dispatcher, docstring=None, module=None):
+        """Get the cached cauldron subclass."""
         if cls.__dict__.get('_subcls',None) is None:
-            cls._subcls = type(cls.__name__, (cls, basecls), {'__module__':cls.__module__, '__doc__':cls.__doc__})
+            cls._subcls = cls._make_subclass(basecls, dispatcher, docstring, module)
             _bases.add(cls)
         return cls._subcls
+    
+    
+    @classmethod
+    def _make_subclass(cls, basecls, dispatcher, docstring=None, module=None):
+        """Make a Cauldron subclass."""
+        if docstring is None:
+            docstring = cls.__doc__
+        if module is None:
+            module = cls.__module__
+        members = {'__module__': module, 
+                   '__doc__': docstring,
+                   'KTL_DISPATCHER':bool(dispatcher) }
+        return type(cls.__name__, (cls, basecls), members)
     
     def __new__(cls, *args, **kwargs):
         if not cls.KTL_REGISTERED:
             dispatcher = cls._is_dispatcher(args, kwargs)
             basecls = cls._get_cauldron_basecls(dispatcher)
             if not issubclass(cls, basecls):
-                newcls = cls._make_subclass(basecls)
+                newcls = cls._get_subclass(basecls, dispatcher)
                 return newcls.__new__(newcls, *args, **kwargs)
         
         # See http://stackoverflow.com/questions/19277399/why-does-object-new-work-differently-in-these-three-cases for why this is necessary.
@@ -167,8 +182,8 @@ class KeywordType(object):
     
     def __init__(self, *args, **kwargs):
         super(KeywordType, self).__init__(*args, **kwargs)
-        if self.KTL_TYPE is None:
-            raise CauldronTypeError("Keyword {0} cannot have KTL type = None".format(self.name))
+        if not isinstance(self.KTL_TYPE, str):
+            raise CauldronTypeError("Keyword {0} cannot have KTL type = {0!r}".format(self.name, self.KTL_TYPE))
     
     def _ktl_type(self):
         """Return the ktl type of this key."""
