@@ -32,7 +32,6 @@ class LocalTaskQueue(threading.Thread):
         super(LocalTaskQueue, self).__init__(name="Task Queue for {0:s}".format(name))
         self.queue = queue.Queue()
         self.log = log or logging.getLogger("ktl.local.TaskQueue.{0:s}".format(name))
-        self.daemon = True
         self.shutdown = threading.Event()
     
     def run(self):

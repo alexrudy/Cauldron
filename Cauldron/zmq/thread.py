@@ -6,6 +6,8 @@ import threading
 import six
 import collections
 
+from ..config import get_timeout
+
 try:
     import zmq
 except ImportError:
@@ -119,7 +121,7 @@ class ZMQThread(threading.Thread):
                 msg += " No error was reported."
             raise ZMQThreadError(msg, self._error)
         
-    def stop(self, join=False, timeout=None):
+    def stop(self, join=True, timeout=None):
         """Stop the responder thread."""
         # If the thread is not alive, do nothing.
         if not self.isAlive():
@@ -139,7 +141,10 @@ class ZMQThread(threading.Thread):
         
         if join or (not self.daemon):
             self.log.trace("{0} joining.".format(self))
-            self.join(timeout=timeout)
-            self.log.trace("{0} joined.".format(self))
+            self.join(timeout=get_timeout(timeout))
+            if not self.is_alive():
+                self.log.trace("{0} joined.".format(self))
+            else:
+                self.log.warning("{0} join timed out.".format(self))
             
         self.log.debug("{0} stopped.".format(self.name))
