@@ -174,9 +174,9 @@ class ZMQPooler(ZMQThread):
             for worker in list(self._active_workers.keys()):
                 if now > (self._active_workers[worker]):
                     self._active_workers.pop(worker)
-        #
-        # for worker in self._workers:
-        #     worker.join()
+        
+        for worker in self._workers:
+            worker.join()
         self.log.debug("Done with workers.")
     
     def thread_target(self):
@@ -214,11 +214,6 @@ class ZMQPooler(ZMQThread):
             frontend.close(linger=self.timeout*1e3)
             signal.close(linger=0)
         
-    def __del__(self):
-        """Stop workers when we delete this."""
-        self.running.clear()
-        for worker in self._workers:
-            worker.stop()
 
 class ZMQWorker(ZMQMicroservice):
     """A ZMQ-based worker"""
