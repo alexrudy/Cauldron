@@ -25,6 +25,8 @@ class LocalTask(_BaseTask):
         super(LocalTask, self).__call__()
         if self.error is not None:
             self.error = DispatcherError(str(self.error))
+        if self.exc_info is not None:
+            self.exc_info = (DispatcherError, self.error, self.exc_info[2])
     
 class LocalTaskQueue(threading.Thread):
     
@@ -76,6 +78,12 @@ class Keyword(ClientKeyword):
     def _ktl_monitored(self):
         """Determine if this keyword is monitored."""
         return self._update in self.source._consumers
+        
+    def _ktl_units(self):
+        """Units for this keyword."""
+        if getattr(self, '_units', None) is None:
+            self._units = self.source._get_units()
+        return '' if self._units is None else self._units
         
     def monitor(self, start=True, prime=True, wait=True):
         if prime:

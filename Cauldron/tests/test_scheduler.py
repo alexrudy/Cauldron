@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """Tests for the schedule features of keywords."""
 
+from Cauldron.types import Integer
+
 import pytest
 import time
 import functools
@@ -21,53 +23,54 @@ def backend(request, config):
         request.addfinalizer(functools.partial(b.stop, timeout=0.1))
     return "zmq"
     
-def increment(self):
-    """Increment function"""
-    value = self.cast(self.value) if self.value is not None else 0
-    newvalue = value + 1
-    if newvalue > 10:
-        raise ValueError()
-    self.set(str(newvalue))
-    return str(newvalue)
+class IncrementingInteger(Integer):
+    
+    def postread(self, value):
+        """Increment function"""
+        value = self.cast(value) if value is not None else 0
+        newvalue = value + 1
+        if newvalue > 10:
+            raise ValueError()
+        self.set(str(newvalue))
+        return str(newvalue)
 
-def test_period(dispatcher, client, keyword_name1):
-    """Test setting a period for updates from a keyword."""
-    
+@pytest.fixture
+def incrementing_integer(backend, dispatcher_setup, keyword_name_integer):
+    """Add an incrementing integer keyword."""
     from Cauldron import DFW
-    kw = DFW.Keyword.Integer(keyword_name1, dispatcher)
-    kw.update = functools.partial(increment, kw)
-    
-    value = client[keyword_name1].read(binary=True)
+    def setup(dispatcher):
+        kw = IncrementingInteger(keyword_name_integer, dispatcher, initial=0)
+    dispatcher_setup.append(setup)
+    return keyword_name_integer
+
+def test_period(request, incrementing_integer, dispatcher, client):
+    """Test setting a period for updates from a keyword."""
+    kw = dispatcher[incrementing_integer]
+    value = client[incrementing_integer].read(binary=True)
     kw.period(0.1)
     time.sleep(0.3)
-    value2 = client[keyword_name1].read(binary=True)
+    value2 = client[incrementing_integer].read(binary=True)
     assert value < value2
     
-def test_bad_period(dispatcher, client, keyword_name1):
+def test_bad_period(incrementing_integer, dispatcher, client):
     """Test a period which should go bad."""
-    from Cauldron import DFW
-    from ..exc import DispatcherError
-    kw = DFW.Keyword.Integer(keyword_name1, dispatcher)
-    kw.update = functools.partial(increment, kw)
+    from Cauldron.exc import DispatcherError
     
-    value = client[keyword_name1].read(binary=True)
-    client[keyword_name1].write(10)
+    kw = dispatcher[incrementing_integer]
+    value = client[incrementing_integer].read(binary=True)
+    client[incrementing_integer].write(10)
     kw.period(0.01)
     time.sleep(0.5)
     with pytest.raises(DispatcherError):
-        value2 = client[keyword_name1].read(binary=True)
+        value2 = client[incrementing_integer].read(binary=True)
 
-def test_schedule(dispatcher, client, keyword_name1):
+def test_schedule(incrementing_integer, dispatcher, client):
     """Test setting a period for updates from a keyword."""
-    
-    from Cauldron import DFW
-    kw = DFW.Keyword.Integer(keyword_name1, dispatcher)
-    kw.update = functools.partial(increment, kw)
-    
-    value = client[keyword_name1].read(binary=True)
+    kw = dispatcher[incrementing_integer]
+    value = client[incrementing_integer].read(binary=True)
     kw.schedule(time.time() + 0.5)
     time.sleep(1.0)
-    value2 = client[keyword_name1].read(binary=True)
+    value2 = client[incrementing_integer].read(binary=True)
     
     appt_time = time.time() + 1.5
     kw.schedule(appt_time)
@@ -76,6 +79,6 @@ def test_schedule(dispatcher, client, keyword_name1):
     kw.schedule(appt_time, cancel=True)
     kw.schedule(appt_time, cancel=True)
     
-    value2 = client[keyword_name1].read(binary=True)
+    value2 = client[incrementing_integer].read(binary=True)
     
     assert value < value2

@@ -462,7 +462,7 @@ class Service(object):
 
 class ZMQBroker(threading.Thread):
     """A broker object for handling ZMQ Messaging patterns"""
-    def __init__(self, name, address, pub_address, sub_address, mon_address, context=None, timeout=1.0):
+    def __init__(self, name, address, pub_address, sub_address, mon_address, context=None, timeout=1.0, heartbeat=True):
         super(ZMQBroker, self).__init__(name=name)
         import zmq
         self.context = context or zmq.Context.instance()
@@ -475,6 +475,7 @@ class ZMQBroker(threading.Thread):
         self.timeout = float(timeout)
         self._local = threading.local()
         self._error = None
+        self._heartbeat = heartbeat
         self.services = dict()
         self.log.info("ZMQBroker.__init__")
         
@@ -487,7 +488,8 @@ class ZMQBroker(threading.Thread):
         pub_address = zmq_get_address(config, "subscribe", bind=True)
         mon_address = zmq_get_address(config, "subscribe", bind=False)
         timeout = config.getfloat("zmq", "timeout")
-        return cls(name, address, pub_address, sub_address, mon_address, timeout=timeout)
+        heartbeat = config.getboolean("zmq", "heartbeat")
+        return cls(name, address, pub_address, sub_address, mon_address, timeout=timeout, heartbeat=heartbeat)
         
     @classmethod
     def serve(cls, config=None, name="ServerBroker"):
@@ -595,8 +597,9 @@ class ZMQBroker(threading.Thread):
         """docstring for cleanup"""
         for service in self.services.values():
             service.finish_fan_messages(socket)
-            service.expire(socket)
-            service.beat(socket)
+            if self._heartbeat:
+                service.expire(socket)
+                service.beat(socket)
     
     def prepare(self):
         """Thread local way to prepare connections."""

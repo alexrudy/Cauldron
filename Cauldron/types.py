@@ -19,7 +19,7 @@ import sys
 import abc
 import six
 import logging
-from .exc import CauldronAPINotImplementedWarning, CauldronXMLWarning
+from .exc import CauldronAPINotImplementedWarning, CauldronXMLWarning, CauldronTypeError
 from .api import guard_use, STRICT_KTL_XML, BASENAME, CAULDRON_SETUP
 from .base.core import _CauldronBaseMeta
 from .extern import ktlxml
@@ -42,6 +42,8 @@ def client_keyword(cls):
     _client.add(cls)
     return cls
     
+_bases = set()
+
 def _generate_keyword_subclass(basecls, subclass, module):
     """Generate a single keyword subclass."""
     if getattr(subclass, '__doc__', None) is not None:
@@ -50,6 +52,7 @@ def _generate_keyword_subclass(basecls, subclass, module):
         doc = _inherited_docstring(basecls)
     cls = type(subclass.__name__, (subclass, basecls),
         {'__module__':module, '__doc__':doc})
+    cls.KTL_REGISTERED = True
     subclass._subcls = cls
     return cls
     
@@ -60,7 +63,7 @@ def generate_keyword_subclasses(basecls, subclasses, module):
 
 def _setup_keyword_class(kwcls, module):
     """Set up a keyword class on a module."""
-    if kwcls.KTL_TYPE is not None:
+    if kwcls.KTL_REGISTERED:
         module.types[kwcls.KTL_TYPE] = kwcls
         for alias in kwcls.KTL_ALIASES:
             module.types[alias] = kwcls
@@ -90,6 +93,14 @@ def setup_dispatcher_keyword_module():
         _setup_keyword_class(kwcls, Keyword)
     Keyword.__all__ = list(set(Keyword.__all__))
     
+@registry.dispatcher.teardown_for('all')
+@registry.client.teardown_for('all')
+def teardown_generated_user_classes():
+    """Cleanup user generated classes."""
+    for cls in _bases:
+        if hasattr(cls, '_subcls'):
+            del cls._subcls
+    _bases.clear()
 
 @six.add_metaclass(_CauldronBaseMeta)
 class KeywordType(object):
@@ -99,6 +110,9 @@ class KeywordType(object):
     """
     KTL_TYPE = None
     """The KTL-API type name corresponding to this class."""
+    
+    KTL_REGISTERED = False
+    """Flag which determines if this subclass is a KTL-registered subclass."""
     
     KTL_ALIASES = ()
     """A list of additional KTL-API type names that can be used with this class."""
@@ -132,12 +146,13 @@ class KeywordType(object):
     @classmethod
     def _make_subclass(cls, basecls):
         """Make a Cauldron subclass."""
-        if cls.__dict__.get('_subcls',None) is None or not issubclass(cls._subcls, basecls):
+        if cls.__dict__.get('_subcls',None) is None:
             cls._subcls = type(cls.__name__, (cls, basecls), {'__module__':cls.__module__, '__doc__':cls.__doc__})
+            _bases.add(cls)
         return cls._subcls
     
     def __new__(cls, *args, **kwargs):
-        if cls.KTL_TYPE is None:
+        if not cls.KTL_REGISTERED:
             dispatcher = cls._is_dispatcher(args, kwargs)
             basecls = cls._get_cauldron_basecls(dispatcher)
             if not issubclass(cls, basecls):
@@ -152,6 +167,8 @@ class KeywordType(object):
     
     def __init__(self, *args, **kwargs):
         super(KeywordType, self).__init__(*args, **kwargs)
+        if self.KTL_TYPE is None:
+            raise CauldronTypeError("Keyword {0} cannot have KTL type = None".format(self.name))
     
     def _ktl_type(self):
         """Return the ktl type of this key."""

@@ -67,6 +67,7 @@ class Keyword(_BaseKeyword):
         super(Keyword, self).__init__(service, name, type)
         self._callbacks = Callbacks()
         self.history = collections.deque(maxlen=5)
+        self._units = None
     
     @api_not_implemented
     def _ktl_broadcasts(self):
@@ -100,10 +101,11 @@ class Keyword(_BaseKeyword):
         """Time stamp from the last KTL read."""
         if self._last_read is not None:
             return time.mktime(self._last_read.timetuple())
-        
+    
+    @abc.abstractmethod
     def _ktl_units(self):
-        """KTL units."""
-        return None # pragma: no cover
+        """Get the units for this keyword."""
+        pass
         
     @api_override
     def cast(self, value):

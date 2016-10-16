@@ -10,7 +10,7 @@ from ..base import ClientService, ClientKeyword
 from ..exc import CauldronAPINotImplementedWarning, CauldronAPINotImplemented, DispatcherError, TimeoutError
 from .common import zmq_get_address, check_zmq, teardown, zmq_connect_socket
 from .thread import ZMQThread
-from .protocol import ZMQCauldronMessage, ZMQCauldronErrorResponse, FRAMEBLANK, FRAMEFAIL, PrefixMatchError
+from .protocol import ZMQCauldronMessage, ZMQCauldronErrorResponse, FRAMEBLANK, PrefixMatchError, FrameFailureError
 from .tasker import Task, TaskQueue
 from .broker import ZMQBroker
 from .responder import ZMQDispatcherError
@@ -128,16 +128,26 @@ class Service(ClientService):
         """Get the KTL type of a specific keyword."""
         name = key.upper()
         with self._lock:
-            if name in self._type_ktl_cache:
-                return self._type_ktl_cache[name]
+            try:
+                ktl_type = self._type_ktl_cache[name]
+            except KeyError:
+                ktl_type = self._lookup_ktl_type(name)
+        return ktl_type
+        
+    def _lookup_ktl_type(self, name):
+        """Lookup the KTL type for a key."""
+        try:
             message = self._synchronous_command("identify", payload=name, keyword=name, direction="CSQ")
+        except FrameFailureError:
+            raise KeyError("Keyword '{0}' does not exist.".format(name))
+        else:
             items = list(set(message.split(":")))
-            if len(items) == 1 and (items[0] not in (FRAMEBLANK.decode('utf-8'), FRAMEFAIL.decode('utf-8'))):
+            if len(items) == 1:
                 ktl_type = items[0]
             else:
-                raise KeyError("Keyword '{0}' does not exist.".format(name))
-            self._type_ktl_cache[name] = ktl_type
-            return ktl_type
+                raise KeyError("Keyword '{0}' is multiply defined.".format(name))
+        self._type_ktl_cache[name] = ktl_type
+        return ktl_type
         
     def __del__(self):
         """On delete, try to shutdown."""
@@ -172,14 +182,14 @@ class Service(ClientService):
         if message.iserror:
             raise DispatcherError("Dispatcher error on command: {0}".format(message.payload))
         message.verify(self)
-        return message.payload
+        return message.unwrap()
     
     def _asynchronous_command(self, command, payload, keyword=None, direction="CDQ", timeout=None, callback=None):
         """Run an asynchronous command."""
         request = ZMQCauldronMessage(command, direction=direction,
             service=self.name, dispatcher=FRAMEBLANK,
-            keyword=keyword if keyword else FRAMEBLANK, 
-            payload=payload if payload else FRAMEBLANK)
+            keyword=keyword if keyword is not None else FRAMEBLANK, 
+            payload=payload if payload is not None else FRAMEBLANK)
         
         callback = callback or self._handle_response
         
@@ -210,18 +220,25 @@ class Keyword(ClientKeyword):
         """Is this keyword monitored."""
         return self.name in self.service._monitor.monitored
         
+    def _ktl_units(self):
+        """Get KTL units."""
+        if getattr(self, '_units', None) is None:
+            self._units = self._synchronous_command('units', "")
+            self.service.log.info("{0!r}.units() = {1}".format(self, self._units))
+        return '' if self._units is None else self._units
+    
     def _handle_response(self, message):
         """Handle a response, and return the payload."""
         self.service.log.msg("{0!r}.recv({1!s})".format(self, message))
         if message.iserror:
             raise DispatcherError("Dispatcher error on command: {0}".format(message.payload))
         message.verify(self.service)
-        self._update(message.payload)
+        self._update(message.unwrap())
         return self._current_value(binary=False, both=False)
         
     def _asynchronous_command(self, command, payload, timeout=None, callback=None):
         """Execute a synchronous command."""
-        return self.service._asynchronous_command(command, payload, self.name, timeout=timeout, callback=self._handle_response)
+        return self.service._asynchronous_command(command, payload, self.name, timeout=timeout, callback=callback or self._handle_response)
         
     def _synchronous_command(self, command, payload, timeout=None):
         """Execute a synchronous command."""
@@ -240,6 +257,21 @@ class Keyword(ClientKeyword):
         else:
             self.service._monitor.monitored.remove(self.name)
     
+    def _await(self, task, timeout, _call_msg=None):
+        """Await an asynchronous task."""
+        
+        if _call_msg is None:
+            _call_msg = lambda : "{0!r}_await(task={1!r}, timeout={2!r})".format(self, task, timeout)
+        
+        self.service.log.trace("{0} waiting.".format(_call_msg()))
+        try:
+            result = task.get(timeout=timeout)
+        except TimeoutError:
+            raise TimeoutError("{0} timed out.".format(_call_msg()))
+        else:
+            self.service.log.trace("{0} complete.".format(_call_msg()))
+        return result
+    
     def read(self, binary=False, both=False, wait=True, timeout=None):
         _call_msg = lambda : "{0!r}.read(wait={1}, timeout={2})".format(self, wait, timeout)
         
@@ -248,14 +280,8 @@ class Keyword(ClientKeyword):
         
         task = self._asynchronous_command("update", "", timeout=timeout)
         if wait:
-            self.service.log.trace("{0} waiting.".format(_call_msg()))
-            try:
-                task.get(timeout=timeout)
-            except TimeoutError:
-                raise TimeoutError("{0} timed out.".format(_call_msg()))
-            else:
-                self.service.log.trace("{0} complete.".format(_call_msg()))
-            return self._current_value(binary=binary, both=both)
+            self._await(task, timeout, _call_msg)
+            return self._current_value(binary=binary, both=both) 
         else:
             return task
         
@@ -270,15 +296,10 @@ class Keyword(ClientKeyword):
             value = self.cast(value)
         except (TypeError, ValueError):
             pass
+        self.service.log.trace("{0} {1}".format(_call_msg(), value))
         task = self._asynchronous_command("modify", value, timeout=timeout)
         if wait:
-            self.service.log.trace("{0} waiting.".format(_call_msg()))
-            try:
-                result = task.get(timeout=timeout)
-            except TimeoutError:
-                raise TimeoutError("{0} timed out.".format(_call_msg()))
-            else:
-                self.service.log.trace("{0} complete.".format(_call_msg()))
+            return self._await(task, timeout, _call_msg)
         else:
             return task
         

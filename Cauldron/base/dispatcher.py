@@ -78,6 +78,19 @@ def get_initial_XML(xml, name):
             break
             
     return initial
+    
+def get_units_xml(xml, name):
+    """Get the keyword's units value from the XML configuration."""
+    keyword_xml = xml[name]
+    
+    units = None
+    
+    try:
+        units = ktlxml.getValue(keyword_xml, 'units')
+    except ValueError:
+        pass
+    
+    return units
 
 class Keyword(_BaseKeyword):
     """A dispatcher-based keyword, which should own its own values."""
@@ -95,6 +108,7 @@ class Keyword(_BaseKeyword):
         self.writeonly = False
         self.readonly = False
         self._period = None
+        self._units = None
         
         try:
             if service.xml is not None:
@@ -158,6 +172,12 @@ class Keyword(_BaseKeyword):
         """Translate a value into a standard representation."""
         return value
         
+    @api_override
+    def _get_units(self):
+        """Get units from XML"""
+        if self.service.xml is not None:
+            return get_units_xml(self.service.xml, self.name)
+    
     def set(self, value, force=False):
         """Set the keyword to the value provided, and broadcast changes.
         
@@ -337,7 +357,8 @@ class Service(_BaseService):
         if setup is not None:
             setup(self)
         
-        self.setupOrphans()
+        if self._config.getboolean("core","setupOrphans"):
+            self.setupOrphans()
         
         self.begin()
     
@@ -378,7 +399,9 @@ class Service(_BaseService):
         except Exception as e:
             if STRICT_KTL_XML:
                 raise
-            warnings.warn(CauldronXMLWarning("XML setup for orphan keyword {0} failed: {1}".format(name, repr(e))))
+            msg = "XML setup for orphan keyword {0} failed: {1}".format(name, str(e))
+            warnings.warn(CauldronXMLWarning(msg))
+            self.log.warning(msg, exc_info=True)
             cls = DFW.Keyword.Keyword
         
         try:
@@ -386,9 +409,11 @@ class Service(_BaseService):
         except WrongDispatcher:
             pass
         else:
-            warnings.warn(CauldronWarning("Set up an orphaned keyword {0} for service {1} dispatcher {2}".format(
+            msg = "Set up an orphaned keyword {0} for service {1} dispatcher {2}".format(
                 name, self.name, self.dispatcher
-            )))
+            )
+            warnings.warn(CauldronWarning(msg))
+            self.log.warning(msg)
     
     @api_override
     def _prepare(self):
@@ -413,6 +438,8 @@ class Service(_BaseService):
                     keyword.set(initial)
                 except ValueError as e:
                     self.log.exception("Bad initial value '%s' for '%s'", initial, keyword.name)
+                else:
+                    self.log.trace("{0!r}.begin() {1}.initial = {2}".format(self, keyword, initial))
         
         self._begin()
         
