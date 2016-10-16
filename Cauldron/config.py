@@ -95,8 +95,8 @@ def reset_configuration():
     global cauldron_configuration
     cauldron_configuration = default_configuration()
     Cauldron = sys.modules[BASENAME]
-    if hasattr(Cauldron, 'configuration'):
-        del Cauldron.configuration
+    Cauldron.configuration = cauldron_configuration
     _timeouts.pop(id(cauldron_configuration), None)
     
 reset_configuration()
+setup_configuration()
