@@ -439,7 +439,7 @@ class Enumerated(Integer):
             return str(value)
         else:
             enums = self._ktl_enumerators()
-            return enums[vnum]
+            return enums.get(vnum, str(value))
     
     def check(self, value):
         """Check the value"""
@@ -450,13 +450,13 @@ class Enumerated(Integer):
         """Translate to the enumerated binary value"""
         try:
             if value in self.values:
-                value = self.values[value]
+                ivalue = self.values[value]
             else:
-                value = int(float(value))
-            cannonical = self.mapping.enums[value]
+                ivalue = int(float(value))
+            cannonical = self.mapping.enums[ivalue]
         except (TypeError, ValueError, KeyError) as e:
             raise ValueError("Bad value for enumerated keyword {0}: '{1}' not in {2!r}".format(self.full_name, value, self.mapping))
-        return str(value)
+        return str(ivalue)
 
 @dispatcher_keyword
 class Mask(Basic, _NotImplemented):
