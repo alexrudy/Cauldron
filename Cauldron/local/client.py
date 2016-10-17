@@ -93,7 +93,7 @@ class Keyword(ClientKeyword):
             self.source._consumers.discard(self._update)
         
     def _read_task(self, unused):
-        result = self.source.update()
+        result = str(self.source.update()) # Ensure ascii across the wire.
         self._update(result)
         
     def read(self, binary=False, both=False, wait=True, timeout=None):
@@ -116,8 +116,8 @@ class Keyword(ClientKeyword):
             return task
         
     def _write_task(self, value):
-        self.source.modify(value)
-        self._update(self.source.value)
+        self.source.modify(str(value))
+        self._update(str(self.source.value))
         return self._current_value()
         
     def write(self, value, wait=True, binary=False, timeout=None):
