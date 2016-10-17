@@ -37,7 +37,6 @@ class TaskQueue(ZMQThread):
         self._pending = {}
         self._task_timeout = ((get_timeout(timeout) or 1.0) * 60) # Wait 60x the normal timeout, then clear old stuff.
         self.frontend_address = "inproc://{0:s}-frontend".format(hex(id(self)))
-        self.daemon = True
         self._local = threading.local()
         self._frontend_sockets = []
         

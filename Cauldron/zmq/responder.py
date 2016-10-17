@@ -108,7 +108,6 @@ class ZMQPooler(ZMQThread):
             pool_size = self.service._config.getint("zmq", "pool")
         self._pool_size = pool_size
         self.timeout = timeout
-        self.daemon = True
     
     def _handle_backend(self, frontend, backend):
         """Handle a backend request."""
@@ -176,7 +175,9 @@ class ZMQPooler(ZMQThread):
                     self._active_workers.pop(worker)
         
         for worker in self._workers:
-            worker.join()
+            worker.join(self._worker_timeout)
+            if worker.is_alive():
+                self.log.warning("{0!r}.join timed out.".format(worker))
         self.log.debug("Done with workers.")
     
     def thread_target(self):
@@ -225,7 +226,6 @@ class ZMQWorker(ZMQMicroservice):
         super(ZMQWorker, self).__init__(address=address,
             context=self.service.ctx, name="DFW.Service.{0:s}.Responder.{1:d}".format(self.service.name,n))
         self._broadcaster = None
-        self.daemon = True
         
     def handle_modify(self, message):
         """Handle a modify command."""
