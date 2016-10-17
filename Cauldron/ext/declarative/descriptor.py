@@ -155,9 +155,6 @@ class KeywordDescriptor(object):
         # Note the distinction is important, replace_method=False in this case.
         self.callback = _DescriptorEvent("_propogate", replace_method=False)
         self._events.append(self.callback)
-        
-        self._name_attr = "_{0}_name_{1}".format(self.__class__.__name__, self.name)
-        self._attr = "_{0}_{1}".format(self.__class__.__name__, self.name)
         self._initial = initial
         self._orig_initial = initial
         self._initial_keyword_values = {}
@@ -174,6 +171,34 @@ class KeywordDescriptor(object):
         if self._bound:
             raise ServiceAlreadyBound("Can't change the name of the keyword after the service has bound to it.")
         self._name = str(value).upper()
+        self._name_attr = "_{0}_name_{1}".format(self.__class__.__name__, self._name)
+        
+    def _bind_name(self, name, obj=None):
+        """Set the name."""
+        if obj is not None:
+            setattr(obj, self._name_attr, name)
+            initial = self._get_initial_value(obj, name)
+            if initial is not None:
+                setattr(obj, self._attr, initial)
+            
+    
+    def get_bound_attr(self, obj, default=None):
+        """Get the bound attribute value."""
+        if default is None:
+            default = self._orig_initial
+        return getattr(obj, self._bound_attr(obj), default)
+        
+    def set_bound_attr(self, obj, value):
+        """Set the bound attribute value."""
+        setattr(obj, self._bound_attr(obj), value)
+    
+    def _bound_attr(self, obj):
+        """Get the bound attribute name for initial values."""
+        return "_{0}_{1}".format(self.__class__.__name__, self.get_bound_name(obj))
+    
+    def get_bound_name(self, obj):
+        """Get the bound name."""
+        return getattr(obj, self._name_attr, self._name)
     
     def set_bound_name(self, obj, value):
         """Set a bound name."""
@@ -181,19 +206,11 @@ class KeywordDescriptor(object):
             warnings.warn(ServiceAlradyBoundWarning("Name change won't take effect until the next time this keyword is bound."))
         
         # Set the new name value.
-        setattr(obj, self._name_attr, str(value).upper())
-        
-        # Compute the initial value.
-        try:
-            initial = str(self.type(getattr(obj, self._attr, self._initial)))
-        except TypeError:
-            # We catch this error in case it was caused because no initial value was set.
-            # If an initial value was set, then we want to raise this back to the user.
-            if not (self._initial is None and not hasattr(obj, self._attr)):
-                raise
-        else:
-            attr = "_{0}_{1}".format(self.__class__.__name__, str(value).upper())
-            setattr(obj, attr, initial)
+        name = str(value).upper()
+        initial = self.get_bound_attr(obj)
+        setattr(obj, self._name_attr, name)
+        if initial is not None:
+            self.set_bound_attr(obj, initial)
         
         if self._bound:
             # Re-bind events to the right keyword.
@@ -218,9 +235,7 @@ class KeywordDescriptor(object):
         try:
             return self.type(self.keyword(obj).update())
         except ServiceNotBound:
-            name = getattr(obj, self._name_attr, self.name)
-            attr = "_{0}_{1}".format(self.__class__.__name__, name.upper())
-            return self.type(getattr(obj, attr, self._orig_initial))
+            return self.type(self.get_bound_attr(obj))
         
     def __set__(self, obj, value):
         """Set the value."""
@@ -229,39 +244,48 @@ class KeywordDescriptor(object):
         try:
             return self.keyword(obj).modify(str(self.type(value)))
         except ServiceNotBound:
-            name = getattr(obj, self._name_attr, self.name)
-            attr = "_{0}_{1}".format(self.__class__.__name__, name.upper())
-            return setattr(obj, attr, self.type(value))
+            return self.set_bound_attr(obj, self.type(value))
         
-    def _bind_initial_value(self, obj):
-        """Bind the initial value for this service."""
-        # We do this here to retain a reference to the same keyword object
-        # thoughout the course of this function.
-        keyword = self.keyword(obj)
-        attr = "_{0}_{1}".format(self.__class__.__name__, keyword.name.upper())
-        
-        # Compute the initial value.
+    def _get_initial_value(self, obj, name):
+        """Get initial value for a keyword."""
+        name = name.upper()
+        attr = "_{0}_{1}".format(self.__class__.__name__, name)
         try:
-            initial = self._initial_keyword_values.setdefault(keyword.name.upper(), 
-                                                              str(self.type(getattr(obj, attr, self._initial))))
-        except TypeError:
+            try:
+                initial = self._initial_keyword_values[name]
+            except KeyError:
+                initial = str(self.type(self.get_bound_attr(obj, self._initial)))
+                self._initial_keyword_values[name] = initial
+        except:
             # We catch this error in case it was caused because no initial value was set.
             # If an initial value was set, then we want to raise this back to the user.
             if not (self._initial is None and not hasattr(obj, attr)):
                 raise
         else:
             if getattr(obj, attr, self._initial) is None:
-                # Do nothing if it was really None everywhere.
-                pass
-            elif keyword['value'] is None:
+                # Do nothing if it was really None everywhere:
+                return None
+            return initial
+        return None
+        
+    def _bind_initial_value(self, obj):
+        """Bind the initial value for this service."""
+        # We do this here to retain a reference to the same keyword object
+        # thoughout the course of this function.
+        keyword = self.keyword(obj)
+        initial = self._get_initial_value(obj, keyword.name.upper())
+        
+        if initial is not None:
+            if keyword['value'] is None:
                 # Only modify the keyword value if it wasn't already set to anything.
                 keyword.modify(initial)
             elif keyword['value'] == initial:
                 # But ignore the case where the current keyword value already matches the initial value
                 pass
             else:
-                raise IntegrityError("Keyword {0!r} has a value {1!r}, and descriptor has initial value {2!r} which do not match.".format(keyword, keyword['value'], initial))
-            
+                raise IntegrityError("Keyword {0!r} has a value {1!r}, and"
+                                     " descriptor has initial value {2!r} which"
+                                     " do not match.".format(keyword, keyword['value'], initial))
         
         # Clean up the instance initial values.
         # try:
@@ -306,7 +330,6 @@ class KeywordDescriptor(object):
         elif service is not None and service.name != self.service.name and self._bound:
             raise ServiceAlreadyBound("Service {0!r} is already bound to {1}".format(self.service, self))
         
-        # if not self._bound:
         self._bind_initial_value(obj)
         
         for event in self._events:
