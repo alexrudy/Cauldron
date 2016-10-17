@@ -183,7 +183,7 @@ class KeywordType(object):
     def __init__(self, *args, **kwargs):
         super(KeywordType, self).__init__(*args, **kwargs)
         if not isinstance(self.KTL_TYPE, str):
-            raise CauldronTypeError("Keyword {0} cannot have KTL type = {0!r}".format(self.name, self.KTL_TYPE))
+            raise CauldronTypeError("Keyword {0} cannot have KTL type = {1!r}".format(self.name, self.KTL_TYPE))
     
     def _ktl_type(self):
         """Return the ktl type of this key."""
