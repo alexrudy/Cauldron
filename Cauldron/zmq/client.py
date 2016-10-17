@@ -18,6 +18,7 @@ from .. import registry
 from ..config import get_configuration, get_timeout
 from ..logger import KeywordMessageFilter
 
+import json
 import six
 import threading
 import logging
@@ -222,7 +223,7 @@ class Keyword(ClientKeyword):
     def _ktl_units(self):
         """Get KTL units."""
         if getattr(self, '_units', None) is None:
-            self._units = self._synchronous_command('units', "")
+            self._units = json.loads(self._synchronous_command('units', ""))
         return '' if self._units is None else self._units
     
     def _handle_response(self, message):

@@ -61,7 +61,7 @@ class Keyword(_BaseKeyword):
     
     """
     
-    _ALLOWED_KEYS = ['ascii', 'binary', 'broadcasts', 'name', 'monitored', 'monitor', 'populated', 'reads', 'writes', 'timestamp', 'units', 'type']
+    _ALLOWED_KEYS = set(['ascii', 'binary', 'broadcasts', 'name', 'monitored', 'monitor', 'populated', 'reads', 'writes', 'timestamp', 'units', 'type'])
     
     def __init__(self, service, name, type=None):
         super(Keyword, self).__init__(service, name, type)

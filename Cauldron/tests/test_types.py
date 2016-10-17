@@ -88,7 +88,6 @@ def keyword_enumerated(backend, dispatcher_setup):
     dispatcher_setup.append(setup)
     return "MYENUMERATED"
 
-@pytest.mark.xfail
 @pytest.mark.parametrize("modify,update", [
     ("ONE", 1),
     ("TWO", 2),
@@ -99,9 +98,11 @@ def keyword_enumerated(backend, dispatcher_setup):
     (4, ValueError),
     ("FOUR", ValueError),
 ])
-def test_keyword_enumerated(keyword_enumerated, dispatcher, modify, update):
+def test_keyword_enumerated(keyword_enumerated, dispatcher, client, modify, update):
     """Modify-update tests for an enumerated keyword."""
     modify_update(dispatcher[keyword_enumerated], modify, update)
+    check_client_type(dispatcher[keyword_enumerated], client, update)
+    assert set(client[keyword_enumerated]['enumerators'].values()) == set(["ZERO", "ONE", "TWO", "THREE"])
 
 @pytest.mark.parametrize("kwtype", ['mask', 'integer array', 'float array', 'double array'])
 def test_keyword_type_not_implemented(kwtype, dispatcher_args, dispatcher_setup, recwarn):

@@ -385,6 +385,7 @@ class Enumeration(collections.Mapping):
         
 
 @dispatcher_keyword
+@client_keyword
 class Enumerated(Integer):
     """An enumerated keyword, which uses an integer as the underlying datatype."""
     KTL_TYPE = 'enumerated'
@@ -395,7 +396,7 @@ class Enumerated(Integer):
         super(Enumerated, self).__init__(*args, **kwargs)
         self.mapping = Enumeration()
         self.values = self.mapping.bkeys
-        
+        self._ALLOWED_KEYS = self._ALLOWED_KEYS.union(["enumerators"])
         try:
             xml = self.service.xml[self.name]
             self.mapping.load_from_xml(xml)
@@ -412,6 +413,18 @@ class Enumerated(Integer):
     def prewrite(self, value):
         value = str(int(self.translate(value)))
         return super(Enumerated, self).prewrite(value)
+        
+    def _ktl_enumerators(self):
+        """Get KTL enumerators."""
+        return super(Enumerated, self)._ktl_units()
+        
+    def _ktl_units(self):
+        """No-op KTL units"""
+        return None
+        
+    def _get_units(self):
+        """Return a dictionary of enumerators."""
+        return self.mapping.enums
     
     def translate(self, value):
         """Translate to the enumerated binary value"""

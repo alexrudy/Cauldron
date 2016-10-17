@@ -10,6 +10,7 @@ from .broker import ZMQBroker
 from ..exc import DispatcherError, WrongDispatcher, TimeoutError
 from ..config import get_timeout
 
+import json
 import collections
 import threading
 import logging
@@ -273,7 +274,7 @@ class ZMQWorker(ZMQMicroservice):
         keyword = self.service[message.keyword]
         #TODO: Not sure if we need the lock here?
         # Probably not, getting units should be *pretty* thread-safe.
-        return keyword._get_units()
+        return json.dumps(keyword._get_units())
         
     def handle_broadcast(self, message):
         """Handle the broadcast command."""
