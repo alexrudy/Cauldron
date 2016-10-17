@@ -358,7 +358,7 @@ class KeywordDescriptor(object):
         
     def keyword(self, obj):
         """The keyword instance for this descriptor."""
-        name = getattr(obj, self._name_attr, self.name)
+        name = self.get_bound_name(obj)
         try:
             return self._service[name]
         except (AttributeError, TypeError, ReferenceError):
