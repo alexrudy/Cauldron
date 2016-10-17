@@ -416,7 +416,10 @@ class Enumerated(Integer):
         
     def _ktl_enumerators(self):
         """Get KTL enumerators."""
-        return super(Enumerated, self)._ktl_units()
+        enums = super(Enumerated, self)._ktl_units()
+        if isinstance(enums, collections.Mapping):
+            return enums
+        return dict(enumerate(enums))
         
     def _ktl_units(self):
         """No-op KTL units"""
@@ -425,6 +428,23 @@ class Enumerated(Integer):
     def _get_units(self):
         """Return a dictionary of enumerators."""
         return self.mapping.enums
+        
+    def cast(self, value):
+        """Cast the enumerated integer to the binary representation."""
+        if self.KTL_DISPATCHER:
+            return self.mapping.enums[int(self.translate(value))]
+        try:
+            vnum = int(float(value))
+        except (TypeError, ValueError) as e:
+            return str(value)
+        else:
+            enums = self._ktl_enumerators()
+            return enums[vnum]
+    
+    def check(self, value):
+        """Check the value"""
+        if not (self.minimum < int(value) < self.maximum):
+            raise ValueError("Keyword {0} must have integer values in range {1} to {2}".format(self.name, self.minimum, self.maximum))
     
     def translate(self, value):
         """Translate to the enumerated binary value"""

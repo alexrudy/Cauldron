@@ -169,7 +169,10 @@ class Keyword(_BaseKeyword):
         
     @api_override
     def translate(self, value):
-        """Translate a value into a standard representation."""
+        """Translate a value into a standard representation.
+        
+        For e.g. an enumerated keyword, this should return the ascii
+        representation of the underlying integer."""
         return value
         
     @api_override

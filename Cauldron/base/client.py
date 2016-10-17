@@ -107,6 +107,10 @@ class Keyword(_BaseKeyword):
         """Get the units for this keyword."""
         pass
         
+    def _ktl_binary(self):
+        """Return the binary value (Native python type.)"""
+        return self.cast(self._ktl_value())
+        
     @api_override
     def cast(self, value):
         """Cast to a native python datatype.
@@ -253,6 +257,7 @@ class Service(_BaseService):
         """Delete this service."""
         self.shutdown()
         
+    @api_override
     def shutdown(self):
         """An explicity shutdown method."""
         pass

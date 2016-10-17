@@ -100,8 +100,15 @@ def keyword_enumerated(backend, dispatcher_setup):
 ])
 def test_keyword_enumerated(keyword_enumerated, dispatcher, client, modify, update):
     """Modify-update tests for an enumerated keyword."""
-    modify_update(dispatcher[keyword_enumerated], modify, update)
-    check_client_type(dispatcher[keyword_enumerated], client, update)
+    dkw = dispatcher[keyword_enumerated]
+    modify_update(dkw, modify, update)
+    
+    if not (inspect.isclass(update) and issubclass(update, Exception)):
+        cupdate = dkw.mapping.enums[update]
+    else:
+        cupdate = update
+    
+    check_client_type(dkw, client, cupdate)
     assert set(client[keyword_enumerated]['enumerators'].values()) == set(["ZERO", "ONE", "TWO", "THREE"])
 
 @pytest.mark.parametrize("kwtype", ['mask', 'integer array', 'float array', 'double array'])
