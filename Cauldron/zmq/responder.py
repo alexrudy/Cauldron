@@ -116,7 +116,7 @@ class ZMQPooler(ZMQThread):
         identifier = backend.recv()
         _ = backend.recv()
         if _ != b"":
-            raise ValueError("Expected buffer frame, got {!r}".format(_))
+            raise ValueError("Expected buffer frame, got {!r}".format(binascii.hexlify(_)))
         if len(identifier) == 0:
             raise ValueError("Expected nonzero identity!")
         msg = backend.recv_multipart()
