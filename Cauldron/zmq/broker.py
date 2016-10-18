@@ -711,13 +711,13 @@ class ZMQBroker(threading.Thread):
             while self.running.is_set():
                 self.respond()
             
-            self.close()
         except Exception as e:
             self._error = e
             raise
         else:
             self.log.debug("Broker done. running={0}".format(self.running.is_set()))
-        
+        finally:
+            self.close()
     
 
 def _setup_logging(verbose):
