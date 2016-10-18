@@ -115,6 +115,10 @@ class ZMQPooler(ZMQThread):
         zmq = check_zmq()
         identifier = backend.recv()
         _ = backend.recv()
+        if _ != b"":
+            raise ValueError("Expected buffer frame.")
+        if len(identifier) == 0:
+            raise ValueError("Expected nonzero identity")
         msg = backend.recv_multipart()
         self._active_workers.pop(identifier, None)
         if len(msg) == 1 and msg[0] == b"ready":
