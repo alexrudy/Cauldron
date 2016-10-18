@@ -397,13 +397,14 @@ class Enumerated(Integer):
         self.mapping = Enumeration()
         self.values = self.mapping.bkeys
         self._ALLOWED_KEYS = self._ALLOWED_KEYS.union(["enumerators"])
-        try:
-            xml = self.service.xml[self.name]
-            self.mapping.load_from_xml(xml)
-        except Exception as e:
-            if STRICT_KTL_XML:
-                raise
-            warnings.warn("XML enumeration setup for keyword '{0}' failed. {1}".format(self.name, e), CauldronXMLWarning)
+        if self.KTL_DISPATCHER:
+            try:
+                xml = self.service.xml[self.name]
+                self.mapping.load_from_xml(xml)
+            except Exception as e:
+                if STRICT_KTL_XML:
+                    raise
+                warnings.warn("XML enumeration setup for keyword '{0}' failed. {1}".format(self.name, e), CauldronXMLWarning)
         
     @property
     def keys(self):
