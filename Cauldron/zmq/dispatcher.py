@@ -63,7 +63,7 @@ class Service(DispatcherService):
             return self._sockets.socket
         
         zmq = check_zmq()
-        socket = self.ctx.socket(zmq.REQ)
+        socket = self.ctx.socket(zmq.DEALER)
         
         zmq_connect_socket(socket, self._config, "broker", log=self.log, label='dispatcher')
         self._sockets.socket = socket
@@ -78,6 +78,7 @@ class Service(DispatcherService):
     
     def _begin(self):
         """Allow command responses to start."""
+        zmq = check_zmq()
         try:
             if not self._thread.is_alive():
                 self._thread.start()
@@ -95,6 +96,7 @@ class Service(DispatcherService):
             self._alive = True
         
         while len(self._message_queue):
+            self.socket.send(b"", flags=zmq.SNDMORE)
             self.socket.send_multipart(self._message_queue.pop().data)
             response = ZMQCauldronMessage.parse(self.socket.recv_multipart())
             response.verify(self)
@@ -119,13 +121,15 @@ class Service(DispatcherService):
         
     def _synchronous_command(self, command, payload, keyword=None, timeout=None):
         """Execute a synchronous command."""
+        zmq = check_zmq()
         message = ZMQCauldronMessage(command, service=self.name, dispatcher=self.dispatcher,
             keyword=keyword.name if keyword else FRAMEBLANK, payload=payload, direction="CDQ")
         if not self._thread.running.is_set():
             self.log.trace("{0!r}.queue({1!s})".format(self, message))
             return self._message_queue.append(message)
         else:
-            self.log.trace("{0!r}.send({0!s})".format(message))
+            self.log.trace("{0!r}.send({1!s})".format(self, message))
+            self.socket.send(b"", flags=zmq.SNDMORE)
             self.socket.send_multipart(message.data)
             if timeout:
                 if not self.socket.poll(timeout * 1e3):
