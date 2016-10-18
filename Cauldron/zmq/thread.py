@@ -147,8 +147,8 @@ class ZMQThread(threading.Thread):
             self.log.trace("{0} joining.".format(self))
             self.join(timeout=get_timeout(timeout))
             if not self.is_alive():
-                self.log.trace("{0} joined.".format(self))
+                self.log.debug("{0} joined.".format(self))
             else:
                 self.log.warning("{0} join timed out.".format(self))
-            
-        self.log.debug("{0} stopped.".format(self.name))
+        else:
+            self.log.debug("{0} stopped.".format(self))

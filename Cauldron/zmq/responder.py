@@ -309,6 +309,8 @@ class ZMQWorker(ZMQMicroservice):
         self.log.log(5, "Starting responder loop.")
         while self.running.is_set():
             ready = dict(poller.poll(timeout=self.timeout*1e3))
+            if not self.running.is_set():
+                continue
             if signal in ready:
                 _ = signal.recv()
                 self.log.log(5, "Got a signal: .running = {0}".format(self.running.is_set()))
@@ -317,8 +319,11 @@ class ZMQWorker(ZMQMicroservice):
                 message = ZMQCauldronMessage.parse(backend.recv_multipart())
                 self.log.log(5, "{0!r}.recv({1})".format(self, message))
                 response = self.handle(message)
-                self.log.log(5, "{0!r}.send({1})".format(self, response))
-                backend.send_multipart(response.data)
+                if self.running.is_set():
+                    self.log.log(5, "{0!r}.send({1})".format(self, response))
+                    backend.send_multipart(response.data)
+                else:
+                    self.log.log(5, "{0!r}.drop({1})".format(self, response))
 
         
         backend.close(linger=0)
