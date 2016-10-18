@@ -164,9 +164,8 @@ class ZMQPooler(ZMQThread):
     
     def _shutdown_workers(self, backend, frontend):
         """Shut down workers."""
-        for worker in self._workers:
-            worker.stop()
         
+        # Drain the task queue from workers.
         while len(self._active_workers):
             if backend.poll(timeout=min([self.timeout, self._worker_timeout])*1e3*0.1):
                 self._handle_backend(frontend, backend)
@@ -176,9 +175,7 @@ class ZMQPooler(ZMQThread):
                     self._active_workers.pop(worker)
         
         for worker in self._workers:
-            worker.join(self._worker_timeout)
-            if worker.is_alive():
-                self.log.warning("{0!r}.join timed out.".format(worker))
+            worker.stop(self._worker_timeout)
         self.log.debug("Done with workers.")
     
     def thread_target(self):
