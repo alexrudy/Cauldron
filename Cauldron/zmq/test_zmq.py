@@ -9,7 +9,8 @@ from .broker import ZMQBroker
 from .thread import ZMQThread, ZMQThreadError
 from ..conftest import fail_if_not_teardown, available_backends
 from ..api import use
-from ..config import cauldron_configuration
+from ..config import cauldron_configuration, reset_timeouts
+from ..types import String
 
 pytestmark = pytest.mark.skipif("zmq" not in available_backends, reason="requires zmq")
 
@@ -29,6 +30,13 @@ def broker(request, backend, config):
         request.addfinalizer(b.stop)
     return b
     
+@pytest.fixture
+def config(config):
+    """Configuration"""
+    reset_timeouts()
+    return config
+    
+
 def test_zmq_available():
     """Test that ZMQ is or isn't available."""
     from Cauldron.zmq.common import ZMQ_AVAILABLE, check_zmq
@@ -62,7 +70,7 @@ def test_setup(broker, backend, config, servicename):
     
     svc = DFW.Service(servicename, config=config, setup=setup)
     svc["KEYWORD"]
-
+    
 class DummyThread(ZMQThread):
     """A dummy thread, which does nothing, then ends."""
     
