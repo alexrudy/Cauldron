@@ -126,11 +126,11 @@ def ktl_show(service, *keywords, **options):
             continue
         
         unit = keyword['units']
-        if unit == '':
+        if unit == '' or unit == "Unknown":
             outfile.write("{0}: {1}\n".format(keyword.name, value))
             outfile.flush()
         else:
-            outfile.write("{0}: {1} {2}\n".format(keyword.name, value, unit))
+            outfile.write("{0}: {1} | {2}\n".format(keyword.name, value, unit))
             outfile.flush()
     return
 

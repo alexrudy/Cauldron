@@ -181,10 +181,10 @@ def setup_entry_points():
     if CAULDRON_ENTRYPOINT_SETUP:
         return
     for ep in pkg_resources.iter_entry_points('Cauldron.backends'):
-        if hasattr(ep, 'load'):
-            obj = ep.load(require=False)
-        else:
+        if hasattr(ep, 'resolve'):
             obj = ep.resolve()
+        else:
+            obj = ep.load(require=False)
         if six.callable(obj):
             obj()
     CAULDRON_ENTRYPOINT_SETUP.on()

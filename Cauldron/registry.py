@@ -76,7 +76,7 @@ class Registry(object):
         self.guard("accessing the Keyword class")
         if self._keyword_cls is None:
             cls = self._keyword[self._backend]
-            self._keyword_cls = type('Keyword', (cls,),
+            self._keyword_cls = type('Keyword', (cls, object),
                 {'__module__':'{0}.Keyword'.format(self._modname)})
         return self._keyword[self._backend]
         
@@ -86,7 +86,7 @@ class Registry(object):
         self.guard("accessing the Service class")
         if self._service_cls is None:
             cls = self._service[self._backend]
-            self._service_cls = type('Service', (cls,),
+            self._service_cls = type('Service', (cls, object),
                 {'__module__':'{0}.Service'.format(self._modname)})
         return self._service_cls
         
