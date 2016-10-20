@@ -136,7 +136,8 @@ class ZMQThread(threading.Thread):
         
         # If the thread is starting, wait
         if not self.finished.is_set():
-            self.log.trace("{0} waiting for .started event.".format(self))
+            if not self.started.is_set():
+                self.log.trace("{0} waiting for .started event.".format(self))
             self.started.wait()
             
             if self.isAlive() and self.started.is_set():
