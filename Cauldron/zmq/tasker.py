@@ -8,7 +8,7 @@ import threading
 import sys
 import time
 from .common import zmq_connect_socket, check_zmq
-from .protocol import ZMQCauldronMessage
+from .protocol import ZMQCauldronMessage, FRAMEBLANK
 from .thread import ZMQThread
 from ..utils.callbacks import WeakMethod
 from ..exc import TimeoutError
@@ -33,12 +33,13 @@ class Task(_BaseTask):
 
 class TaskQueue(ZMQThread):
     """A client task queue"""
-    def __init__(self, name, ctx=None, log=None, timeout=None):
-        super(TaskQueue, self).__init__(name="ktl.Service.{0:s}.Tasks".format(name), context=ctx)
+    def __init__(self, name, ctx=None, log=None, timeout=None, backend_address=None):
+        super(TaskQueue, self).__init__(name=name, context=ctx)
         zmq = check_zmq()
         self._pending = {}
         self._task_timeout = ((get_timeout(timeout) or 1.0) * 60) # Wait 60x the normal timeout, then clear old stuff.
         self.frontend_address = "inproc://{0:s}-frontend".format(hex(id(self)))
+        self._backend_address = backend_address
         self._local = threading.local()
         self._frontend_sockets = []
         
@@ -86,11 +87,27 @@ class TaskQueue(ZMQThread):
         self.log.trace("{0!r}.put({1})".format(self, task.request))
         self.frontend.send(task.request.identifier)
         
+    def asynchronous_command(self, command, payload, service, keyword=None, direction="CDQ", timeout=None, callback=None, dispatcher=None):
+        """Run an asynchronous command."""
+        request = ZMQCauldronMessage(command, direction=direction,
+            service=service.name, dispatcher=dispatcher if dispatcher is not None else FRAMEBLANK,
+            keyword=keyword if keyword is not None else FRAMEBLANK, 
+            payload=payload if payload is not None else FRAMEBLANK)
+        task = Task(request, callback, get_timeout(timeout))
+        self.put(task)
+        return task
+        
+    def synchronous_command(self, command, payload, service, keyword=None, direction="CDQ", timeout=None, callback=None, dispatcher=None):
+        """Execute a synchronous command."""
+        timeout = get_timeout(timeout)
+        task = self.asynchronous_command(command, payload, service, keyword, direction, timeout, callback)
+        return task.get(timeout=timeout)
+        
     def thread_target(self):
         """Run the task queue thread."""
         zmq = check_zmq()
         backend = self.ctx.socket(zmq.DEALER)
-        zmq_connect_socket(backend, get_configuration(), "broker", log=self.log, label='client')
+        zmq_connect_socket(backend, get_configuration(), "broker", log=self.log, label='client', address=self._backend_address)
         
         frontend = self.ctx.socket(zmq.PULL)
         frontend.bind(self.frontend_address)

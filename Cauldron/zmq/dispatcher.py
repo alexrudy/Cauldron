@@ -74,8 +74,9 @@ class Service(DispatcherService):
     def _prepare(self):
         """Begin this service."""
         self._thread = ZMQPooler(self, zmq_get_address(self._config, "broker", bind=False))
+        self._tasker = TaskQueue(self.log.name +".Tasks", ctx=self.ctx, 
+                                 log=self.log, backend_address=self._thread.internal_address)
         self._scheduler = Scheduler(self.log.name + ".Scheduler", self.ctx)
-        self._message_queue = []
     
     def _begin(self):
         """Allow command responses to start."""
@@ -87,8 +88,13 @@ class Service(DispatcherService):
             if not self._scheduler.is_alive():
                 self._scheduler.start()
                 self.log.trace("Started ZMQ Scheduler Thread.")
+            if not self._tasker.is_alive():
+                self._tasker.start()
+                self.log.trace("Started ZMQ Tasker Thread.")
+            
             self._thread.check(timeout=10)
             self._scheduler.check(timeout=10)
+            self._tasker.check(timeout=10)
         except:
             self._thread.stop()
             self._scheduler.stop()
@@ -96,20 +102,16 @@ class Service(DispatcherService):
         else:
             self._alive = True
         
-        while len(self._message_queue):
-            self.socket.send(b"", flags=zmq.SNDMORE)
-            self.socket.send_multipart(self._message_queue.pop().data)
-            response = ZMQCauldronMessage.parse(self.socket.recv_multipart())
-            response.verify(self)
-        
     def shutdown(self):
+        
+        if hasattr(self, '_tasker') and self._tasker is not None:
+            self._tasker.stop()
+        
         if hasattr(self, '_scheduler') and self._scheduler is not None and self._scheduler.is_alive():
             self._scheduler.stop()
-            self._scheduler.join()
         
         if hasattr(self, '_thread') and self._thread is not None and self._thread.is_alive():
             self._thread.stop()
-            self._thread.join()
         
         for socket in self._sockets_to_close:
             socket.close()
@@ -120,24 +122,17 @@ class Service(DispatcherService):
             pass
         self._alive = False
         
-    def _synchronous_command(self, command, payload, keyword=None, timeout=None):
+    def _asynchronous_command(self, command, payload, keyword=None, timeout=None, callback=None):
         """Execute a synchronous command."""
-        zmq = check_zmq()
-        message = ZMQCauldronMessage(command, service=self.name, dispatcher=self.dispatcher,
-            keyword=keyword.name if keyword else FRAMEBLANK, payload=payload, direction="CDQ")
-        if not self._thread.running.is_set():
-            self.log.trace("{0!r}.queue({1!s})".format(self, message))
-            return self._message_queue.append(message)
-        else:
-            self.log.trace("{0!r}.send({1!s})".format(self, message))
-            self.socket.send(b"", flags=zmq.SNDMORE)
-            self.socket.send_multipart(message.data)
-            if timeout:
-                if not self.socket.poll(timeout * 1e3):
-                    raise TimeoutError("Dispatcher timed out performing a synchronous command. {0}: {1!r}".format(command, message))
-            response = ZMQCauldronMessage.parse(self.socket.recv_multipart())
-        response.verify(self)
-        return response
+        return self._tasker.asynchronous_command(command, payload, self, keyword, direction="CDQ",
+                                                 timeout=timeout, callback=callback,
+                                                 dispatcher=self.dispatcher)
+        
+    def _synchronous_command(self, command, payload, keyword=None, timeout=None, callback=None):
+        """Handle synchronous command."""
+        return self._tasker.synchronous_command(command, payload, self, keyword, direction="CDQ",
+                                                timeout=timeout, callback=callback,
+                                                dispatcher=self.dispatcher)
         
 
 @registry.dispatcher.keyword_for("zmq")
@@ -150,7 +145,7 @@ class Keyword(DispatcherKeyword):
     
     def _broadcast(self, value):
         """Broadcast this keyword value."""
-        self.service._synchronous_command("broadcast", value, self)
+        self.service._asynchronous_command("broadcast", value, self.name)
     
     def schedule(self, appointment=None, cancel=False):
         """Schedule an update."""
