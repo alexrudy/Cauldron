@@ -23,10 +23,30 @@ import six
 import threading
 import logging
 import warnings
+import atexit
 
 __all__ = ["Service", "Keyword"]
 
+def teardown():
+    """Teardown registered instances."""
+    _cleanup()
+
 registry.client.teardown_for('zmq')(teardown)
+
+_service_registry = set()
+
+def _cleanup(_registry=_service_registry):
+    """Cleanup a service instance at exit."""
+    while True:
+        try:
+            svc = _registry.pop()
+        except KeyError:
+            break
+        else:
+            svc.shutdown()
+
+atexit.register(_cleanup)
+
 
 class _ZMQMonitorThread(ZMQThread):
     """A monitoring thread for ZMQ-powered Services which listens for broadcasts."""
@@ -111,6 +131,7 @@ class Service(ClientService):
         self._tasker = None
         self._lock = threading.RLock()
         self._type_ktl_cache = {}
+        _service_registry.add(self)
         super(Service, self).__init__(name, populate)
         
     def _prepare(self):
@@ -118,7 +139,7 @@ class Service(ClientService):
         if not ZMQBroker.check(ctx=self.ctx):
             raise ZMQDispatcherError("Can't locate a suitable dispatcher for {0}".format(self.name))
         self._monitor = _ZMQMonitorThread(self)
-        self._tasker = TaskQueue(self.name, ctx=self.ctx, log=self.log)
+        self._tasker = TaskQueue("ktl.Service.{0:s}.Tasks".format(self.name), ctx=self.ctx, log=self.log)
         self._tasker.start()
         address = self._synchronous_command("lookup", "subscribe", direction="CBQ")
         self._monitor.address = address
@@ -186,22 +207,13 @@ class Service(ClientService):
     
     def _asynchronous_command(self, command, payload, keyword=None, direction="CDQ", timeout=None, callback=None):
         """Run an asynchronous command."""
-        request = ZMQCauldronMessage(command, direction=direction,
-            service=self.name, dispatcher=FRAMEBLANK,
-            keyword=keyword if keyword is not None else FRAMEBLANK, 
-            payload=payload if payload is not None else FRAMEBLANK)
-        
         callback = callback or self._handle_response
-        
-        task = Task(request, callback, get_timeout(timeout))
-        self._tasker.put(task)
-        return task
+        return self._tasker.asynchronous_command(command, payload, self, keyword, direction, timeout, callback)
         
     def _synchronous_command(self, command, payload, keyword=None, direction="CDQ", timeout=None, callback=None):
         """Execute a synchronous command."""
-        timeout = get_timeout(timeout)
-        task = self._asynchronous_command(command, payload, keyword, direction, timeout, callback)
-        return task.get(timeout=timeout)
+        callback = callback or self._handle_response
+        return self._tasker.synchronous_command(command, payload, self, keyword, direction, timeout, callback)
         
     
 @registry.client.keyword_for("zmq")
@@ -258,7 +270,6 @@ class Keyword(ClientKeyword):
     
     def _await(self, task, timeout, _call_msg=None):
         """Await an asynchronous task."""
-        
         if _call_msg is None:
             _call_msg = lambda : "{0!r}_await(task={1!r}, timeout={2!r})".format(self, task, timeout)
         

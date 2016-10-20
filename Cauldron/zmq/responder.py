@@ -84,6 +84,7 @@ def _check_for_registration(service, socket, poller=None, log=None, timeout=None
     
     # Check that we got the welcome message.
     ready = dict(poller.poll(timeout=timeout * 1e3))
+    log.log(5, repr(ready) + repr(socket) + repr(zmq.POLLIN))
     if ready.get(socket) == zmq.POLLIN:
         message = ZMQCauldronMessage.parse(socket.recv_multipart())
         if message.payload != "confirmed":
@@ -111,6 +112,11 @@ class ZMQPooler(ZMQThread):
             pool_size = self.service._config.getint("zmq", "pool")
         self._pool_size = pool_size
         self.timeout = timeout
+        
+    @property
+    def internal_address(self):
+        """Return the internal address for the pooler."""
+        return self._internal_address
     
     def _handle_backend(self, frontend, internal, backend):
         """Handle a backend request."""
@@ -128,12 +134,12 @@ class ZMQPooler(ZMQThread):
             self.log.trace("{0}.recv() worker {1} ready".format(self, binascii.hexlify(identifier)))
         elif fori == "F":
             self.log.trace("{0}.broker() B2F {1}".format(self, binascii.hexlify(identifier)))
-            frontend.send(b"", flags=zmq.SNDMORE)
-            frontend.send_multipart(msg)
+            frontend.send(b"", flags=zmq.SNDMORE|zmq.NOBLOCK)
+            frontend.send_multipart(msg, flags=zmq.NOBLOCK)
         elif fori == "I":
             self.log.trace("{0}.broker() B2I {1}".format(self, binascii.hexlify(identifier)))
-            internal.send(b"", flags=zmq.SNDMORE)
-            internal.send_multipart(msg)
+            internal.send(b"", flags=zmq.SNDMORE|zmq.NOBLOCK)
+            internal.send_multipart(msg, flags=zmq.NOBLOCK)
         self._worker_queue.append(identifier)
         
     def _handle_frontend(self, frontend, backend, code="F"):
@@ -179,18 +185,19 @@ class ZMQPooler(ZMQThread):
     def _shutdown_workers(self, frontend, internal, backend):
         """Shut down workers."""
         
-        # Drain the task queue from workers.
-        while len(self._active_workers):
-            if backend.poll(timeout=min([self.timeout, self._worker_timeout])*1e3*0.1):
-                self._handle_backend(frontend, internal, backend)
-            now = time.time()
-            for worker in list(self._active_workers.keys()):
-                if now > (self._active_workers[worker]):
-                    self._active_workers.pop(worker)
-        
-        for worker in self._workers:
-            worker.stop(self._worker_timeout)
-        self.log.debug("Done with workers.")
+        try:
+            # Drain the task queue from workers.
+            while len(self._active_workers):
+                if backend.poll(timeout=min([self.timeout, self._worker_timeout])*1e3*0.1):
+                    self._handle_backend(frontend, internal, backend)
+                now = time.time()
+                for worker in list(self._active_workers.keys()):
+                    if now > (self._active_workers[worker]):
+                        self._active_workers.pop(worker)
+        finally:
+            for worker in self._workers:
+                worker.stop(self._worker_timeout)
+            self.log.debug("Done with workers.")
     
     def thread_target(self):
         """Run the thread worker"""
@@ -200,7 +207,7 @@ class ZMQPooler(ZMQThread):
         frontend = self.ctx.socket(zmq.DEALER)
         self.connect(frontend, self._frontend_address)
         internal = self.ctx.socket(zmq.DEALER)
-        self.connect(internal, self._internal_address)
+        self.connect(internal, self._internal_address, 'bind')
         backend = self.ctx.socket(zmq.ROUTER)
         self.connect(backend, self._backend_address, 'bind')
         
@@ -210,7 +217,12 @@ class ZMQPooler(ZMQThread):
         poller.register(internal, zmq.POLLIN)
         poller.register(signal, zmq.POLLIN)
         
-        self.__broker = register_dispatcher(self.service, frontend, poller, self.log, address=self._frontend_address)
+        r_poller = zmq.Poller()
+        r_poller.register(frontend, zmq.POLLIN)
+        r_poller.register(signal, zmq.POLLIN)
+        
+        self.log.debug("Registering dispatcher {0} with broker at {1}".format(self.service.dispatcher, self._frontend_address))
+        self.__broker = register_dispatcher(self.service, frontend, r_poller, self.log, address=self._frontend_address)
         
         self.log.debug("{0} starting workers".format(self))
         for i in range(self._pool_size):
@@ -225,11 +237,13 @@ class ZMQPooler(ZMQThread):
                 if not self._poll_and_respond(poller, frontend, internal, backend, signal):
                     break
         finally:
-            self._shutdown_workers(frontend, internal, backend)
-            backend.close(linger=0)
-            internal.close(linger=0)
-            frontend.close(linger=self.timeout*1e3)
-            signal.close(linger=0)
+            try:
+                self._shutdown_workers(frontend, internal, backend)
+            finally:
+                backend.close(linger=0)
+                internal.close(linger=0)
+                frontend.close(linger=self.timeout*1e3)
+                signal.close(linger=0)
         
 
 class ZMQWorker(ZMQMicroservice):
