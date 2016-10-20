@@ -145,8 +145,9 @@ class ZMQThread(threading.Thread):
                 
         
         if join or (not self.daemon):
-            self.log.trace("{0} joining.".format(self))
-            self.join(timeout=get_timeout(timeout))
+            timeout = get_timeout(timeout)
+            self.log.trace("{0} joining. timeout={1}".format(self, timeout))
+            self.join(timeout=timeout)
             if not self.is_alive():
                 self.log.debug("{0} joined.".format(self))
             else:
