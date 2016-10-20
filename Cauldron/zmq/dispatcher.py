@@ -9,6 +9,7 @@ from .protocol import ZMQCauldronMessage, FRAMEFAIL, FRAMEBLANK
 from .responder import ZMQPooler
 from .broker import ZMQBroker
 from .schedule import Scheduler
+from .tasker import Task, TaskQueue
 from ..base import DispatcherService, DispatcherKeyword
 from .. import registry
 from ..exc import DispatcherError, WrongDispatcher, TimeoutError
