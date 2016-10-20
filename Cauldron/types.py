@@ -284,7 +284,11 @@ class Double(Basic):
         
     def postread(self, value):
         """Post read """
-        return super(Double, self).postread(self._type(value))
+        try:
+            value = self._type(value)
+        except:
+            pass
+        return super(Double, self).postread(value)
     
 @dispatcher_keyword
 class Float(Double):
