@@ -15,7 +15,7 @@ import uuid
 from ..exc import DispatcherError
 
 __all__ = ['MessageType', 'Directions', 'ZMQCauldronErrorResponse', 
-    'ZMQCauldronParserError', 'ZMQCauldronMessage', 'PrefixMatchError']
+    'ZMQCauldronParserError', 'ZMQCauldronMessage', 'PrefixMatchError', 'FrameFailureError']
 
 FRAMEBLANK = six.binary_type(b"\x01")
 FRAMEFAIL = six.binary_type(b"\x02")
@@ -166,9 +166,12 @@ class ZMQCauldronErrorResponse(Exception):
         super(ZMQCauldronErrorResponse, self).__init__(msg)
         self.message = message
         
+class FrameFailureError(Exception):
+    """Raised to indicate a messagte failed"""
+    pass
+        
 class ZMQCauldronParserError(ZMQCauldronErrorResponse):
     """An error caused by a failed parser."""
-    pass
     
     @classmethod
     def with_message(cls, message):
@@ -187,6 +190,13 @@ def decode(str_or_bytes):
             if len(result) != len(special.decode('utf-8')):
                 result = result[len(special.decode('utf-8')):]
     return result
+    
+def _decode_handle_none(value, alternative=FRAMEBLANK):
+    if value is None:
+        rv = alternative
+    else:
+        rv = value
+    return decode(rv)
 
 class ZMQCauldronMessage(object):
     """A message object."""
@@ -196,11 +206,11 @@ class ZMQCauldronMessage(object):
     def __init__(self, command=FRAMEBLANK, service=FRAMEBLANK, dispatcher=FRAMEBLANK, 
         keyword=FRAMEBLANK, payload=FRAMEBLANK, direction="CDQ", prefix=None, identifier=None):
         super(ZMQCauldronMessage, self).__init__()
-        self.command = decode(command or FRAMEBLANK)
-        self.service = decode(service or FRAMEBLANK)
-        self.dispatcher = decode(dispatcher or FRAMEBLANK)
-        self.keyword = decode(keyword or FRAMEBLANK)
-        self.payload = decode(payload or FRAMEBLANK)
+        self.command = _decode_handle_none(command)
+        self.service = _decode_handle_none(service)
+        self.dispatcher = _decode_handle_none(dispatcher)
+        self.keyword = _decode_handle_none(keyword)
+        self.payload = _decode_handle_none(payload)
         direction = decode(direction)
         if direction not in DIRECTIONS.codes:
             raise ValueError("Invalid choice of message direction: {0} {1!r}".format(direction, DIRECTIONS.codes))
@@ -341,6 +351,14 @@ class ZMQCauldronMessage(object):
         """Represent the message, including prefix."""
         return "<{0} |{1}|{2}>".format(self.__class__.__name__,
             "|".join([binascii.hexlify(p).decode('utf-8') for p in self.prefix]), self.to_string())
+    
+    def unwrap(self):
+        """Unwrap the payload."""
+        if self.payload == FRAMEBLANK.decode('utf-8'):
+            return None
+        elif self.payload == FRAMEFAIL.decode('utf-8'):
+            raise FrameFailureError("Frame failure: {0!r}".format(self))
+        return self.payload
     
     @classmethod
     def parse(cls, data):

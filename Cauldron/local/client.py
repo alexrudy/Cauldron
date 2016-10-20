@@ -25,6 +25,8 @@ class LocalTask(_BaseTask):
         super(LocalTask, self).__call__()
         if self.error is not None:
             self.error = DispatcherError(str(self.error))
+        if self.exc_info is not None:
+            self.exc_info = (DispatcherError, self.error, self.exc_info[2])
     
 class LocalTaskQueue(threading.Thread):
     
@@ -76,6 +78,12 @@ class Keyword(ClientKeyword):
         """Determine if this keyword is monitored."""
         return self._update in self.source._consumers
         
+    def _ktl_units(self):
+        """Units for this keyword."""
+        if getattr(self, '_units', None) is None:
+            self._units = self.source._get_units()
+        return '' if self._units is None else self._units
+        
     def monitor(self, start=True, prime=True, wait=True):
         if prime:
             self.read(wait=wait)
@@ -85,7 +93,7 @@ class Keyword(ClientKeyword):
             self.source._consumers.discard(self._update)
         
     def _read_task(self, unused):
-        result = self.source.update()
+        result = str(self.source.update()) # Ensure ascii across the wire.
         self._update(result)
         
     def read(self, binary=False, both=False, wait=True, timeout=None):
@@ -108,8 +116,8 @@ class Keyword(ClientKeyword):
             return task
         
     def _write_task(self, value):
-        self.source.modify(value)
-        self._update(self.source.value)
+        self.source.modify(str(value))
+        self._update(str(self.source.value))
         return self._current_value()
         
     def write(self, value, wait=True, binary=False, timeout=None):

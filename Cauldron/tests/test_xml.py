@@ -68,6 +68,10 @@ def test_Service_with_dispatcher(xmlvar, backend, servicename, config, keyword_n
     keyword = svc[keyword_name_ENUMERATED]
     svc.shutdown()
     
+def test_keyword_units(strictxml, dispatcher, client, keyword_name_INTEGER):
+    """Test a keyword with units"""
+    assert client[keyword_name_INTEGER]['units'] == 'warps'
+    
 def test_Service_with_wrong_dispatcher(strictxml, backend, servicename, config, keyword_name_ENUMERATED, dispatcher_name2):
     """XML service with dispatcher explicitly set."""
     from Cauldron import DFW

@@ -6,8 +6,8 @@
 	<keyword>
 		<name>KEYWORD_ENUMERATED</name>
 		<type>enumerated</type>
-		<help level="brief">Control loop mode</help>
-		<help level="verbose">Control loop mode.</help>
+		<help level="brief">Brief help text on an enumerated keyword.</help>
+		<help level="verbose">Verbose help text on an enumerated keyword.</help>
 		<values>
 			<entry>
 				<key>0</key>
@@ -25,4 +25,130 @@
 			</initialize>
 		</serverside>
 	</keyword>
+	<keyword>
+		<name>KEYWORD_INTEGER</name>
+		<type>integer</type>
+		<help level="brief">An integer keyword with units.</help>
+		<help level="verbose">A long description of an integer keyword with units.</help>
+		<units>warps</units>
+	</keyword>
+	<keyword>
+		<name>COMMAND</name>
+		<type>boolean</type>
+		<units>myunit</units>
+	</keyword>
+	<keyword>
+		<name>KEYWORD</name>
+		<type>basic</type>
+	</keyword>
+	<keyword>
+		<name>KEYWORD0</name>
+		<type>basic</type>
+	</keyword>
+	<keyword>
+		<name>KEYWORD1</name>
+		<type>basic</type>
+	</keyword>
+	<keyword>
+		<name>KEYWORD2</name>
+		<type>basic</type>
+	</keyword>
+	<keyword>
+		<name>MUNGEDKEYWORD</name>
+		<type>basic</type>
+	</keyword>
+	<keyword>
+		<name>MYBASIC</name>
+		<type>basic</type>
+		<units>myunit</units>
+	</keyword>
+	<keyword>
+		<name>MYBOOLEAN</name>
+		<type>boolean</type>
+		<units>myunit</units>
+	</keyword>
+	<keyword>
+		<name>MYDOUBLE</name>
+		<type>double</type>
+		<units>myunit</units>
+	</keyword>
+	<keyword>
+		<name>MYENUMERATED</name>
+		<type>enumerated</type>
+		<units>myunit</units>
+		<values>
+			<entry>
+				<key>0</key>
+				<value>ZERO</value>
+			</entry>
+			<entry>
+				<key>1</key>
+				<value>ONE</value>
+			</entry>
+			<entry>
+				<key>2</key>
+				<value>TWO</value>
+			</entry>
+			<entry>
+				<key>3</key>
+				<value>THREE</value>
+			</entry>
+		</values>
+	</keyword>
+	<keyword>
+		<name>MYFLOAT</name>
+		<type>float</type>
+		<units>myunit</units>
+	</keyword>
+	<keyword>
+		<name>MYINT</name>
+		<type>integer</type>
+		<units>myunit</units>
+	</keyword>
+	<keyword>
+		<name>MYINTEGER</name>
+		<type>integer</type>
+		<units>myunit</units>
+	</keyword>
+	<keyword>
+		<name>MYKEYWORD</name>
+		<type>basic</type>
+	</keyword>
+	<keyword>
+		<name>MYNOTIMPLEMENTEDDOUBLEARRAY</name>
+		<type>double array</type>
+	</keyword>
+	<keyword>
+		<name>MYNOTIMPLEMENTEDFLOATARRAY</name>
+		<type>float array</type>
+	</keyword>
+	<keyword>
+		<name>MYNOTIMPLEMENTEDINTEGERARRAY</name>
+		<type>integer array</type>
+	</keyword>
+	<keyword>
+		<name>MYNOTIMPLEMENTEDMASK</name>
+		<type>mask</type>
+	</keyword>
+	<keyword>
+		<name>MYSTRING</name>
+		<type>string</type>
+	</keyword>
+	<keyword>
+		<name>OTHERKEYWORD</name>
+		<type>basic</type>
+	</keyword>
+	<keyword>
+		<name>OTHERKEYWORD2</name>
+		<type>basic</type>
+	</keyword>
+	<keyword>
+		<name>SOMEKEYWORD</name>
+		<type>basic</type>
+	</keyword>
+	<keyword>
+		<name>TYPEDKEYWORD</name>
+		<type>basic</type>
+	</keyword>
+	
 </bundle>

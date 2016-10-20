@@ -77,7 +77,8 @@ class _KeywordEvent(object):
             self.listeners.append(listener)
         if event.replace_method and self.nlisteners > 1:
             raise ValueError("There is more than one method replacement for '{0}'"
-                 " on keyword '{1}'".format(event.name, keyword.name))
+                 " on keyword '{1}': [{2:s}]".format(event.name, keyword.name, 
+                 ",".join([repr(cb) for l in self.listeners for cb in l.event.callbacks])))
         
         self.replace_method |= event.replace_method
         self.name = event.name

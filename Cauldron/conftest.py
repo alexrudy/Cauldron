@@ -54,7 +54,9 @@ def pytest_configure(config):
     except ValueError:
         try:
             from lumberjack.config import configure
+            from lumberjack.warnings import captureWarnings
             configure("stream")
+            captureWarnings()
         except ImportError:
             pass
 
@@ -104,7 +106,7 @@ MAX_KEYWORD_NUBMER = 4
 def pytest_generate_tests(metafunc):
     for fixture in metafunc.fixturenames:
         if fixture.startswith("keyword_name_"):
-            postfix = fixture[len("keyword_name_"):]
+            postfix = fixture[len("keyword_name_"):].upper()
             metafunc.parametrize(fixture, ["KEYWORD_{0:s}".format(postfix)])
         elif fixture.startswith("keyword_name"):
             number = int("0"+fixture[len("keyword_name"):])
@@ -112,20 +114,25 @@ def pytest_generate_tests(metafunc):
                 raise ValueError("Fixture {0} doesn't represent a known keyword.".format(fixture))
             metafunc.parametrize(fixture, ["KEYWORD{0:d}".format(number)])
         if fixture.startswith("missing_keyword_name"):
-            postfix = fixture[len("missing_keyword_name"):]
+            postfix = fixture[len("missing_keyword_name"):].upper()
             metafunc.parametrize(fixture, ["MISSINGKEYWORD{0:s}".format(postfix)])
     
 @pytest.fixture(scope='function')
 def config(tmpdir):
     """DFW configuration."""
     from .config import cauldron_configuration
-    cauldron_configuration.set("zmq", "broker", "tcp://localhost:9090")
-    cauldron_configuration.set("zmq", "publish", "tcp://localhost:9091")
-    cauldron_configuration.set("zmq", "subscribe", "tcp://localhost:9092")
+    cauldron_configuration.set("zmq", "broker", "inproc://broker")
+    cauldron_configuration.set("zmq", "publish", "inproc://publish")
+    cauldron_configuration.set("zmq", "subscribe", "inproc://subscribe")
     cauldron_configuration.set("zmq", "pool", "2")
     cauldron_configuration.set("zmq", "timeout", "5")
     cauldron_configuration.set("core", "timeout", "5")
     return cauldron_configuration
+    
+@pytest.fixture
+def noOrphans(config):
+    """Set the configuration to not setup orphans."""
+    config.set("core","setupOrphans","no")
     
 
 @pytest.fixture(scope='function')
@@ -158,12 +165,33 @@ def dispatcher_name2():
     """The dispatcher name"""
     return "+service+_dispatch_2"
 
+@pytest.fixture
+def dispatcher_setup(request, backend):
+    """Return a list of dispatcher functions to be set up."""
+    setup_functions = []
+    def clear():
+        del setup_functions[:]
+    request.addfinalizer(clear)
+    return setup_functions
+    
+@pytest.fixture
+def dispatcher_setup_func(dispatcher_setup):
+    """A dispatcher setup function"""
+    def setup(service):
+        for func in dispatcher_setup:
+            func(service)
+    return setup
 
 @pytest.fixture
-def dispatcher(request, backend, servicename, config, dispatcher_name):
+def dispatcher_args(backend, servicename, config, dispatcher_name, dispatcher_setup_func, xmlvar):
+    """Arguments required to start a dispatcher."""
+    return (servicename, config, dispatcher_setup_func, dispatcher_name)
+
+@pytest.fixture
+def dispatcher(request, backend, servicename, config, dispatcher_name, dispatcher_setup_func, xmlvar):
     """Establish the dispatcher for a particular kind of service."""
     from Cauldron import DFW
-    svc = DFW.Service(servicename, config, dispatcher=dispatcher_name)
+    svc = DFW.Service(servicename, config, dispatcher_setup_func, dispatcher=dispatcher_name)
     request.addfinalizer(lambda : svc.shutdown())
     return svc
     

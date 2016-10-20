@@ -5,6 +5,7 @@ Base classes relevant to all Cauldron tools.
 from __future__ import absolute_import
 
 import six
+import sys
 import abc
 import time
 import weakref
@@ -31,7 +32,7 @@ class _CauldronBaseMeta(InheritDocstrings, abc.ABCMeta):
 class Task(object):
     """A task container for the task queue."""
     
-    __slots__ = ('request', 'event', 'result', 'response', 'error', 'callback', 'timeout')
+    __slots__ = ('request', 'event', 'result', 'response', 'error', 'exc_info', 'callback', 'timeout')
     
     def __init__(self, message, callback, timeout=None):
         super(Task, self).__init__()
@@ -46,6 +47,7 @@ class Task(object):
         self.response = None
         self.result = None
         self.error = None
+        self.exc_info = None
         self.event = threading.Event()
         
     def __call__(self):
@@ -54,6 +56,7 @@ class Task(object):
             self.result = self.callback(self.request)
         except Exception as e:
             self.error = e
+            self.exc_info = sys.exc_info()
         self.event.set()
         
     def wait(self, timeout=None):
@@ -62,14 +65,19 @@ class Task(object):
             self.event.wait(timeout=get_timeout(timeout))
         return self.event.isSet()
     
+    def reraise(self):
+        """Re-raise the internal error."""
+        if self.exc_info is not None:
+            six.reraise(*self.exc_info)
+        elif self.error is not None:
+            raise self.error
+    
     def get(self, timeout=None):
         """Get the result."""
-        if self.error is not None:
-            raise self.error
+        self.reraise()
         if not self.wait(timeout=timeout):
             raise TimeoutError("Task timed out.")
-        if self.error is not None:
-            raise self.error
+        self.reraise()
         return self.result
         
     def timedout(self, msg="Task timed out."):
@@ -101,6 +109,9 @@ class _BaseKeyword(object):
     service = None
     """The parent :class:`Service` object for this keyword."""
     
+    _name = "?name?"
+    """Default name for this class."""
+    
     def __init__(self, service, name, type=None):
         super(_BaseKeyword, self).__init__()
         name = str(name).upper()
@@ -120,7 +131,7 @@ class _BaseKeyword(object):
     def __repr__(self):
         """Represent this keyword"""
         repr_str = "<{0} service={1} name={2}".format(
-            self.__class__.__name__, self.service.name, self.name)
+            self.__class__.__name__, getattr(self.service, 'name', '?service?'), self.name)
         if getattr(self, '_last_value', None) is not None:
             repr_str += " value={value}".format(value=self._last_value)
         return repr_str + ">"

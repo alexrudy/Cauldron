@@ -61,12 +61,13 @@ class Keyword(_BaseKeyword):
     
     """
     
-    _ALLOWED_KEYS = ['ascii', 'binary', 'broadcasts', 'name', 'monitored', 'monitor', 'populated', 'reads', 'writes', 'timestamp', 'units', 'type']
+    _ALLOWED_KEYS = set(['ascii', 'binary', 'broadcasts', 'name', 'monitored', 'monitor', 'populated', 'reads', 'writes', 'timestamp', 'units', 'type'])
     
     def __init__(self, service, name, type=None):
         super(Keyword, self).__init__(service, name, type)
         self._callbacks = Callbacks()
         self.history = collections.deque(maxlen=5)
+        self._units = None
     
     @api_not_implemented
     def _ktl_broadcasts(self):
@@ -100,10 +101,15 @@ class Keyword(_BaseKeyword):
         """Time stamp from the last KTL read."""
         if self._last_read is not None:
             return time.mktime(self._last_read.timetuple())
-        
+    
+    @abc.abstractmethod
     def _ktl_units(self):
-        """KTL units."""
-        return None # pragma: no cover
+        """Get the units for this keyword."""
+        pass
+        
+    def _ktl_binary(self):
+        """Return the binary value (Native python type.)"""
+        return self.cast(self._ktl_value())
         
     @api_override
     def cast(self, value):
@@ -251,6 +257,7 @@ class Service(_BaseService):
         """Delete this service."""
         self.shutdown()
         
+    @api_override
     def shutdown(self):
         """An explicity shutdown method."""
         pass

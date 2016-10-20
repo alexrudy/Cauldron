@@ -32,7 +32,7 @@ def _docstring_left_indent(docstring):
         try:
             left_indent = min(match.start() for match in matches if match)
         except ValueError:
-            raise ValueError("Malformed docstring '{0:s}'".format(docstring))
+            left_indent = 0
     else:
         left_indent = 0
     return left_indent

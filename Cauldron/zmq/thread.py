@@ -4,6 +4,7 @@ import weakref
 import logging
 import threading
 import six
+import sys
 import collections
 
 from ..config import get_timeout
@@ -40,6 +41,7 @@ class ZMQThread(threading.Thread):
         self.finished = threading.Event()
         self.log = logging.getLogger(name)
         self._error = None
+        self._exc_tb = None
         self._signal_address = "inproc://signal-{0:s}-{1:s}".format(hex(id(self)), name)
         
     def start(self):
@@ -58,6 +60,7 @@ class ZMQThread(threading.Thread):
         except zmq.ZMQError as e:
             self.log.error("{0} can't {1} to address '{1}' because {2}".format(self, method, address, e))
             self._error = e
+            self._exc_tb = sys.exc_info()[2]
             raise
         else:
             self.log.trace("{0} {1} to address '{2}'".format(self, method, address))
@@ -99,6 +102,7 @@ class ZMQThread(threading.Thread):
         except Exception as exc:
             self.log.trace("{0} shutdown because '{1!r}'.".format(self, exc))
             self._error = exc
+            self._exc_tb = sys.exc_info()[2]
             self.log.exception("{0} error:".format(self))
             # raise
         else:
@@ -119,7 +123,7 @@ class ZMQThread(threading.Thread):
                 msg += " Thread Error: {0}".format(repr(self._error))
             else:
                 msg += " No error was reported."
-            raise ZMQThreadError(msg, self._error)
+            six.reraise(ZMQThreadError, ZMQThreadError(msg, self._error), self._exc_tb)
         
     def stop(self, join=True, timeout=None):
         """Stop the responder thread."""
@@ -132,7 +136,8 @@ class ZMQThread(threading.Thread):
         
         # If the thread is starting, wait
         if not self.finished.is_set():
-            self.log.trace("{0} waiting for .started event.".format(self))
+            if not self.started.is_set():
+                self.log.trace("{0} waiting for .started event.".format(self))
             self.started.wait()
             
             if self.isAlive() and self.started.is_set():
@@ -143,8 +148,8 @@ class ZMQThread(threading.Thread):
             self.log.trace("{0} joining.".format(self))
             self.join(timeout=get_timeout(timeout))
             if not self.is_alive():
-                self.log.trace("{0} joined.".format(self))
+                self.log.debug("{0} joined.".format(self))
             else:
                 self.log.warning("{0} join timed out.".format(self))
-            
-        self.log.debug("{0} stopped.".format(self.name))
+        else:
+            self.log.debug("{0} stopped.".format(self))
