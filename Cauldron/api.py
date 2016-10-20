@@ -61,7 +61,7 @@ def use(name):
     setup_entry_points()
     
     if name not in registry.keys():
-        eps = map(repr,pkg_resources.iter_entry_points('Cauldron.backends'))
+        eps = map(repr, pkg_resources.iter_entry_points('Cauldron.backends'))
         raise ValueError("The Cauldron backend '{0}' is not registered. Available backends are {1:s}. Entry points were {2:s}".format(
             name, ",".join(registry.keys()), ",".join(eps)))
     
