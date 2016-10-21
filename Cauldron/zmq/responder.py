@@ -188,13 +188,15 @@ class ZMQPooler(ZMQThread):
         try:
             # Drain the task queue from workers.
             while len(self._active_workers):
-                if backend.poll(timeout=min([self.timeout, self._worker_timeout])*1e3*0.1):
+                if backend.poll(timeout=min([self.timeout, self._worker_timeout])*1e3):
                     self._handle_backend(frontend, internal, backend)
                 now = time.time()
                 for worker in list(self._active_workers.keys()):
                     if now > (self._active_workers[worker]):
                         self._active_workers.pop(worker)
         finally:
+            for worker in self._workers:
+                worker.signal_stop()
             for worker in self._workers:
                 worker.stop(self._worker_timeout)
             self.log.debug("Done with workers.")
