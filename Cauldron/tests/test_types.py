@@ -117,7 +117,7 @@ def test_keyword_type_not_implemented(kwtype, dispatcher_args, dispatcher_setup,
     from Cauldron import DFW
     from Cauldron.exc import CauldronAPINotImplementedWarning
     def setup(dispatcher):
-        kwd = DFW.Keyword.types[kwtype]("MYNOTIMPLEMENTED{}".format(kwtype.upper().replace(" ","")), dispatcher)
+        kwd = DFW.Keyword.types[kwtype]("MYNOTIMPLEMENTED{0}".format(kwtype.upper().replace(" ","")), dispatcher)
         w = recwarn.pop()
         assert issubclass(w.category, CauldronAPINotImplementedWarning)
     dispatcher_setup.append(setup)
