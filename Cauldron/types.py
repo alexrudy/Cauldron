@@ -197,7 +197,7 @@ class DispatcherKeywordType(KeywordType):
     """Keyword type for dispatchers."""
     
     @classmethod
-    def _get_cauldron_basecls(cls, dispatcher):
+    def _get_cauldron_basecls(cls, dispatcher=None):
         """Get the Cauldron basecls."""
         assert dispatcher in (None, True)
         registry.dispatcher.guard("initializing any keyword objects.")
@@ -207,7 +207,7 @@ class ClientKeywordType(KeywordType):
     """Keyword type for ktl clients."""
     
     @classmethod
-    def _get_cauldron_basecls(self, dispatcher):
+    def _get_cauldron_basecls(cls, dispatcher=None):
         """Get the Cauldron basecls."""
         assert dispatcher in (None, False)
         registry.client.guard("initializing any keyword objects.")
