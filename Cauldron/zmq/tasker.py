@@ -100,7 +100,7 @@ class TaskQueue(ZMQThread):
     def synchronous_command(self, command, payload, service, keyword=None, direction="CDQ", timeout=None, callback=None, dispatcher=None):
         """Execute a synchronous command."""
         timeout = get_timeout(timeout)
-        task = self.asynchronous_command(command, payload, service, keyword, direction, timeout, callback)
+        task = self.asynchronous_command(command, payload, service, keyword, direction, timeout, callback, dispatcher)
         return task.get(timeout=timeout)
         
     def thread_target(self):
