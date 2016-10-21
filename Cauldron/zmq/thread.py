@@ -125,9 +125,8 @@ class ZMQThread(threading.Thread):
                 msg += " No error was reported."
             six.reraise(ZMQThreadError, ZMQThreadError(msg, self._error), self._exc_tb)
         
-    def stop(self, join=True, timeout=None):
-        """Stop the responder thread."""
-        # If the thread is not alive, do nothing.
+    def signal_stop(self):
+        """Signal to the underlying thread in a safe way."""
         if not self.isAlive():
             return
         
@@ -142,9 +141,13 @@ class ZMQThread(threading.Thread):
             
             if self.isAlive() and self.started.is_set():
                 self.send_signal()
-                
         
-        if join or (not self.daemon):
+    def stop(self, join=True, timeout=None):
+        """Stop the responder thread."""
+        # If the thread is not alive, do nothing.
+        self.signal_stop()
+        
+        if join:
             timeout = get_timeout(timeout)
             self.log.trace("{0} joining. timeout={1}".format(self, timeout))
             self.join(timeout=timeout)
