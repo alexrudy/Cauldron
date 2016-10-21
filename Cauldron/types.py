@@ -462,6 +462,11 @@ class Enumerated(Integer):
         except (TypeError, ValueError, KeyError) as e:
             raise ValueError("Bad value for enumerated keyword {0}: '{1}' not in {2!r}".format(self.full_name, value, self.mapping))
         return str(ivalue)
+        
+    def _update(self, value):
+        """Update this keyword value."""
+        super(Enumerated, self)._update(self.cast(value))
+        
 
 @dispatcher_keyword
 class Mask(Basic, _NotImplemented):
