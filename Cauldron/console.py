@@ -12,12 +12,6 @@ import sys
 from .exc import TimeoutError, DispatcherError
 from .config import get_timeout
 
-try:
-    import lumberjack
-    lumberjack.setup_warnings_logger()
-except:
-    pass
-    
 
 class BackendAction(argparse.Action):
     """An action to select a KTL backend."""

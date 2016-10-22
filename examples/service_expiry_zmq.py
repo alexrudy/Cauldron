@@ -8,7 +8,6 @@ from lumberjack import setup_logging, setup_warnings_logger
 from logging import getLogger
 
 setup_logging(mode='stream', level=10)
-setup_warnings_logger("")
 log = getLogger("example.zmq")
 
 # Get ready!
