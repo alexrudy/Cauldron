@@ -164,7 +164,7 @@ class KeywordType(object):
         members = {'__module__': module, 
                    '__doc__': docstring,
                    'KTL_DISPATCHER':bool(dispatcher) }
-        return type(cls.__name__, (cls, basecls), members)
+        return type(cls.__name__, (cls, basecls, object), members)
     
     def __new__(cls, *args, **kwargs):
         if not cls.KTL_REGISTERED:

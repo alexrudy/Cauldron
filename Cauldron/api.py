@@ -83,6 +83,10 @@ def use(name):
     DFW.Service = Service
     DFW.Keyword = Keyword
     
+def _make_newstyle_class(base):
+    """Convert a class to a new-style class."""
+    return type(base.__name__, (base, object), {'__module__':base.__module__})
+    
 def setup_ktl_backend():
     """Set up the KTL backend."""
     Cauldron = sys.modules[BASENAME]
@@ -92,10 +96,14 @@ def setup_ktl_backend():
     except ImportError:
         pass
     else:
-        registry.client.service_for("ktl", ktl.Service)
-        registry.client.keyword_for("ktl", ktl.Keyword)
-        registry.dispatcher.service_for("ktl", DFW.Service)
-        registry.dispatcher.keyword_for("ktl", DFW.Keyword.Keyword)
+        from .bugfixer import setupKeywords
+        
+        registry.client.service_for("ktl", _make_newstyle_class(ktl.Service))
+        registry.client.keyword_for("ktl", _make_newstyle_class(ktl.Keyword))
+        
+        DFW.Service.setupKeywords = setupKeywords
+        registry.dispatcher.service_for("ktl", _make_newstyle_class(DFW.Service))
+        registry.dispatcher.keyword_for("ktl", _make_newstyle_class(DFW.Keyword.Keyword))
     
 setup_ktl_backend()
     
