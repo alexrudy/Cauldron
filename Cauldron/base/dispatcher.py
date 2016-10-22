@@ -25,6 +25,16 @@ from .. import registry
 
 __all__ = ['Keyword', 'Service']
 
+ktlxml_get = None
+try:
+    ktlxml_get = getattr(ktlxml, 'get')
+except:
+    try:
+        ktlxml_get = getattr(ktlxml, 'Get')
+    except:
+        pass
+
+
 def get_dispatcher_XML(service, name):
     """Check that the XML for the dispatcher is correct.
     
@@ -33,8 +43,8 @@ def get_dispatcher_XML(service, name):
     """
     if service.dispatcher != None:
         keyword_node = service.xml[name]
-        dispatcher_node = ktlxml.get.dispatcher(keyword_node)
-        dispatcher = ktlxml.get.value(dispatcher_node, 'name')
+        dispatcher_node = ktlxml_get.dispatcher(keyword_node)
+        dispatcher = ktlxml_get.value(dispatcher_node, 'name')
         return dispatcher
     return None
 
@@ -306,7 +316,7 @@ class Keyword(_BaseKeyword):
 class Service(_BaseService):
     """A dispatcher is a KTL service server-side.
     
-    A class encapsulating a basic representation of a complete KTL service. The `name` argument is case sensitive, and will be used to locate (and load) the service's KTLXML representation. The `config` argument specifies the stdiosvc configuration file that will be used when loading the stdiosvc front-end. The `setup` function will be called to properly instantiate all keywords associated with this :class:`Service` instance; it accepts a :class:`Service` instance as its sole argument, and should instantiate :class:`Keyword.Basic` objects directly. If any keywords are not instantiated, they will be given placeholder "cacheing" :class:`Keyword.Basic` instances of the appropriate type (string, integer, etc.). See :func:`setupOrphans` for an example. If `dispatcher` is specified, only keywords corresponding to that dispatcher number will be instantiated.
+    A class encapsulating a basic representation of a complete KTL service. The `name` argument is case sensitive, and will be used to locate (and load) the service's KTLXML representation. The `config` argument specifies the stdiosvc configuration file that will be used when loading the stdiosvc front-end. The `setup` function will be called to properly instantiate all keywords associated with this :class:`Service` instance; it accepts a :class:`Service` instance as its sole argument, and should instantiate :class:`Keyword.Basic` objects directly. If any keywords are not instantiated, they will be given placeholder "cacheing" :class:`Keyword.Basic` instances of the appropriate type (string, integer, etc.). See :func:`setupKeywords` for an example. If `dispatcher` is specified, only keywords corresponding to that dispatcher number will be instantiated.
     
     Parameters
     ----------
@@ -349,11 +359,17 @@ class Service(_BaseService):
             self.log.warning(str(warning), exc_info=True)
             self.xml = None
         else:
-            # Implementors will be expected to assign Keyword instances
-            # for each KTL keyword in this KTL service.
-            for keyword in self.xml.list():
-                if self.dispatcher == get_dispatcher_XML(self, keyword):
-                    self._keywords[keyword] = None
+            if ktlxml_get is None:
+                if STRICT_KTL_XML:
+                    raise ImportError("Can't find ktlxml module's ktlxml.get.dispatcher")
+                else:
+                    self.log.warning("Can't locate ktlxml module's ktlxml.get.dispatcher. Keywords will not be validated against XML.")
+            else:
+                # Implementors will be expected to assign Keyword instances
+                # for each KTL keyword in this KTL service.
+                for keyword in self.xml.list():
+                    if self.dispatcher == get_dispatcher_XML(self, keyword):
+                        self._keywords[keyword] = None
         
         self._prepare()
         
@@ -361,7 +377,7 @@ class Service(_BaseService):
             setup(self)
         
         if self._config.getboolean("core","setupOrphans"):
-            self.setupOrphans()
+            self.setupKeywords()
         
         self.begin()
     
@@ -384,7 +400,7 @@ class Service(_BaseService):
         self.status_keyword = keyword
         return True
     
-    def setupOrphans(self):
+    def setupKeywords(self):
         """Set up orphaned keywords, that is keywords which aren't attached to a specific keyword class."""
         for name, keyword in self._keywords.items():
             if keyword is None:
@@ -410,7 +426,7 @@ class Service(_BaseService):
         try:
             cls(name=name, service=self)
         except WrongDispatcher:
-            pass
+            self.log.debug("Skipping orphaned keyword {0}, wrong dispatcher.".format(name))
         else:
             msg = "Set up an orphaned keyword {0} for service {1} dispatcher {2}".format(
                 name, self.name, self.dispatcher
