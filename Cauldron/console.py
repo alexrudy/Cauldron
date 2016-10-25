@@ -12,11 +12,6 @@ import sys
 from .exc import TimeoutError, DispatcherError
 from .config import get_timeout
 
-try:
-    import lumberjack
-    lumberjack.setup_warnings_logger()
-except:
-    pass
 
 class BackendAction(argparse.Action):
     """An action to select a KTL backend."""
@@ -25,7 +20,7 @@ class BackendAction(argparse.Action):
         """Handle add_argument args."""
         kwargs['nargs'] = 1
         kwargs['const'] = None
-        kwargs.setdefault('default','ktl')
+        kwargs.setdefault('default',None)
         kwargs['type'] = str
         kwargs['choices'] = None
         kwargs.setdefault('required', False)
@@ -35,12 +30,6 @@ class BackendAction(argparse.Action):
         
     def __call__(self, parser, namespace, values, option_string):
         """Actions to take to set up the Cauldron backend."""
-        from .api import use
-        backend = values[0]
-        try:
-            use(backend)
-        except ValueError as e:
-            parser.error("The backend '{0}' is not available.\n{1!s}".format(backend, e))
         setattr(namespace, self.dest, values[0])
         
     
@@ -59,18 +48,18 @@ class ConfigureAction(argparse.Action):
     
     def __call__(self, parser, namespace, values, option_string):
         """Actions to take to configure cauldron."""
-        from .config import read_configuration
-        configuration = read_configuration(values)
-        setattr(namespace, 'config', configuration)
+        setattr(namespace, self.dest, values[0])
         
 
-def setup_debug_logging():
+def prepare_logging(parser, namespace):
     """Setup debug logging."""
+    if not getattr(namespace, 'debug', False):
+        return
     try:
         import lumberjack
         h = lumberjack.SplitStreamHandler()
-        h.setFormatter(lumberjack.ColorFormatter("%(clevelname)s: %(message)s [%(name)s]"))
-    except:
+        h.setFormatter(lumberjack.ColorLevelFormatter("--> %(clevelname)s: %(message)s [%(name)s]"))
+    except Exception as e:
         h = logging.StreamHandler()
     
     h.setLevel(logging.DEBUG)
@@ -78,13 +67,40 @@ def setup_debug_logging():
         logger = logging.getLogger(logger)
         logger.setLevel(logging.DEBUG)
         logger.addHandler(h)
+    
+
+def prepare_configuration(parser, namespace):
+    """Prepare configuration."""
+    from .config import read_configuration
+    configuration = read_configuration(getattr(namespace, 'config', None))
+    setattr(namespace, 'config', configuration)
+    
+def prepare_backend(parser, namespace):
+    """Prepare backend."""
+    from .api import use
+    backend = getattr(namespace, 'backend', None)
+    cbackend = namespace.config.get("init","backend")
+    if cbackend != "none" and backend is None:
+        backend = cbackend
+    try:
+        use(backend)
+    except ValueError as e:
+        parser.error("The backend '{0}' is not available.\n{1!s}".format(backend, e))
+    setattr(namespace, 'backend', backend)
+
+def prepare_actions(parser, namespace):
+    """Prepare actions from the namespace of options."""
+    prepare_configuration(parser, namespace)
+    prepare_backend(parser, namespace)
+    prepare_logging(parser, namespace)
+    
 
 def show():
     """Argument parsing and actions."""
     parser = argparse.ArgumentParser(description="Show a single keyword value.")
     parser.add_argument('-c', '--configuration', action=ConfigureAction, 
         help="The Cauldron configuration file.")
-    parser.add_argument('-k', '--backend', action=BackendAction, default='ktl',
+    parser.add_argument('-k', '--backend', action=BackendAction,
         help="The Cauldron Backend to use.")
     parser.add_argument('-s', '--service', type=str, required=True,
         help="Name of the KTL service containing the keyword(s) to display.")
@@ -94,8 +110,7 @@ def show():
         help="Show debug information.")
     parser.add_argument('keyword', type=str, nargs="+", help="Name of the KTL Keyword to display.")
     opt = parser.parse_args()
-    if opt.debug:
-        setup_debug_logging()
+    prepare_actions(parser, opt)
     ktl_show(opt.service, *opt.keyword, binary=opt.binary)
     return 0
     
@@ -126,7 +141,7 @@ def ktl_show(service, *keywords, **options):
             continue
         
         unit = keyword['units']
-        if unit == '' or unit == "Unknown":
+        if unit == '' or unit == "Unknown" or unit is None:
             outfile.write("{0}: {1}\n".format(keyword.name, value))
             outfile.flush()
         else:
@@ -204,7 +219,7 @@ def modify():
     parser = argparse.ArgumentParser(description="Modify a keyword value or a series of keyword values on a given KTL service.", epilog=epilog)
     parser.add_argument('-c', '--configuration', action=ConfigureAction, 
         help="The Cauldron configuration file.", metavar='config.cfg')
-    parser.add_argument('-k', '--backend', action=BackendAction, default='ktl',
+    parser.add_argument('-k', '--backend', action=BackendAction,
         help="The Cauldron Backend to use.")
     parser.add_argument('-s', '--service', type=str, required=True,
         help="Name of the KTL service containing the keyword(s) to modify.")
@@ -230,8 +245,7 @@ def modify():
         parser.error(str(e))
     for flag, value in flags.items():
         setattr(opt, flag, value)
-    if opt.debug:
-        setup_debug_logging()
+    prepare_actions(parser, opt)
     flags['timeout'] = opt.timeout
     try:
         ktl_modify(opt.service, *commands, **flags)

@@ -71,8 +71,8 @@ class _ZMQMonitorThread(ZMQThread):
                         self.log.addFilter(f)
                         try:
                             if keyword.name in self.monitored:
-                                keyword._update(message.payload)
-                                self.log.trace("{0!r}.monitor({1}={2})".format(self, keyword.name, message.payload))
+                                keyword._update(message.unwrap())
+                                self.log.trace("{0!r}.monitor({1}={2})".format(self, keyword.name, message.unwrap()))
                             else:
                                 self.log.trace("{0!r}.monitor({1}) ignored".format(self, keyword.name))
                         except Exception as e:

@@ -725,7 +725,6 @@ def _setup_logging(verbose):
     try:
         import lumberjack
         lumberjack.setup_logging(mode='stream', level=30 - 10 * verbose)
-        lumberjack.setup_warnings_logger("DFW.Broker")
     except Exception as e:
         print(e)
         pass

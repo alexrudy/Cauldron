@@ -27,16 +27,12 @@ def import_mod(search_path=[], name="", min_version=None):
         except ImportError:
             continue
             
-        sys.modules[name] = imp.load_module(mod_name, *mod_info)
-        
-        try:
-            if min_version is None or StrictVersion(mod.__version__) >= min_version:
-                break
-        except (AttributeError, ValueError):
-            # Attribute error if the six module isn't what it should be and
-            # doesn't have a .__version__; ValueError if the version string
-            # exists but is somehow bogus/unparseable
-            continue
+        if mod_name in sys.modules:
+            sys.modules[name] = sys.modules[mod_name]
+            break
+        else:
+            sys.modules[name] = imp.load_module(mod_name, *mod_info)
+            break
     else:
         raise ImportError(
             "Cauldron requires the {0} module with a minimum version {1}.".format(name, min_version))
