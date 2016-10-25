@@ -5,6 +5,7 @@ A queue to handle ZMQ messages asynchronously from the client.
 
 from six.moves import queue
 import threading
+import sys
 import time
 from .common import zmq_connect_socket, check_zmq
 from .protocol import ZMQCauldronMessage
@@ -24,6 +25,7 @@ class Task(_BaseTask):
             self.result = self.callback(message)
         except Exception as e:
             self.error = e
+            self.exc_info = sys.exc_info()
         finally:
             self.event.set()
         
@@ -81,6 +83,7 @@ class TaskQueue(ZMQThread):
     def put(self, task):
         """Add a task to the queue."""
         self._pending[task.request.identifier] = (time.time(), task)
+        self.log.trace("{0!r}.put({1})".format(self, task.request))
         self.frontend.send(task.request.identifier)
         
     def thread_target(self):
