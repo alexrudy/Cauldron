@@ -409,6 +409,8 @@ class Enumerated(Integer):
                 if STRICT_KTL_XML:
                     raise
                 warnings.warn("XML enumeration setup for keyword '{0}' failed. {1}".format(self.name, e), CauldronXMLWarning)
+        else:
+            self._ktl_enumerators()
         
     @property
     def keys(self):
@@ -421,7 +423,10 @@ class Enumerated(Integer):
         
     def _ktl_enumerators(self):
         """Get KTL enumerators."""
-        enums = super(Enumerated, self)._ktl_units()
+        enums = getattr(self, '_ktl_enumerators_cache', None)
+        if enums is None:
+            enums = super(Enumerated, self)._ktl_units()
+            self._ktl_enumerators_cache = enums
         if isinstance(enums, collections.Mapping):
             return enums
         return dict(enumerate(enums))
