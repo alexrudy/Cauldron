@@ -48,10 +48,11 @@ class _KeywordEvent(object):
     
     name = ""
     replace_method = False
+    func = None
     
     def __new__(cls, keyword, instance, event):
         """Construct or intercept the construction of a keyword event."""
-        if isinstance(getattr(keyword, event.name), cls):
+        if isinstance(getattr(keyword, event.name, None), cls):
             return getattr(keyword, event.name)
         return super(_KeywordEvent, cls).__new__(cls)
     
@@ -65,11 +66,18 @@ class _KeywordEvent(object):
         # object on an as-needed basis. However, everything done in this method
         # should be ok with multiple invocations.
         
-        func = getattr(keyword, event.name)
+        func = getattr(keyword, event.name, None)
+        
+        if func is not None and func is not self:
+            functools.update_wrapper(self, func)
+        
         if func is not self:
             self.func = func
             setattr(keyword, event.name, self)
-            functools.update_wrapper(self, func)
+        
+        if event.name == "_propogate" and func is None:
+            keyword.callback(self.__call__)
+        
         if not hasattr(self, 'listeners'):
             self.listeners = []
         listener = _KeywordListener(keyword, instance, event)
@@ -113,7 +121,7 @@ class _KeywordEvent(object):
         
         if self.replace_method and self.nlisteners:
             return returned
-        else:
+        elif self.func is not None:
             return self.func(*args, **kwargs)
         
 class _KeywordListener(object):
