@@ -81,6 +81,10 @@ def get_timeout(timeout):
             _timeouts[id(config)] = timeout
     return timeout
     
+def reset_timeouts():
+    """Reset timeouts cache."""
+    _timeouts.clear()
+    
 @registry.dispatcher.setup_for('all')
 @registry.client.setup_for('all')
 def setup_configuration():
