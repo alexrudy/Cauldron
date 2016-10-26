@@ -322,6 +322,7 @@ def ktl_modify(service, *commands, **options):
                 outfile.write("{0:s} complete\n".format(keyword.name))
                 outfile.flush()
     finally:
-        svc.shutdown()
+        if hasattr(svc, 'shutdown'):
+            svc.shutdown()
     return
     
