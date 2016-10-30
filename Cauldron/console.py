@@ -55,17 +55,20 @@ def prepare_logging(parser, namespace):
     """Setup debug logging."""
     if not getattr(namespace, 'debug', False):
         return
+    h = logging.StreamHandler()
     try:
         import lumberjack
         h = lumberjack.SplitStreamHandler()
         h.setFormatter(lumberjack.ColorLevelFormatter("--> %(clevelname)s: %(message)s [%(name)s]"))
+    except ImportError as e:
+        pass
     except Exception as e:
-        h = logging.StreamHandler()
+        print(e)
     
-    h.setLevel(logging.DEBUG)
+    h.setLevel(namespace.debug)
     for logger in ["Cauldron", "ktl"]:
         logger = logging.getLogger(logger)
-        logger.setLevel(logging.DEBUG)
+        logger.setLevel(namespace.debug)
         logger.addHandler(h)
     
 
@@ -106,7 +109,7 @@ def show():
         help="Name of the KTL service containing the keyword(s) to display.")
     parser.add_argument('-b', '--binary', action='store_true',
         help="Display the binary version of a keyword.")
-    parser.add_argument('-d', '--debug', action='store_true',
+    parser.add_argument('-d', '--debug', action='store_const', const=logging.NOTSET,
         help="Show debug information.")
     parser.add_argument('keyword', type=str, nargs="+", help="Name of the KTL Keyword to display.")
     opt = parser.parse_args()
@@ -299,7 +302,7 @@ def ktl_modify(service, *commands, **options):
                 if verbose:
                     outfile.write("setting {0:s} = {1:s} {2:s}\n".format(keyword.name, value, mode))
                     outfile.flush()
-                sequence = keyword.write(value, binary=binary, wait=wait)
+                sequence = keyword.write(value, binary=binary, wait=wait, timeout=timeout)
                 if parallel == True and nowait == False:
                     waitfor.append((keyword, sequence))
         
@@ -319,6 +322,7 @@ def ktl_modify(service, *commands, **options):
                 outfile.write("{0:s} complete\n".format(keyword.name))
                 outfile.flush()
     finally:
-        svc.shutdown()
+        if hasattr(svc, 'shutdown'):
+            svc.shutdown()
     return
     

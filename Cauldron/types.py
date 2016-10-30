@@ -124,11 +124,15 @@ class KeywordType(object):
     def _is_dispatcher(cls, args, kwargs):
         """Get the service argument."""
         if "service" in kwargs:
+            if "DFW.Service" in str(type(kwargs["service"])):
+                return True
             return getattr(kwargs["service"],'_DISPATCHER', None)
         for i,arg in enumerate(args):
             if i > 1:
                 break
             if not isinstance(arg, six.string_types):
+                if "DFW.Service" in str(type(arg)):
+                    return True
                 return getattr(arg, '_DISPATCHER', None)
         return None
     
@@ -400,7 +404,8 @@ class Enumerated(Integer):
         super(Enumerated, self).__init__(*args, **kwargs)
         self.mapping = Enumeration()
         self.values = self.mapping.bkeys
-        self._ALLOWED_KEYS = self._ALLOWED_KEYS.union(["enumerators"])
+        if hasattr(self, '_ALLOWED_KEYS'):
+            self._ALLOWED_KEYS = self._ALLOWED_KEYS.union(["enumerators"])
         if self.KTL_DISPATCHER:
             try:
                 xml = self.service.xml[self.name]
@@ -409,6 +414,8 @@ class Enumerated(Integer):
                 if STRICT_KTL_XML:
                     raise
                 warnings.warn("XML enumeration setup for keyword '{0}' failed. {1}".format(self.name, e), CauldronXMLWarning)
+        else:
+            self['enumerators']
         
     @property
     def keys(self):
@@ -421,7 +428,10 @@ class Enumerated(Integer):
         
     def _ktl_enumerators(self):
         """Get KTL enumerators."""
-        enums = super(Enumerated, self)._ktl_units()
+        enums = getattr(self, '_ktl_enumerators_cache', None)
+        if enums is None:
+            enums = super(Enumerated, self)._ktl_units()
+            self._ktl_enumerators_cache = enums
         if isinstance(enums, collections.Mapping):
             return enums
         return dict(enumerate(enums))
@@ -443,8 +453,8 @@ class Enumerated(Integer):
         except (TypeError, ValueError) as e:
             return str(value)
         else:
-            enums = self._ktl_enumerators()
-            return enums.get(vnum, str(value))
+            enums = self['enumerators']
+            return enums.get(str(vnum), str(value))
     
     def check(self, value):
         """Check the value"""
@@ -456,6 +466,8 @@ class Enumerated(Integer):
         try:
             if value in self.values:
                 ivalue = self.values[value]
+            elif str(value) in self.mapping:
+                return self.mapping[str(value)]
             else:
                 ivalue = int(float(value))
             cannonical = self.mapping.enums[ivalue]

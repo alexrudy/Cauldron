@@ -306,7 +306,7 @@ class Keyword(ClientKeyword):
             value = self.cast(value)
         except (TypeError, ValueError):
             pass
-        self.service.log.trace("{0} {1}".format(_call_msg(), value))
+        self.service.log.trace("{0} = {1}".format(_call_msg(), value))
         task = self._asynchronous_command("modify", value, timeout=timeout)
         if wait:
             return self._await(task, timeout, _call_msg)

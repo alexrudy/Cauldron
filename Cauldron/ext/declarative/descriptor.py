@@ -273,6 +273,10 @@ class KeywordDescriptor(object):
         # We do this here to retain a reference to the same keyword object
         # thoughout the course of this function.
         keyword = self.keyword(obj)
+        if keyword is None:
+            # This can happen if keyword is an orphan, but bind is triggered
+            # before the dispatcher has totally set itself up.
+            return
         initial = self._get_initial_value(obj, keyword.name.upper())
         
         if initial is not None:
