@@ -8,6 +8,7 @@ import threading
 import time
 import logging
 import collections
+import multiprocessing
 import binascii
 import weakref
 
@@ -466,7 +467,7 @@ class ZMQBroker(threading.Thread):
         super(ZMQBroker, self).__init__(name=name)
         import zmq
         self.context = context or zmq.Context.instance()
-        self.running = threading.Event()
+        self.running = multiprocessing.Event()
         self.log = logging.getLogger("DFW.Broker." + name )
         self._address = address
         self._pub_address = pub_address
@@ -481,7 +482,9 @@ class ZMQBroker(threading.Thread):
         
     @classmethod
     def from_config(cls, config, name="ConfiguredBroker"):
-        """Make a new item from a configuration."""
+        """Generate a new broker using the configuration provided.
+        
+        Returns the broker object in its inital state."""
         config = read_configuration(config)
         address = zmq_get_address(config, "broker", bind=True)
         sub_address = zmq_get_address(config, "publish", bind=True)
@@ -493,14 +496,17 @@ class ZMQBroker(threading.Thread):
         
     @classmethod
     def serve(cls, config=None, name="ServerBroker"):
-        """Make a broker which serves."""
+        """Make a broker which runs in the current thread until stopped.
+        
+        This method is *blocking*.
+        """
         obj = cls.from_config(config, name)
         obj.run()
         return obj
         
     @classmethod
     def daemon(cls, config=None, daemon=True):
-        """Serve in a process."""
+        """Starts a broker in a subprocess using multiprocessing."""
         import multiprocessing as mp
         cfg = read_configuration(config)
         for name in ["broker", "publish", "subscribe"]:
@@ -513,7 +519,12 @@ class ZMQBroker(threading.Thread):
     
     @classmethod
     def sub(cls, config=None, daemon=True):
-        """Serve in either a subprocess or thread."""
+        """Starts a broker in either a subprocess or a thread.
+        
+        If none of the ZMQ broker addresses use the ``inproc://`` zmq protocol
+        then the broker will be started in a subprocess. Otherwise, the broker
+        will start in the current process using the global ZMQ context.
+        """
         cfg = read_configuration(config)
         if all(zmq_check_nonlocal_address(cfg, name) for name in ["broker", "publish", "subscribe"]):
             return cls.daemon(config, daemon=daemon)
@@ -531,9 +542,13 @@ class ZMQBroker(threading.Thread):
         
     @classmethod
     def setup(cls, config=None, timeout=2.0, daemon=True):
-        """Ensure a broker is set up to start."""
+        """Ensure that a broker is running.
+        
+        If :meth:`check` can find a broker, no broker is started.
+        Otherwise a broker is started using :meth:`sub`.
+        """
         if not cls.check(timeout=timeout):
-            b = cls.thread(config=config, daemon=daemon)
+            b = cls.sub(config=config, daemon=daemon)
             b.running.wait(timeout=min([timeout, 2.0]))
             if not b.running.is_set():
                 msg = "Couldn't start ZMQ broker."

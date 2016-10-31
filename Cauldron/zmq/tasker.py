@@ -7,6 +7,7 @@ from six.moves import queue
 import threading
 import sys
 import time
+import zmq
 from .common import zmq_connect_socket, check_zmq
 from .protocol import ZMQCauldronMessage, FRAMEBLANK
 from .thread import ZMQThread
@@ -85,7 +86,9 @@ class TaskQueue(ZMQThread):
         """Add a task to the queue."""
         self._pending[task.request.identifier] = (time.time(), task)
         self.log.trace("{0!r}.put({1})".format(self, task.request))
-        self.frontend.send(task.request.identifier)
+        self.frontend.send(task.request.identifier, flags=zmq.NOBLOCK)
+        self.log.trace("{0!r}.put({1}) done.".format(self, task.request))
+        
         
     def asynchronous_command(self, command, payload, service, keyword=None, direction="CDQ", timeout=None, callback=None, dispatcher=None):
         """Run an asynchronous command."""
