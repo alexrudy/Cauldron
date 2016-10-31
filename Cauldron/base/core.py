@@ -123,6 +123,8 @@ class _BaseKeyword(object):
         self._acting = False
         if type is not None:
             self._type = type
+        self.log = logging.getLogger(".".join([self.service.log.name, name]))
+        
             
     def _type(self, value):
         """When in doubt, just stringify."""
@@ -130,8 +132,8 @@ class _BaseKeyword(object):
         
     def __repr__(self):
         """Represent this keyword"""
-        repr_str = "<{0} service={1} name={2}".format(
-            self.__class__.__name__, getattr(self.service, 'name', '?service?'), self.name)
+        repr_str = "<Keyword type={0} service={1} name={2}".format(
+            getattr(self, 'KTL_TYPE', 'basic'), getattr(self.service, 'name', '?service?'), self.name)
         if getattr(self, '_last_value', None) is not None:
             repr_str += " value={value}".format(value=self._last_value)
         return repr_str + ">"
