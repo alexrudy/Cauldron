@@ -86,7 +86,7 @@ def fail_if_not_teardown():
             continue
         if thread not in SEEN_THREADS:
             count += 1
-            log.warning(repr(thread))
+            log.warning("Zombie thread: {0!r}".format(thread))
             SEEN_THREADS.add(thread)
             
     # If there are new, non-daemon threads, cause an error.
