@@ -220,6 +220,10 @@ class Service(ClientService):
 class Keyword(ClientKeyword):
     # Client keyword object for use with ZMQ.
     
+    def _prepare(self):
+        """Prepare this keyword for use."""
+        self._async_units()
+    
     def _ktl_reads(self):
         """Is this keyword readable?"""
         return True
@@ -235,12 +239,30 @@ class Keyword(ClientKeyword):
     def _ktl_units(self):
         """Get KTL units."""
         if getattr(self, '_units', None) is None:
-            self._units = json.loads(self._synchronous_command('units', ""))
+            timeout = get_timeout(None)
+            self._got_units.wait(timeout)
+            if not self._got_units.is_set():
+                raise DispatcherError("Dispatcher error on command 'units'.")
         return '' if self._units is None else self._units
+        
+    def _async_units(self, timeout=None):
+        """Asynchronously request units."""
+        self._got_units = threading.Event()
+        return self._asynchronous_command("units", "", timeout=timeout, callback=self._handle_units)
+        
+    def _handle_units(self, message):
+        """Handle a message response which has units.."""
+        self.log.msg("{0!r}.recv({1!s})".format(self, message))
+        if message.iserror:
+            raise DispatcherError("Dispatcher error on command: {0}".format(message.payload))
+        message.verify(self.service)
+        self._units = json.loads(message.unwrap())
+        self._got_units.set()
+        return self._units
     
     def _handle_response(self, message):
         """Handle a response, and return the payload."""
-        self.service.log.msg("{0!r}.recv({1!s})".format(self, message))
+        self.log.msg("{0!r}.recv({1!s})".format(self, message))
         if message.iserror:
             raise DispatcherError("Dispatcher error on command: {0}".format(message.payload))
         message.verify(self.service)

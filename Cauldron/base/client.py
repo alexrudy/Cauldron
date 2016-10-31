@@ -68,6 +68,12 @@ class Keyword(_BaseKeyword):
         self._callbacks = Callbacks()
         self.history = collections.deque(maxlen=5)
         self._units = None
+        self._prepare()
+        
+    @api_override
+    def _prepare(self):
+        """Function called to prepare this keyword for use."""
+        pass
     
     @api_not_implemented
     def _ktl_broadcasts(self):
@@ -220,7 +226,7 @@ class Keyword(_BaseKeyword):
         """An internal callback to handle value updates."""
         self._last_read = datetime.datetime.now()
         if self._last_value != value:
-            self.service.log.getChild(self.name).trace("{0}._update({1!r})".format(self.full_name, value))
+            self.log.trace("{0}._update({1!r})".format(self.full_name, value))
             self._last_value = value
             self.history.append(HistorySlice(self._last_read.time(), self._ktl_binary(), self._ktl_ascii(), self.name))
             self.propagate()
