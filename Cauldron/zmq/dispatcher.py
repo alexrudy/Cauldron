@@ -146,6 +146,7 @@ class Keyword(DispatcherKeyword):
     def _broadcast(self, value):
         """Broadcast this keyword value."""
         self.service._asynchronous_command("broadcast", value, self.name)
+        self.log.trace("{0!r}.broadcast() done.".format(self))
     
     def schedule(self, appointment=None, cancel=False):
         """Schedule an update."""
