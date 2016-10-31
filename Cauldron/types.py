@@ -414,8 +414,7 @@ class Enumerated(Integer):
                 if STRICT_KTL_XML:
                     raise
                 warnings.warn("XML enumeration setup for keyword '{0}' failed. {1}".format(self.name, e), CauldronXMLWarning)
-        else:
-            self['enumerators']
+            
         
     @property
     def keys(self):
@@ -432,9 +431,10 @@ class Enumerated(Integer):
         if enums is None:
             enums = super(Enumerated, self)._ktl_units()
             self._ktl_enumerators_cache = enums
-        if isinstance(enums, collections.Mapping):
-            return enums
-        return dict(enumerate(enums))
+        if not isinstance(enums, collections.Mapping):
+            enums = dict(enumerate(enums))
+        self.log.trace("Enumerators are {0!r}".format(enums))
+        return enums
         
     def _ktl_units(self):
         """No-op KTL units"""
@@ -442,19 +442,37 @@ class Enumerated(Integer):
         
     def _get_units(self):
         """Return a dictionary of enumerators."""
-        return self.mapping.enums
+        enums = {}
+        for k, v in self.mapping.enums.items():
+            enums[str(k)] = v
+        return enums
         
     def cast(self, value):
         """Cast the enumerated integer to the binary representation."""
         if self.KTL_DISPATCHER:
-            return self.mapping.enums[int(self.translate(value))]
+            return int(self.translate(value))
         try:
             vnum = int(float(value))
         except (TypeError, ValueError) as e:
-            return str(value)
-        else:
             enums = self['enumerators']
-            return enums.get(str(vnum), str(value))
+            for k, v in enums.items():
+                if v == str(value):
+                    vnum = int(k)
+                    break
+            else:
+                raise ValueError("Bad value for enumerated keyword {0}: '{1}' not in {2!r}".format(self.full_name, value, self.mapping))
+        return vnum
+        
+    def _to_ascii(self, value):
+        """Convert a binary value to ASCII."""
+        try:
+            vnum = int(float(value))
+        except (TypeError, ValueError) as e:
+            raise ValueError("Bad value for enumerated keyword {0}: '{1}' not in {2!r}".format(self.full_name, value, self.mapping))
+        if self.KTL_DISPATCHER:
+            return self.mapping.enums[vnum]
+        else:
+            return self['enumerators'][str(vnum)]
     
     def check(self, value):
         """Check the value"""
@@ -466,6 +484,8 @@ class Enumerated(Integer):
         try:
             if value in self.values:
                 ivalue = self.values[value]
+            elif str(value) in self.values:
+                ivalue = self.values[str(value)]
             elif str(value) in self.mapping:
                 return self.mapping[str(value)]
             else:
@@ -477,7 +497,7 @@ class Enumerated(Integer):
         
     def _update(self, value):
         """Update this keyword value."""
-        super(Enumerated, self)._update(self.cast(value))
+        super(Enumerated, self)._update(self._to_ascii(value))
         
 
 @dispatcher_keyword

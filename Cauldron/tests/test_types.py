@@ -92,12 +92,12 @@ def keyword_enumerated(backend, dispatcher_setup):
     return "MYENUMERATED"
 
 @pytest.mark.parametrize("modify,update,rbinary,rascii", [
-    ("ONE", 1, "ONE", "ONE"),
-    ("TWO", 2, "TWO", "TWO"),
-    ("THREE", 3, "THREE", "THREE"),
-    (1, 1, "ONE", "ONE"),
-    (2, 2, "TWO", "TWO"),
-    (3, 3, "THREE", "THREE"),
+    ("ONE", 1, 1, "ONE"),
+    ("TWO", 2, 2, "TWO"),
+    ("THREE", 3, 3, "THREE"),
+    (1, 1, 1, "ONE"),
+    (2, 2, 2, "TWO"),
+    (3, 3, 3, "THREE"),
     (4, ValueError, None, None),
     ("FOUR", ValueError, None, None),
 ])
