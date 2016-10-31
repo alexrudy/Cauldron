@@ -12,6 +12,7 @@ from ..config import get_timeout
 
 import json
 import collections
+import contextlib
 import threading
 import logging
 import weakref
@@ -248,6 +249,21 @@ class ZMQPooler(ZMQThread):
                 signal.close(linger=0)
         
 
+@contextlib.contextmanager
+def deadlock_context(lock, log, name):
+    """Attempt to detect and warn about deadlocks."""
+    locked = lock.acquire(False)
+    if not locked:
+        log.warning("Deadlock warning for lock {0}".format(name))
+        lock.acquire()
+    else:
+        log.trace("Acquired lock {0}".format(name))
+    try:
+        yield lock
+    finally:
+        lock.release()
+        log.trace("Released lock {0}".format(name))
+
 class ZMQWorker(ZMQMicroservice):
     """A ZMQ-based worker"""
     
@@ -263,7 +279,7 @@ class ZMQWorker(ZMQMicroservice):
         """Handle a modify command."""
         message.verify(self.service)
         keyword = self.service[message.keyword]
-        with keyword._lock:
+        with deadlock_context(keyword._lock, self.log, keyword.full_name):
             keyword.modify(message.payload)
         return keyword.value
     
@@ -271,7 +287,7 @@ class ZMQWorker(ZMQMicroservice):
         """Handle an update command."""
         message.verify(self.service)
         keyword = self.service[message.keyword]
-        with keyword._lock:
+        with deadlock_context(keyword._lock, self.log, keyword.full_name):
             value = keyword.update()
         return value
         
