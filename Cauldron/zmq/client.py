@@ -222,7 +222,8 @@ class Keyword(ClientKeyword):
     
     def _prepare(self):
         """Prepare this keyword for use."""
-        self._async_units()
+        if self.KTL_TYPE == 'enumerated':
+            self._async_units()
     
     def _ktl_reads(self):
         """Is this keyword readable?"""
@@ -240,6 +241,8 @@ class Keyword(ClientKeyword):
         """Get KTL units."""
         if getattr(self, '_units', None) is None:
             timeout = get_timeout(None)
+            if not hasattr(self, '_got_units'):
+                self._async_units(timeout)
             self._got_units.wait(timeout)
             if not self._got_units.is_set():
                 raise DispatcherError("Dispatcher error on command 'units'.")
