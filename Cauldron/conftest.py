@@ -49,14 +49,10 @@ if "zmq" in available_backends:
 
 def pytest_configure(config):
     """Activate log capturing if appropriate."""
-    try:
-        config.getini('log_format')
-    except ValueError:
+    if config.pluginmanager.get_plugin("pytest_catchlog") is None:
         try:
-            from lumberjack.config import configure
-            from lumberjack.warnings import captureWarnings
-            configure("stream")
-            captureWarnings()
+            from lumberjack import setup_logging
+            setup_logging("stream", level=0)
         except ImportError:
             pass
 
