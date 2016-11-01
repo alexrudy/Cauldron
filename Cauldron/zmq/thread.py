@@ -7,7 +7,8 @@ import six
 import sys
 import collections
 
-from ..config import get_timeout
+from ..config import get_timeout, get_configuration
+from ..exc import TimeoutError
 
 try:
     import zmq
@@ -76,14 +77,12 @@ class ZMQThread(threading.Thread):
         """Get a socket to signal to the underlying thread."""
         signal = self.ctx.socket(zmq.PUSH)
         try:
-            self.log.trace("{0} sending wakeup signal.".format(self))
             signal.connect(self._signal_address)
             if signal.poll(timeout=timeout, flags=zmq.POLLOUT):
                 try:
                     signal.send(message, flags=zmq.NOBLOCK)
                 except zmq.Again as exc: # pragma: no cover
                     self.log.debug("Signalling may have failed, socket would block. finished = {0}".format(self.finished.is_set()))
-                    pass
             elif not self.finished.is_set(): # pragma: no cover
                 # We might have missed something.
                 self.log.debug("Signalling may have failed. finished = {0} but socket wasn't ready.".format(self.finished.is_set()))
@@ -155,6 +154,9 @@ class ZMQThread(threading.Thread):
             if not self.is_alive():
                 self.log.debug("{0} joined.".format(self))
             else:
-                self.log.warning("{0} join timed out.".format(self))
+                msg = "{0} join timed out.".format(self)
+                if get_configuration().getboolean("zmq","error-on-join-timeout"):
+                    raise TimeoutError(msg)
+                self.log.warning(msg)
         else:
             self.log.debug("{0} stopped.".format(self))
