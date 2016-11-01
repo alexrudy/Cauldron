@@ -17,18 +17,21 @@ def backend(request):
     request.addfinalizer(fail_if_not_teardown)
 
 @pytest.fixture
-def local_service(backend, servicename, config, keyword_name):
+def local_service(request, backend, servicename, config, keyword_name):
     """docstring for local_service"""
     from Cauldron.DFW import Service
     svc = Service(servicename, config=config)
     mykw = svc[keyword_name]
+    request.addfinalizer(svc.shutdown)
     return svc
     
 @pytest.fixture
-def local_client(local_service, servicename):
+def local_client(request, local_service, servicename):
     """Test a client."""
     from Cauldron import ktl
-    return ktl.Service(servicename)
+    svc = ktl.Service(servicename)
+    request.addfinalizer(svc.shutdown)
+    return svc
 
 def test_duplicate_services(backend, servicename):
     """Test duplicate services."""
