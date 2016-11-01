@@ -85,9 +85,12 @@ class TaskQueue(ZMQThread):
     def put(self, task):
         """Add a task to the queue."""
         self._pending[task.request.identifier] = (time.time(), task)
-        self.log.trace("{0!r}.put({1})".format(self, task.request))
-        self.frontend.send(task.request.identifier, flags=zmq.NOBLOCK)
-        self.log.trace("{0!r}.put({1}) done.".format(self, task.request))
+        if self.frontend.poll(flags=zmq.POLLOUT) and self.running.is_set():
+            self.log.trace("{0!r}.put({1})".format(self, task.request))
+            self.frontend.send(task.request.identifier)
+            self.log.trace("{0!r}.put({1}) done.".format(self, task.request))
+        else:
+            self.log.trace("{0!r}.drop({1})".format(self, task.request))
         
         
     def asynchronous_command(self, command, payload, service, keyword=None, direction="CDQ", timeout=None, callback=None, dispatcher=None):
