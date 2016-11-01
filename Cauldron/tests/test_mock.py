@@ -24,10 +24,12 @@ def mock_service(backend, servicename, config, keyword_name):
     return svc
     
 @pytest.fixture
-def mock_client(servicename):
+def mock_client(request, servicename):
     """A 'mock' client, which doesn't even require a service backend."""
     from Cauldron import ktl
-    return ktl.Service(servicename)
+    svc = ktl.Service(servicename)
+    request.addfinalizer(svc.shutdown)
+    return svc
 
 def test_duplicate_services(backend, servicename):
     """Test duplicate 'mock' services."""
