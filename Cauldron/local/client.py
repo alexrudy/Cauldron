@@ -42,7 +42,7 @@ class LocalTaskQueue(threading.Thread):
             try:
                 task = self.queue.get()
                 if task is None:
-                    raise queue.Empty
+                    break
                 task()
                 self.queue.task_done()
             except queue.Empty:
@@ -52,11 +52,13 @@ class LocalTaskQueue(threading.Thread):
         """Stop the task-queue thread."""
         self.shutdown.set()
         try:
+            self.log.debug("Sentinel going to task queue.")
             self.queue.put(None, block=False)
         except queue.Full:
-            pass
+            self.log.warning("Couldn't close the task queue, it was full.")
         else:
             self.join()
+            self.log.debug("Closed task queue")
 
 @registry.client.keyword_for("local")
 class Keyword(ClientKeyword):
