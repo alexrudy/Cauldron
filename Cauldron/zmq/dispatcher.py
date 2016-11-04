@@ -104,7 +104,24 @@ class Service(DispatcherService):
         
     def shutdown(self):
         
-        if hasattr(self, '_tasker') and self._tasker is not None:
+        # The following block tries to get around
+        # a few race conditions which can happen
+        # when shutting down a service explicitly.
+        
+        # This code is unlikely to matter in real
+        # world cases. It works by giving up the
+        # GIL for a short amount of time if it
+        # detects a locked keyword. Keywords are
+        # only locked by the underlying responder
+        # threads which handle KTL commands.
+        for keyword in self._keywords.values():
+            if keyword._lock.acquire(False):
+                keyword._lock.release()
+            else:
+                time.sleep(0.1)
+                break
+        
+        if hasattr(self, '_tasker') and self._tasker is not None and self._tasker.is_alive():
             self._tasker.stop()
         
         if hasattr(self, '_scheduler') and self._scheduler is not None and self._scheduler.is_alive():

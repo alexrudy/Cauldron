@@ -369,9 +369,9 @@ class ZMQWorker(ZMQMicroservice):
                 message = ZMQCauldronMessage.parse(backend.recv_multipart())
                 self.log.log(5, "{0!r}.recv({1})".format(self, message))
                 response = self.handle(message)
-                if self.running.is_set():
-                    self.log.log(5, "{0!r}.send({1})".format(self, response))
+                if self.running.is_set() and backend.poll(flags=zmq.POLLOUT):
                     backend.send_multipart(response.data)
+                    self.log.log(5, "{0!r}.send({1})".format(self, response))
                 else:
                     self.log.log(5, "{0!r}.drop({1})".format(self, response))
 
