@@ -59,6 +59,23 @@ class Task(object):
             self.exc_info = sys.exc_info()
         self.event.set()
         
+    @property
+    def status(self):
+        """Status"""
+        if not self.event.is_set():
+            return "pending"
+        elif self.error is None and self.exc_info is None:
+            return "success"
+        else:
+            return "error"
+        
+    def __repr__(self):
+        """Task repr."""
+        return "<{0}(request={1!r}, status={2:s})>".format(
+            self.__class__.__name__, self.request,
+            self.status
+        )
+        
     def wait(self, timeout=None):
         """Wait for this task to be finished."""
         if not self.event.isSet():
