@@ -11,33 +11,33 @@ cache = {}
 def cached(service):
     """Cache service sting names."""
     try:
-        return cache[service]
+        svc = cache[service]
     except KeyError:
         svc = cache[service] = Service.Service(service, populate=False)
     return svc
     
 def _make_cached_service_method(method):
     """Return a cached method slot-in for the procedural mode."""
-    method = getattr(Service.Service, method)
-    @functools.wraps(method)
+    m = getattr(Service.Service, method)
+    @functools.wraps(m)
     def _cached_service_method(service, *args, **kwargs):
         if not isinstance(service, str):
             raise TypeError("Service must be a string.")
-        return method(cached(service), *args, **kwargs)
+        return getattr(cached(service), method)(*args, **kwargs)
     _cached_service_method.__module__ = __name__
     return _cached_service_method
     
 def _make_cached_keyword_method(method):
     """Return a cached method slot-in for the procedural mode."""
-    method = getattr(Keyword.Keyword, method)
-    @functools.wraps(method)
+    m = getattr(Keyword.Keyword, method)
+    @functools.wraps(m)
     def _cached_keyword_method(service, keyword, *args, **kwargs):
         if not isinstance(service, str):
             raise TypeError("Service must be a string.")
         if not isinstance(keyword, str):
             raise TypeError("Keyword must be a string.")
         keyword = cached(service)[keyword]
-        return method(keyword, *args, **kwargs)
+        return getattr(keyword, method)(*args, **kwargs)
     _cached_keyword_method.__module__ = __name__
     return _cached_keyword_method
 
