@@ -35,6 +35,7 @@ class Registry(object):
         self._teardown = collections.defaultdict(WeakOrderedSet)
         self._keyword = {}
         self._service = {}
+        self._backends = set()
         self._backend = None
         self._modname = modname
         self._service_cls = None
@@ -47,9 +48,16 @@ class Registry(object):
         """Get the backend name."""
         return self._backend
         
+    def deferred(self, backend):
+        """Register a backend as a deferred backend.
+        
+        Should only be used if the backend really will be set up by the time use() is called.
+        """
+        self._backends.add(backend)
+        
     def keys(self):
         """Return the active and available registry keys."""
-        return list(set(self._keyword.keys()).union(self._service.keys()))
+        return self._backends
         
     def guard(self, msg, error=RuntimeError):
         """Guard against backends that aren't set up."""
@@ -96,6 +104,8 @@ class Registry(object):
             if backend in self._keyword:
                 raise KeyError("Cannot register multiple Keyword classes for backend '{0}'".format(backend))
             self._keyword[backend] = class_
+            if backend in self._service:
+                self._backends.add(backend)
             return class_
         if keyword is None:
             return _decorate
@@ -107,6 +117,8 @@ class Registry(object):
             if backend in self._service:
                 raise KeyError("Cannot register multiple Service classes for backend '{0}'".format(backend))
             self._service[backend] = class_
+            if backend in self._keyword:
+                self._backends.add(backend)
             return class_
         if service is None:
             return _decorate

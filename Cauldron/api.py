@@ -87,25 +87,56 @@ def _make_newstyle_class(base):
     """Convert a class to a new-style class."""
     return type(base.__name__, (base, object), {'__module__':base.__module__})
     
+@registry.client.setup_for("ktl")
+@registry.dispatcher.setup_for("ktl")
 def setup_ktl_backend():
     """Set up the KTL backend."""
     Cauldron = sys.modules[BASENAME]
+    if "ktl" not in registry.keys():
+        return
     try:
         import ktl
+    except ImportError:
+        pass
+    else:
+        registry.client.service_for("ktl", _make_newstyle_class(ktl.Service))
+        registry.client.keyword_for("ktl", _make_newstyle_class(ktl.Keyword))
+        
+    try:
         import DFW
     except ImportError:
         pass
     else:
-        from .bugfixer import setupKeywords
-        
-        registry.client.service_for("ktl", _make_newstyle_class(ktl.Service))
-        registry.client.keyword_for("ktl", _make_newstyle_class(ktl.Keyword))
-        
-        DFW.Service.setupKeywords = setupKeywords
         registry.dispatcher.service_for("ktl", _make_newstyle_class(DFW.Service))
         registry.dispatcher.keyword_for("ktl", _make_newstyle_class(DFW.Keyword.Keyword))
     
-setup_ktl_backend()
+    
+def check_ktl_backend():
+    """Check for the KTL backend."""
+    try:
+        import imp
+    except ImportError:
+        return
+    
+    try:
+        f, pathname, descr = imp.find_module("ktl")
+    except ImportError:
+        pass
+    else:
+        registry.client.deferred("ktl")
+        if f:
+            f.close()
+    
+    try:
+        f, pathname, descr = imp.find_module("DFW")
+    except ImportError:
+        pass
+    else:
+        registry.dispatcher.deferred("ktl")
+        if f:
+            f.close()
+    
+check_ktl_backend()
     
 def _expunge_module(module_name):
     """Given a module name, expunge it from sys.modules."""
