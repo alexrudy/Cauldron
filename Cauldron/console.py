@@ -7,6 +7,7 @@ import argparse
 import collections
 import time
 import logging
+import traceback
 import sys
 
 from .exc import TimeoutError, DispatcherError
@@ -53,24 +54,23 @@ class ConfigureAction(argparse.Action):
 
 def prepare_logging(parser, namespace):
     """Setup debug logging."""
-    if not getattr(namespace, 'debug', False):
-        return
+    level = getattr(namespace, 'debug', logging.WARNING)
     h = logging.StreamHandler()
     try:
         import lumberjack
         h = lumberjack.SplitStreamHandler()
         h.setFormatter(lumberjack.ColorLevelFormatter("--> %(clevelname)s: %(message)s [%(name)s]"))
     except ImportError as e:
-        pass
+        traceback.print_exc()
     except Exception as e:
-        print(e)
+        traceback.print_exc()
     
-    h.setLevel(namespace.debug)
+    h.setLevel(level)
     for logger in ["Cauldron", "ktl"]:
         logger = logging.getLogger(logger)
-        logger.setLevel(namespace.debug)
+        logger.setLevel(level)
         logger.addHandler(h)
-    
+    logging.getLogger("Cauldron").debug("Setup logging at level {0}".format(level))
 
 def prepare_configuration(parser, namespace):
     """Prepare configuration."""
@@ -94,8 +94,8 @@ def prepare_backend(parser, namespace):
 def prepare_actions(parser, namespace):
     """Prepare actions from the namespace of options."""
     prepare_configuration(parser, namespace)
-    prepare_backend(parser, namespace)
     prepare_logging(parser, namespace)
+    prepare_backend(parser, namespace)
     
 
 def show():
@@ -109,8 +109,8 @@ def show():
         help="Name of the KTL service containing the keyword(s) to display.")
     parser.add_argument('-b', '--binary', action='store_true',
         help="Display the binary version of a keyword.")
-    parser.add_argument('-d', '--debug', action='store_const', const=logging.NOTSET,
-        help="Show debug information.")
+    parser.add_argument('-d', '--debug', action='store_const', const=logging.DEBUG,
+        help="Show debug information.", default=logging.WARNING)
     parser.add_argument('keyword', type=str, nargs="+", help="Name of the KTL Keyword to display.")
     opt = parser.parse_args()
     prepare_actions(parser, opt)
@@ -125,31 +125,35 @@ def ktl_show(service, *keywords, **options):
     errfile = options.pop('error', sys.stderr if outfile == sys.stdout else outfile)
     
     svc = ktl.Service(service, populate=False)
-    for keyword in keywords:
+    try:
+        for keyword in keywords:
         
-        try:
-            keyword = svc[keyword]
-        except KeyError as e:
-            errfile.write("Can't find keyword '{0}' in service '{1}'\n{2!s}\n".format(
-                keyword.upper(), svc.name, e
-            ))
-            errfile.flush()
-            continue
+            try:
+                keyword = svc[keyword]
+            except KeyError as e:
+                errfile.write("Can't find keyword '{0}' in service '{1}'\n{2!s}\n".format(
+                    keyword.upper(), svc.name, e
+                ))
+                errfile.flush()
+                continue
         
-        try:
-            value = keyword.read(binary=binary)
-        except DispatcherError as e:
-            errfile.write("Can't read from keyword '{0}'\n{1!s}".format(keyword.full_name, e))
-            errfile.flush()
-            continue
+            try:
+                value = keyword.read(binary=binary)
+            except DispatcherError as e:
+                errfile.write("Can't read from keyword '{0}'\n{1!s}".format(keyword.full_name, e))
+                errfile.flush()
+                continue
         
-        unit = keyword['units']
-        if unit == '' or unit == "Unknown" or unit is None:
-            outfile.write("{0}: {1}\n".format(keyword.name, value))
-            outfile.flush()
-        else:
-            outfile.write("{0}: {1} | {2}\n".format(keyword.name, value, unit))
-            outfile.flush()
+            unit = keyword['units']
+            if unit == '' or unit == "Unknown" or unit is None:
+                outfile.write("{0}: {1}\n".format(keyword.name, value))
+                outfile.flush()
+            else:
+                outfile.write("{0}: {1} | {2}\n".format(keyword.name, value, unit))
+                outfile.flush()
+    finally:
+        if hasattr(svc, 'shutdown'):
+            svc.shutdown()
     return
 
 def parseModifyCommands(commands, flags, verbose=False):
@@ -228,8 +232,8 @@ def modify():
         help="Name of the KTL service containing the keyword(s) to modify.")
     parser.add_argument('-b', '--binary', action='store_true',
         help="Interpret an argument as.")
-    parser.add_argument('-d', '--debug', action='store_true',
-        help="Show debug information.")
+    parser.add_argument('-d', '--debug', action='store_const', const=logging.DEBUG,
+        help="Show debug information.", default=logging.WARNING)
     parser.add_argument('-n', '--nowait', action='store_true',
         help="Don't wait for modify to complete, return immediately.")
     parser.add_argument('-q', '--silent', action='store_true',
