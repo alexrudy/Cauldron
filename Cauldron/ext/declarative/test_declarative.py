@@ -109,8 +109,15 @@ def test_descriptor_basics(dispatcher, cls, dualcls):
     
     newinstance.mykeyword = "Goodbye"
     
+@pytest.mark.xfail
 def test_descriptor_params(dispatcher, cls):
-    """Test descriptor parameter use."""
+    """Test descriptor parameter use.
+    
+    This works b/c cls sets a read and write callback
+    which munge the value to always be "OtherValue" when
+    it goes through the keyword machinery.
+    
+    """
     instance = cls()
     assert instance.mungedkeyword == "SomeValue"
     instance.bind(dispatcher)

@@ -233,7 +233,10 @@ class KeywordDescriptor(object):
         if self.writeonly:
             raise ValueError("Keyword {0} is write-only.".format(self.name))
         try:
-            return self.type(self.keyword(obj).update())
+            keyword = self.keyword(obj)
+            #TODO: Hmm, I'm not sure about this.
+            keyword.update()
+            return self.type(keyword.value)
         except ServiceNotBound:
             return self.type(self.get_bound_attr(obj))
         
@@ -242,7 +245,9 @@ class KeywordDescriptor(object):
         if self.readonly:
             raise ValueError("Keyword {0} is read-only.".format(self.name))
         try:
-            return self.keyword(obj).modify(str(self.type(value)))
+            keyword = self.keyword(obj)
+            keyword.modify(str(self.type(value)))
+            return keyword.value
         except ServiceNotBound:
             return self.set_bound_attr(obj, self.type(value))
         
