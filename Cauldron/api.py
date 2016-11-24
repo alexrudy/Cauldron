@@ -88,10 +88,8 @@ def _make_newstyle_class(base):
     return type(base.__name__, (base, object), {'__module__':base.__module__})
     
 @registry.client.setup_for("ktl")
-@registry.dispatcher.setup_for("ktl")
 def setup_ktl_backend():
-    """Set up the KTL backend."""
-    Cauldron = sys.modules[BASENAME]
+    """Set up the KTL backend for ktl."""
     if "ktl" not in registry.keys():
         return
     try:
@@ -102,6 +100,11 @@ def setup_ktl_backend():
         registry.client.service_for("ktl", _make_newstyle_class(ktl.Service))
         registry.client.keyword_for("ktl", _make_newstyle_class(ktl.Keyword))
         
+@registry.dispatcher.setup_for("ktl")
+def setup_dfw_backend():
+    """Set up the KTL backend for DFW."""
+    if "ktl" not in registry.keys():
+        return
     try:
         import DFW
     except ImportError:
