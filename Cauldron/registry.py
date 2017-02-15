@@ -135,9 +135,9 @@ class Registry(object):
     def setup(self):
         """Do the setup process."""
         self.guard("calling the setup functions")
-        for func in self._setup['all']:
-            func()
         for func in self._setup[self._backend]:
+            func()
+        for func in self._setup['all']:
             func()
     
     def teardown(self):

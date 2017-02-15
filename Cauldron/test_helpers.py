@@ -8,6 +8,7 @@ It is also used internally in Cauldron to facilitate testing of the module itsel
 import sys
 import pkg_resources
 import logging
+import warnings
 from .utils._weakrefset import WeakSet
 
 log = logging.getLogger(__name__)
@@ -68,10 +69,11 @@ def fail_if_not_teardown():
     
     # Check for cycles.
     import gc
-    gc.collect()
+    for i in range(4):
+        gc.collect()
     if len(gc.garbage):
         print(gc.garbage)
-        raise ValueError("There is garbage: {0!r}".format(gc.garbage))
+        warnings.warn("There is garbage: {0!r}".format(gc.garbage))
     
     # Check for zombie threads.
     import threading, time
