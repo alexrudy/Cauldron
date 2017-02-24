@@ -7,7 +7,7 @@ Cauldron
 .. image:: https://coveralls.io/repos/alexrudy/Cauldron/badge.svg?branch=master
     :target: https://coveralls.io/github/alexrudy/Cauldron?branch=master
     
-.. image:: http://cauldron.readthedocs.io/en/latest/?badge=latest
+.. image:: https://readthedocs.org/projects/cauldron/badge/?version=latest
     :target: http://cauldron.readthedocs.io/en/latest/?badge=latest
 
 Cauldron is a library to remove the dependency on the "Keck Telescope Libary", KTL.
