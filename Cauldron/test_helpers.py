@@ -72,8 +72,9 @@ def fail_if_not_teardown():
     for i in range(4):
         gc.collect()
     if len(gc.garbage):
-        print(gc.garbage)
-        warnings.warn("There is garbage: {0!r}".format(gc.garbage))
+        log.warning("There are {0:d} pieces of garbage".format(len(gc.garbage)))
+        for garbage in gc.garbage:
+            log.warning("Garbage: {0!r}".format(garbage))
     
     # Check for zombie threads.
     import threading, time

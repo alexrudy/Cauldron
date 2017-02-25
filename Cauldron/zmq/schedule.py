@@ -13,7 +13,7 @@ from .thread import ZMQThread
 now = time.time
 log = logging.getLogger(__name__)
 
-Appointment = collections.namedtuple("Appointment", ["next", "keywords"])
+Appointment = collections.namedtuple("Appointment", ["next_event", "keywords"])
 
 _keyword_update_errors = collections.defaultdict(lambda : 0)
 MAX_KEYWORD_UPDATE_ERRORS = 5
@@ -38,7 +38,7 @@ class Collection(object):
     def __init__(self, period):
         super(Collection, self).__init__()
         self.period = period
-        self.next = now() + self.period
+        self.next_event = now() + self.period
         self.keywords = []
         self._lock = threading.RLock()
         
@@ -69,7 +69,7 @@ class Collection(object):
                 log.log(5, "Update took too long, increasing waiting period.")
                 n = ((finished - next_update) // self.period) + 1
                 next_update = finished + (self.period * n)
-            self.next = next_update
+            self.next_event = next_update
 
 class TimingDictionary(object):
     """A dictionary of timing items."""
@@ -80,12 +80,13 @@ class TimingDictionary(object):
         self.locked = threading.RLock()
         
     @property
-    def next(self):
+    def next_event(self):
         """Get the next time."""
-        if len(self.__heap):
-            self.__heap[0][0]
-        else:
-            return 0.0
+        with self.locked:
+            if len(self.__heap):
+                return self.__heap[0][0]
+            else:
+                return 0.0
         
     def __len__(self):
         """Length"""
@@ -98,7 +99,7 @@ class TimingDictionary(object):
     def push(self, key, value):
         """Add a time item."""
         if key not in self.__data:
-            heapq.heappush(self.__heap, (value.next, key))
+            heapq.heappush(self.__heap, (value.next_event, key))
         self.__data[key] = value
     
     def __getitem__(self, key):
@@ -182,8 +183,10 @@ class Scheduler(ZMQThread):
         self.started.set()
         try:
             while self.running.isSet():
+                float(self._periods.next_event)
+                float(self._appointments.next_event)
                 
-                next_wake = min([self._periods.next, self._appointments.next])
+                next_wake = min([self._periods.next_event, self._appointments.next_event])
                 timeout = max([0.1, next_wake])
                 if signal.poll(timeout=timeout * 1e3):
                     _ = signal.recv()
@@ -191,13 +194,13 @@ class Scheduler(ZMQThread):
                     continue
                 
                 thetime = now()
-                if len(self._periods) and self._periods.next <= thetime:
+                if len(self._periods) and self._periods.next_event <= thetime:
                     with self._periods.locked:
                         collection = self._periods.pop()
                         collection.update()
                         if len(collection):
                             self._periods.push(collection.period, collection)
-                if len(self._appointments) and self._appointments.next <= thetime:
+                if len(self._appointments) and self._appointments.next_event <= thetime:
                     with self._appointments.locked:
                         appointment = self._appointments.pop()
                     for keyword in appointment.keywords:

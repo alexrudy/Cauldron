@@ -5,8 +5,13 @@ from __future__ import absolute_import
 try:
     from collections import OrderedDict
 except ImportError:
+    # Suppress the astropy deprecation warning
+    # emitted on import of this module.
+    import warnings
     try:
-        from astropy.utils.compat.odict import OrderedDict
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            from astropy.utils.compat.odict import OrderedDict
     except ImportError:
         from ._odict_compat import OrderedDict
 

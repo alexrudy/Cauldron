@@ -1,6 +1,5 @@
 numpy
 matplotlib
 Cython
-git+https://github.com/astropy/astropy-helpers.git@master
 astropy
 zmq
