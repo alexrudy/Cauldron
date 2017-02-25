@@ -1,0 +1,22 @@
+session_name: Cauldron
+start_directory: ./ # load session relative to config location (project root).
+before_script: ./bootstrap.py
+environment:
+  VENVNAME: Cauldron
+windows:
+- window_name: src
+  focus: True
+  shell_command_before:
+    - workon -n $VENVNAME
+  panes:
+    - pane
+- window_name: test
+  shell_command_before:
+    - workon -n $VENVNAME
+  panes:
+    - watching_testrunner -b Cauldron -p '*.p*' -- python setup.py test
+- window_name: doc
+  shell_command_before:
+    - workon -n Zeeko
+  panes:
+    - watching_testrunner -b Cauldron -p '*.p*' -- python setup.py build_docs
