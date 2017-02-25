@@ -151,9 +151,9 @@ class ZMQPooler(ZMQThread):
         if self.running.isSet():
             worker = self._worker_queue.popleft()
             self.log.trace("{0}.broker() {2}2B {1}".format(self, binascii.hexlify(worker), code))
-            backend.send(worker, flags=zmq.SNDMORE)
-            backend.send(b"", flags=zmq.SNDMORE)
-            backend.send_multipart(msg)
+            backend.send(worker, flags=zmq.SNDMORE|zmq.NOBLOCK)
+            backend.send(b"", flags=zmq.SNDMORE|zmq.NOBLOCK)
+            backend.send_multipart(msg, flags=zmq.NOBLOCK)
             self._active_workers[worker] = time.time() + self._worker_timeout
             self._directory[worker] = code
         else:
@@ -162,8 +162,8 @@ class ZMQPooler(ZMQThread):
             except Exception:
                 pass
             else:
-                frontend.send(b"", flags=zmq.SNDMORE)
-                frontend.send_multipart(response.data)
+                frontend.send(b"", flags=zmq.SNDMORE|zmq.NOBLOCK)
+                frontend.send_multipart(response.data, flags=zmq.NOBLOCK)
     
     def _poll_and_respond(self, poller, frontend, internal, backend, signal):
         """Poll for messages, handle them."""

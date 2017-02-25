@@ -87,7 +87,7 @@ class TaskQueue(ZMQThread):
         self._pending[task.request.identifier] = (time.time(), task)
         if self.frontend.poll(flags=zmq.POLLOUT) and self.running.is_set():
             self.log.trace("{0!r}.put({1})".format(self, task.request))
-            self.frontend.send(task.request.identifier)
+            self.frontend.send(task.request.identifier, flags=zmq.NOBLOCK)
             self.log.trace("{0!r}.put({1}) done.".format(self, task.request))
         else:
             self.log.trace("{0!r}.drop({1})".format(self, task.request))
