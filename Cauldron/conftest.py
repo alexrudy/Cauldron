@@ -47,6 +47,7 @@ available_backends = get_available_backends()
 if "zmq" in available_backends:
     PYTEST_HEADER_MODULES['zmq'] = 'zmq'
 
+@pytest.hookimpl(tryfirst=True)
 def pytest_configure(config):
     """Activate log capturing if appropriate."""
     if config.pluginmanager.get_plugin("pytest_catchlog") is None:
@@ -55,6 +56,16 @@ def pytest_configure(config):
             setup_logging("stream", level=0)
         except ImportError:
             pass
+    else:
+        config.option.log_format = '%(name)-35s %(lineno)4d %(levelname)-8s %(message)s %(filename)s'
+        
+    try:
+        import faulthandler
+    except ImportError:
+        pass
+    else:
+        faulthandler.enable()
+
 
 def pytest_report_header(config):
     import astropy.tests.pytest_plugins as astropy_pytest_plugins
@@ -71,6 +82,7 @@ def pytest_report_header(config):
     
 def _handle_zmq_sigabrt(signum, stackframe):
     """Handle a ZMQ SIGABRT"""
+    print("")
     print("Got a signal: {0}".format(signum))
     if stackframe:
         print(traceback.print_stack(stackframe))
@@ -84,7 +96,8 @@ def setup_zmq_sigabrt_handler():
         pass
     else:
         #TODO: Version bound this, once the problem is fixed.
-        signal.signal(signal.SIGABRT, _handle_zmq_sigabrt)
+        # signal.signal(signal.SIGABRT, _handle_zmq_sigabrt)
+        pass
         
 setup_zmq_sigabrt_handler()
 
