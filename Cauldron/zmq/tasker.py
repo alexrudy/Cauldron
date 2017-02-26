@@ -57,7 +57,7 @@ class TaskQueue(ZMQThread):
                 continue
             dur = starttime + task.timeout
             if dur < now:
-                self.log.trace("{0!r}.timeout({1})".format(self, task.request))
+                self.log.trace("{0!r}.timeout({1}) after {2:s}".format(self, task.request, task.timeout))
                 task.timedout()
                 self._pending.pop(task.request.identifier)
             elif (timeout > (task.timeout * 1e3)):

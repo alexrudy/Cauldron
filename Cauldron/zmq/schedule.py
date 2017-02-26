@@ -13,7 +13,7 @@ from ..scheduler import Scheduler
 
 __all__ = ['ZMQScheduler']
 
-now = time.time()
+now = time.time
 
 class ZMQScheduler(ZMQThread, Scheduler):
     """A scheduler maintains appointments and periods, and responds with the next timeout."""
