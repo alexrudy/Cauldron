@@ -42,8 +42,8 @@ class LocalScheduler(Scheduler, threading.Thread):
         """Run the task queue thread."""
         while not self.shutdown.isSet():
             now = time.time()
-            self.run_periods(at=thetime)
-            self.run_appointments(at=thetime)
+            self.run_periods(at=now)
+            self.run_appointments(at=now)
             timeout = self.get_timeout()
             self.waker.wait(timeout=timeout)
             self.waker.clear()
