@@ -11,17 +11,17 @@ import functools
 from ..conftest import fail_if_not_teardown, available_backends
 pytestmark = pytest.mark.skipif("zmq" not in available_backends, reason="requires zmq")
 
-@pytest.fixture
-def backend(request, config):
-    """Always return the zmq backend."""
-    from Cauldron.api import use
-    use("zmq")
-    request.addfinalizer(fail_if_not_teardown)
-    from Cauldron.zmq.broker import ZMQBroker
-    b = ZMQBroker.setup(config=config, timeout=0.01, daemon=False)
-    if b:
-        request.addfinalizer(functools.partial(b.stop, timeout=0.1))
-    return "zmq"
+# @pytest.fixture
+# def backend(request, config):
+#     """Always return the zmq backend."""
+#     from Cauldron.api import use
+#     use("zmq")
+#     request.addfinalizer(fail_if_not_teardown)
+#     from Cauldron.zmq.broker import ZMQBroker
+#     b = ZMQBroker.setup(config=config, timeout=0.01, daemon=False)
+#     if b:
+#         request.addfinalizer(functools.partial(b.stop, timeout=0.1))
+#     return "zmq"
     
 class IncrementingInteger(Integer):
     

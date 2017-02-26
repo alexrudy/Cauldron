@@ -262,12 +262,12 @@ class Keyword(_BaseKeyword):
         """Read the value from the authority source. Called to get the value for :meth:`update`."""
         return self.value
     
-    @api_not_implemented
+    @api_not_required
     def schedule(self, appointment=None, cancel=False):
         """Schedule an update."""
         pass # pragma: no cover
     
-    @api_not_implemented
+    @api_not_required
     def period(self, period):
         """How often a keyword should be updated."""
         pass # pragma: no cover

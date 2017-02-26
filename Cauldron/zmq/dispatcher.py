@@ -8,7 +8,7 @@ from .common import zmq_get_address, check_zmq, teardown, zmq_connect_socket
 from .protocol import ZMQCauldronMessage, FRAMEFAIL, FRAMEBLANK
 from .responder import ZMQPooler
 from .broker import ZMQBroker
-from .schedule import Scheduler
+from .schedule import ZMQScheduler
 from .tasker import Task, TaskQueue
 from ..base import DispatcherService, DispatcherKeyword
 from .. import registry
@@ -76,7 +76,7 @@ class Service(DispatcherService):
         self._thread = ZMQPooler(self, zmq_get_address(self._config, "broker", bind=False))
         self._tasker = TaskQueue(self.log.name +".Tasks", ctx=self.ctx, 
                                  log=self.log, backend_address=self._thread.internal_address)
-        self._scheduler = Scheduler(self.log.name + ".Scheduler", self.ctx)
+        self._scheduler = ZMQScheduler(self.log.name + ".Scheduler", self.ctx)
     
     def _begin(self):
         """Allow command responses to start."""
@@ -115,11 +115,14 @@ class Service(DispatcherService):
         # only locked by the underlying responder
         # threads which handle KTL commands.
         for keyword in self._keywords.values():
-            if keyword._lock.acquire(False):
-                keyword._lock.release()
-            else:
-                time.sleep(0.1)
-                break
+            try:
+                if keyword._lock.acquire(False):
+                    keyword._lock.release()
+                else:
+                    time.sleep(0.1)
+                    break
+            except:
+                pass
         
         if hasattr(self, '_tasker') and self._tasker is not None and self._tasker.is_alive():
             self._tasker.stop()
