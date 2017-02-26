@@ -15,8 +15,10 @@ import logging
 
 from ..config import get_timeout
 from ..utils.callbacks import WeakMethod
+from ..utils.referencecompat import ReferenceError
 from ..utils.helpers import _inherited_docstring
 from ..exc import TimeoutError
+from ..logger import KeywordMessageFilter
 
 from astropy.utils.misc import InheritDocstrings
 
@@ -140,7 +142,8 @@ class _BaseKeyword(object):
         self._acting = False
         if type is not None:
             self._type = type
-        self.log = logging.getLogger(".".join([self.service.log.name, name]))
+        self.log = self.service.log.getChild(name)
+        self.log.addFilter(KeywordMessageFilter(self))
         
             
     def _type(self, value):
@@ -149,8 +152,13 @@ class _BaseKeyword(object):
         
     def __repr__(self):
         """Represent this keyword"""
+        try:
+            service_name = getattr(self.service, 'name', '?service?')
+        except ReferenceError:
+            service_name = '?dead service?'
+        
         repr_str = "<Keyword type={0} service={1} name={2}".format(
-            getattr(self, 'KTL_TYPE', 'basic'), getattr(self.service, 'name', '?service?'), self.name)
+            getattr(self, 'KTL_TYPE', 'basic'), service_name, self.name)
         if getattr(self, '_last_value', None) is not None:
             repr_str += " value={value}".format(value=self._last_value)
         return repr_str + ">"

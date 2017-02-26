@@ -37,7 +37,7 @@ class KeywordMessageFilter(logging.Filter):
         self._keyword = weakref.ref(keyword)
     
     def filter(self, record):
-        """Filter"""
+        """Filter by applying keyword names."""
         record.keyword_name = self._keyword_name
         keyword = self._keyword()
         if keyword is not None:
@@ -46,4 +46,5 @@ class KeywordMessageFilter(logging.Filter):
             record.keyword = "<MissingKeyword '{0}'>".format(self._keyword_name)
         return True
     
+
     
