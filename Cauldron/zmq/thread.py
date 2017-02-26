@@ -32,7 +32,7 @@ class ZMQThreadError(Exception):
             s += " from {0!r}".format(self.exc)
         return s
 
-class ZMQThread(threading.Thread):
+class ZMQThread(threading.Thread, object):
     """A ZMQ Thread control object."""
     def __init__(self, name, context=None):
         super(ZMQThread, self).__init__(name=six.text_type(name))
