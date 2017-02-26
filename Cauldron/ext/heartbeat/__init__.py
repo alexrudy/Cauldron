@@ -8,6 +8,8 @@ from Cauldron.types import Integer, DispatcherKeywordType
 from Cauldron.exc import NoWriteNecessary
 from Cauldron.utils.callbacks import Callbacks
 
+__all__ = ['HeartbeatKeyword']
+
 class HeartbeatKeyword(Integer, DispatcherKeywordType):
     """This keyword will update with a period to identify a dispatcher as alive.
     """
