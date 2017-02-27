@@ -1,3 +1,4 @@
 astropy
 six
+--no-binary pyzmq
 pyzmq
