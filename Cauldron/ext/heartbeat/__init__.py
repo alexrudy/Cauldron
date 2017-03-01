@@ -5,8 +5,6 @@ An extension for a heartbeat keyword following the convention used by KTL in the
 from __future__ import absolute_import
 
 from Cauldron.types import Integer, DispatcherKeywordType
-from Cauldron.exc import NoWriteNecessary
-from Cauldron.utils.callbacks import Callbacks
 
 __all__ = ['HeartbeatKeyword']
 
