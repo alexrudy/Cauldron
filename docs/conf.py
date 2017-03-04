@@ -42,11 +42,14 @@ except ImportError:
 from astropy_helpers.sphinx.conf import *
 
 # Get configuration information from setup.cfg
-from distutils import config
-conf = config.ConfigParser()
+try:
+    from ConfigParser import ConfigParser
+except ImportError:
+    from configparser import ConfigParser
+conf = ConfigParser()
+
 conf.read([os.path.join(os.path.dirname(__file__), '..', 'setup.cfg')])
 setup_cfg = dict(conf.items('metadata'))
-
 # -- General configuration ----------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
@@ -85,6 +88,8 @@ __import__(setup_cfg['package_name'])
 package = sys.modules[setup_cfg['package_name']]
 
 # Use the mock backend for automodAPI.
+__import__(setup_cfg['package_name'] + ".test_helpers")
+package.test_helpers.setup_entry_points_api()
 package.use('local')
 # The short X.Y version.
 version = package.__version__.split('-', 1)[0]
