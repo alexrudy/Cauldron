@@ -46,11 +46,19 @@ def mkvirtualenv(version='', project=PROJECT_DIR, name=PROJECT):
 def main():
     """Main function to bootstrap things"""
     if not os.path.exists(VIRTUAL_ENV):
-        mkvirtualenv()
+        print("Building virtual environment for {0}".format(PROJECT))
+        mkvirtualenv(project=PROJECT_DIR, name=PROJECT)
     
-    pip_install(['-r', 'requirements.txt'])
-    pip_install(['-r', pjoin('requirements','test.txt')])
-    pip_install(['-r', pjoin('requirements','doc.txt')])
+    requirements = pjoin(PROJECT_DIR, 'requirements.txt')
+    if not os.path.exists(requirements):
+        error("Can't find requirements.txt at {0}".format(requirements))
+    pip_install(['-r', requirements])
+    requirements_dir = pjoin(PROJECT_DIR, 'requirements')
+    if os.path.exists(requirements_dir):
+        pip_install(['-r', pjoin(requirements_dir,'test.txt')])
+        pip_install(['-r', pjoin(requirements_dir,'doc.txt')])
+    else:
+        warning("No requirements/ directory found in {0}".format(PROJECT_DIR))
 
 if __name__ == '__main__':
     main()
