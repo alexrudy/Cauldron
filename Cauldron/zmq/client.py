@@ -17,6 +17,7 @@ from .responder import ZMQDispatcherError
 from .. import registry
 from ..config import get_configuration, get_timeout
 from ..logger import KeywordMessageFilter
+from ..compat import WeakSet
 
 import json
 import six
@@ -33,7 +34,7 @@ def teardown():
 
 registry.client.teardown_for('zmq')(teardown)
 
-_service_registry = set()
+_service_registry = WeakSet()
 
 def _cleanup(_registry=_service_registry):
     """Cleanup a service instance at exit."""
