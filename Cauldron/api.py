@@ -83,9 +83,9 @@ def use(name):
     DFW.Service = Service
     DFW.Keyword = Keyword
     
-def _make_newstyle_class(base):
+def _make_newstyle_class(base, *bases):
     """Convert a class to a new-style class."""
-    return type(base.__name__, (base, object), {'__module__':base.__module__})
+    return type(base.__name__, (base,) + bases + (object,), {'__module__':base.__module__})
     
 @registry.client.setup_for("ktl")
 def setup_ktl_backend():
@@ -97,8 +97,9 @@ def setup_ktl_backend():
     except ImportError:
         pass
     else:
-        registry.client.service_for("ktl", _make_newstyle_class(ktl.Service))
-        registry.client.keyword_for("ktl", _make_newstyle_class(ktl.Keyword))
+        from Cauldron.shim.client import Service, Keyword
+        registry.client.service_for("ktl", _make_newstyle_class(ktl.Service, Service))
+        registry.client.keyword_for("ktl", _make_newstyle_class(ktl.Keyword, Keyword))
         
 @registry.dispatcher.setup_for("ktl")
 def setup_dfw_backend():
@@ -110,8 +111,9 @@ def setup_dfw_backend():
     except ImportError:
         pass
     else:
-        registry.dispatcher.service_for("ktl", _make_newstyle_class(DFW.Service))
-        registry.dispatcher.keyword_for("ktl", _make_newstyle_class(DFW.Keyword.Keyword))
+        from Cauldron.shim.dispatcher import Service, Keyword
+        registry.dispatcher.service_for("ktl", _make_newstyle_class(DFW.Service, Service))
+        registry.dispatcher.keyword_for("ktl", _make_newstyle_class(DFW.Keyword.Keyword, Keyword))
     
     
 def check_ktl_backend():

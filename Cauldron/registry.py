@@ -86,7 +86,7 @@ class Registry(object):
             cls = self._keyword[self._backend]
             self._keyword_cls = type('Keyword', (cls, object),
                 {'__module__':'{0}.Keyword'.format(self._modname)})
-        return self._keyword[self._backend]
+        return self._keyword_cls
         
     @property
     def Service(self):
