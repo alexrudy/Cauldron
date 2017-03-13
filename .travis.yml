@@ -2,7 +2,7 @@ language: python
 
 python:
     - 2.7
-    - 3.4
+    - 3.6
 env:
     global:
         # The following versions are the 'default' for tests, unless
@@ -44,7 +44,7 @@ matrix:
         - python: 2.7
           env: CONDA_DEPENDENCIES=$CONDA_REQ_DEPENDENCIES
           
-        - python: 3.4
+        - python: 3.6
           env: CONDA_DEPENDENCIES=$CONDA_REQ_DEPENDENCIES
           
 
