@@ -6,6 +6,7 @@ This module handles the API for the system, registering backends and using them.
 from __future__ import absolute_import
 
 import six
+import os
 import types
 import sys
 import warnings
@@ -238,7 +239,14 @@ def setup_entry_points():
 @registry.dispatcher.setup_for('all')
 def setup_xml_from_config():
     """Setup XML from configuation."""
-    if get_configuration().getboolean('core', 'strictxml'):
+    config = get_configuration()
+    if config.has_option('core', 'xmldir'):
+        path = config.get("core", "xmldir")
+        if path != ":notset:":
+            if "RELDIR" in os.environ:
+                log.warning("Overwriting environment value of RELDIR={0} to {1}".format(os.environ["RELDIR"], path))
+            os.environ['RELDIR'] = path 
+    if config.getboolean('core', 'strictxml'):
         STRICT_KTL_XML.on()
 
 @registry.client.setup_for('all')

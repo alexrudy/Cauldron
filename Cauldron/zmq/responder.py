@@ -110,7 +110,10 @@ class ZMQPooler(ZMQThread):
         self._directory = dict()
         self._workers = set()
         if pool_size is None:
-            pool_size = self.service._config.getint("zmq", "pool")
+            if self.service._config.has_option("zmq:{0}".format(self.service.name), "pool"):
+                pool_size = self.service._config.getint("zmq:{0}".format(self.service.name), "pool")
+            else:
+                pool_size = self.service._config.getint("zmq", "pool")
         self._pool_size = pool_size
         self.timeout = timeout
         
