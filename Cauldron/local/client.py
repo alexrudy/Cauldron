@@ -16,17 +16,16 @@ from .. import registry
 
 __all__ = ['Service', 'Keyword']
 
-
 class LocalTask(_BaseTask):
     """A simple object to mock asynchronous operations."""
     
-    def __call__(self):
-        """Make sure that errors are properly set."""
-        super(LocalTask, self).__call__()
+    def reraise(self):
+        """Wrap raised errors in dispatcher errors."""
         if self.error is not None:
             self.error = DispatcherError(str(self.error))
         if self.exc_info is not None:
             self.exc_info = (DispatcherError, self.error, self.exc_info[2])
+        super(LocalTask, self).reraise()
     
 class LocalTaskQueue(threading.Thread):
     
