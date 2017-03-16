@@ -7,7 +7,7 @@ import contextlib
 def get_service(name):
     """Generate a service object for a given name."""
     from Cauldron.ktl.procedural import cached
-    if isinstance(name, (str, bytes))
+    if isinstance(name, (str, bytes)):
         return cached(name)
     return name
     
