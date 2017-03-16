@@ -16,6 +16,16 @@ from .. import registry
 
 __all__ = ['Service', 'Keyword']
 
+_registry = weakref.WeakValueDictionary()
+
+@registry.client.teardown_for("local")
+def clear():
+    """Clear the registry."""
+    for svc in _registry.values():
+        svc.shutdown()
+    _registry.clear()
+
+
 class LocalTask(_BaseTask):
     """A simple object to mock asynchronous operations."""
     
@@ -34,6 +44,7 @@ class LocalTaskQueue(threading.Thread):
         self.queue = queue.Queue()
         self.log = log or logging.getLogger("ktl.local.TaskQueue.{0:s}".format(name))
         self.shutdown = threading.Event()
+        self.daemon = True
     
     def run(self):
         """Run the task queue thread."""
@@ -162,6 +173,7 @@ class Service(ClientService):
         except KeyError:
             raise ServiceNotStarted("Service '{0!s}' is not started.".format(name))
         super(Service, self).__init__(name, populate)
+        _registry[self.name] = self
         
     def _prepare(self):
         """Prepare the local client for action."""

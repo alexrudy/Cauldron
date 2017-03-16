@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 
 import threading
+import click
+import contextlib
 
 def setup(service):
     """Set up the KTL service with some dummy keywords."""
@@ -12,52 +14,43 @@ def setup(service):
     kwd.mapping[1] = 'QUAD'
     kwd.mapping[2] = 'BINQUAD'
 
-def server(shutdown, running, service='saotest'):
+@contextlib.contextmanager
+def dispatch(run, service='saotest'):
     """Server to serve KTL keywords"""
-    from Cauldron import DFW
-    svc = DFW.Service(service, None, setup=setup)
+    if run:
+        from Cauldron import DFW
+        svc = DFW.Service(service, None, setup=setup)
     try:
-        running.set()
-        while not shutdown.is_set():
-            shutdown.wait(300)
+        yield
     finally:
-        svc.shutdown()
+        if run:
+            svc.shutdown()
     
 
-def client(service):
+def client(service, keyword, n):
     """Client side of things."""
     from Cauldron import ktl
     svc = ktl.Service(service)
-    try:
-        kw = svc['WFSCENTROID']
-        print("# binary, ascii")
-        for i in range(3):
-            kw.write(i)
-            kw.read()
-            print(kw['binary'], kw['ascii'])
-        
-    finally:
-        svc.shutdown()
+    kw = svc[keyword]
+    template = "{0!s:20s} | {1:20s} | {2:10s}"
+    click.echo("# " + template.format('binary', 'type', 'ascii'))
+    for i in range(n):
+        kw.write(i)
+        kw.read()
+        click.echo("  " + template.format(kw['binary'], type(kw['binary']), kw['ascii']))
     
-
-def main():
-    """Main command."""
+@click.command()
+@click.option("--dispatcher/--no-dispatcher", default=False, help="Run a dispatcher.")
+@click.option("-k", "--backend", default='local', help='The Cauldron backend to select.')
+@click.option("-s", "--service", default='saotest', help="Service to test against.")
+@click.option("--keyword", type=str, default="WFSCENTROID", help="Keyword to examine.")
+@click.option("-n", type=int, default=3, help="Number of enumerations to examine.")
+def main(keyword, n, dispatcher, backend, service):
+    """Test against an enumerated keyword."""
     import Cauldron
-    from Cauldron.api import STRICT_KTL_XML
-    STRICT_KTL_XML.off()
-    Cauldron.use("local")
-    SERVICE = 'saotest'
-    shutdown = threading.Event()
-    running = threading.Event()
-    thread = threading.Thread(target=server, args=(shutdown, running, SERVICE))
-    thread.start()
-    try:
-        running.wait(10)
-        if running.is_set():
-            client(SERVICE)
-    finally:
-        shutdown.set()
-        thread.join()
+    Cauldron.use(backend)
+    with dispatch(dispatcher, service):
+        client(service, keyword, n)
     
 if __name__ == '__main__':
     main()

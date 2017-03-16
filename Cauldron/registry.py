@@ -4,6 +4,7 @@ A registry of setup and teardown functions for dispatchers and clients.
 """
 
 import collections
+import atexit
 from .compat import WeakOrderedSet
 from .utils.helpers import _inherited_docstring
 
@@ -42,6 +43,7 @@ class Registry(object):
         self._keyword_cls = None
         if doc is not None:
             self.__doc__ = doc
+        atexit.register(self.teardown)
             
     @property
     def backend(self):

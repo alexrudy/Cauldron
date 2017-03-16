@@ -24,7 +24,6 @@ import six
 import threading
 import logging
 import warnings
-import atexit
 
 __all__ = ["Service", "Keyword"]
 
@@ -45,9 +44,6 @@ def _cleanup(_registry=_service_registry):
             break
         else:
             svc.shutdown()
-
-atexit.register(_cleanup)
-
 
 class _ZMQMonitorThread(ZMQThread):
     """A monitoring thread for ZMQ-powered Services which listens for broadcasts."""

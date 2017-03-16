@@ -478,7 +478,7 @@ class ZMQBroker(threading.Thread):
         self._error = None
         self._heartbeat = heartbeat
         self.services = dict()
-        self.log.info("ZMQBroker.__init__")
+        self.log.trace("ZMQBroker.__init__")
         
     @classmethod
     def from_config(cls, config, name="ConfiguredBroker"):

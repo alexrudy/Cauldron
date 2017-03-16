@@ -22,6 +22,7 @@ import logging
 from .exc import CauldronAPINotImplementedWarning, CauldronXMLWarning, CauldronTypeError
 from .api import guard_use, STRICT_KTL_XML, BASENAME, CAULDRON_SETUP
 from .base.core import _CauldronBaseMeta
+from .base.xml import emit_xml_warning
 from .extern import ktlxml
 from . import registry
 from .utils.helpers import _inherited_docstring, _prepend_to_docstring
@@ -413,7 +414,9 @@ class Enumerated(Integer):
             except Exception as e:
                 if STRICT_KTL_XML:
                     raise
-                warnings.warn("XML enumeration setup for keyword '{0}' failed. {1}".format(self.name, e), CauldronXMLWarning)
+                if self.service.xml is not None:
+                    msg = "XML enumeration setup for keyword '{0}' failed. {1}".format(self.name, e)
+                    emit_xml_warning(self.log, msg)
             
         
     @property
