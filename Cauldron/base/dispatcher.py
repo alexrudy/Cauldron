@@ -382,6 +382,15 @@ class Service(_BaseService):
     def __iter__(self):
         """Iterator over self."""
         return six.itervalues(self._keywords)
+        
+    def __enter__(self):
+        """Use this service as a context manager."""
+        return self
+    
+    def __exit__(self, exc_tp, exc_val, exc_tb):
+        """Ensure that the service is shutdown on exit."""
+        self.shutdown()
+        return False # Don't suppress errors raised in the context.
     
     def get(self, name, default=None):
         """Get a keyword."""
