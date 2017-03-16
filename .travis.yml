@@ -11,10 +11,11 @@ env:
         - ASTROPY_VERSION=stable
         - NUMPY_VERSION=stable
         - CONDA_REQ_DEPENDENCIES='Cython jinja2 six setuptools'
-        - CONDA_DEPENDENCIES='Cython jinja2 six setuptools pyzmq'
+        - CONDA_DEPENDENCIES='Cython jinja2 six setuptools'
         - SETUP_CMD='test'
         - MAIN_CMD='python setup.py'
         - PIP_DEPENDENCIES='pytest-catchlog git+https://github.com/alexrudy/lumberjack.git'
+        - PIP_PYZMQ=yes
     matrix:
       - SETUP_CMD='egg_info'
       - SETUP_CMD='test'
@@ -42,10 +43,14 @@ matrix:
           
         # Try without some optional deps
         - python: 2.7
-          env: CONDA_DEPENDENCIES=$CONDA_REQ_DEPENDENCIES
+          env: 
+            - CONDA_DEPENDENCIES=$CONDA_REQ_DEPENDENCIES
+            - PIP_PYZMQ=no
           
         - python: 3.6
-          env: CONDA_DEPENDENCIES=$CONDA_REQ_DEPENDENCIES
+          env: 
+            - CONDA_DEPENDENCIES=$CONDA_REQ_DEPENDENCIES
+            - PIP_PYZMQ=no
           
 
 # Setting sudo to false opts in to Travis-CI container-based builds.
@@ -64,6 +69,7 @@ install:
     # CI-Helpers
     - git clone git://github.com/astropy/ci-helpers.git
     - source ci-helpers/travis/setup_conda_$TRAVIS_OS_NAME.sh
+    - if [[ $PIP_PYZMQ == 'yes' ]]; then pip install --no-binary pyzmq pyzmq
     
 script:
    - $MAIN_CMD $SETUP_CMD
