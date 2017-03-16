@@ -39,14 +39,14 @@ def ktl_context(service, **kwargs):
     initial_state = {}
     # Record the initial state.
     for keyword in kwargs:
-        initial_state[keyword] = service[keyword].read()
+        initial_state[keyword] = service[str(keyword)].read()
     try:
         for keyword, value in kwargs.items():
-            service[keyword].write(value)
+            service[str(keyword)].write(value)
         yield
     finally:
-        for keyword, value in initial_state:
-            service[keyword].write(value)
+        for keyword, value in initial_state.items():
+            service[str(keyword)].write(value)
 
 class Service(object):
     """An attribute service"""
