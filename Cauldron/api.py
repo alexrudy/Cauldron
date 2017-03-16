@@ -34,6 +34,8 @@ BASENAME = ".".join(__name__.split(".")[:-1])
 KTL_DEFAULT_NAMES = set(['ktl', 'DFW'])
 
 STRICT_KTL_XML = _Setting("STRICT_KTL_XML", False)
+WARN_KTL_XML = _Setting("WARN_KTL_XML", True) # Emit warnings for XML problems.
+WARNINGS_KTL = _Setting("WARNINGS_KTL", False) # Emit warnings through python's warnings system.
 
 def use_strict_xml():
     """Use strict XML settings. Strict XML enforces all of the KTL XML rules to the letter, and requires that all keywords be pre-defined in XML files which are loaded when connecting a service from either the client or dispatcher side.
