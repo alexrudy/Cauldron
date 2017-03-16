@@ -47,17 +47,19 @@ available_backends = get_available_backends()
 if "zmq" in available_backends:
     PYTEST_HEADER_MODULES['zmq'] = 'zmq'
 
-@pytest.hookimpl(tryfirst=True)
 def pytest_configure(config):
     """Activate log capturing if appropriate."""
-    if config.pluginmanager.get_plugin("pytest_catchlog") is None:
-        try:
-            from lumberjack import setup_logging
-            setup_logging("stream", level=0)
-        except ImportError:
-            pass
-    else:
-        config.option.log_format = '%(name)-35s %(lineno)4d %(levelname)-8s %(message)s %(filename)s'
+    try:
+        if config.pluginmanager.get_plugin("pytest_catchlog") is None:
+            try:
+                from lumberjack import setup_logging
+                setup_logging("stream", level=0)
+            except ImportError:
+                pass
+        else:
+            config.option.log_format = '%(name)-35s %(lineno)4d %(levelname)-8s %(message)s %(filename)s'
+    except:
+        pass
         
     try:
         import faulthandler
@@ -65,6 +67,9 @@ def pytest_configure(config):
         pass
     else:
         faulthandler.enable()
+        
+if hasattr(pytest, 'hookimpl'):
+    pytest_configure = pytest.hookimpl(tryfirst=True)(pytest_configure)
 
 
 def pytest_report_header(config):
