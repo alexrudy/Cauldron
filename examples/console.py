@@ -7,6 +7,7 @@ from Cauldron.api import STRICT_KTL_XML
 STRICT_KTL_XML.off()
 import threading
 import click
+import logging
 
 class Finalizer(threading.Thread):
     """A thread finalizer."""
@@ -14,6 +15,15 @@ class Finalizer(threading.Thread):
         super(Finalizer, self).__init__(*args, **kwargs)
         self.running = threading.Event()
         self.shutdown = threading.Event()
+        
+    def __enter__(self):
+        """Start this thread."""
+        self.start()
+    
+    def __exit__(self, exc_type, exc_val, tb):
+        """Exit from this thread."""
+        self.shutdown.set()
+        self.join(timeout=1)
         
     def initializer(self):
         """Initalize the thread."""
@@ -59,7 +69,7 @@ class Broker(Finalizer):
     def initializer(self):
         """Initialize the broker."""
         from Cauldron.zmq.broker import ZMQBroker
-        self._b = ZMQBroker.sub()
+        self._b = ZMQBroker.thread()
     
     def finalizer(self):
         """Shutdown the broker."""
@@ -99,27 +109,26 @@ def configure():
     cauldron_configuration.set("core", "timeout", "5")
 
 @click.command()
-@click.option("--parallel/--no-parallel", default=False)
-@click.option("--wait/--no-wait", default=False)
-@click.option("--timeout", type=float, default=1.0)
-def main(parallel, wait, timeout):
-    """Main command."""
+@click.option("--parallel/--no-parallel", default=False, help="Make writes in parallel.")
+@click.option("--wait/--no-wait", default=False, help="Wait on changes to complete.")
+@click.option("--timeout", type=float, default=1.0, help="Set a timeout for the console.")
+@click.option("--verbose", "level", flag_value=logging.NOTSET, help="Use verbose logging.")
+@click.option("--debug", "level", flag_value=logging.DEBUG, help="Use debug logging.")
+@click.option("--info", "level", default=True, flag_value=logging.INFO, help="Default logging.")
+@click.option("--quiet", "level", flag_value=logging.ERROR, help="Make things quiet.")
+def main(parallel, wait, timeout, level):
+    """Repeatedly run the console command to try to identify problems."""
     import lumberjack
-    lumberjack.setup_logging(mode='stream')
+    lumberjack.setup_logging(mode='stream', level=level)
+    log = logging.getLogger()
+    log.setLevel(level)
     configure()
     from Cauldron.api import use
     use("zmq")
     service = 'saotest'
     threads = [broker(), Server(service=service)]
-    try:
-        for t in threads:
-            t.start()
+    with broker(), Server(service=service):
         console(service, parallel, not wait, timeout)
-    finally:
-        for t in threads:
-            t.shutdown.set()
-        for t in threads:
-            t.join(timeout=10)
 
 if __name__ == '__main__':
     main()
