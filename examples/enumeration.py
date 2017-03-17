@@ -34,12 +34,15 @@ def client(service, keyword, n):
     kw = svc[str(keyword)]
     template = "{0!s:20s} | {1:20s} | {2:10s} | {3:10s}"
     click.echo("# " + template.format('binary', 'type', 'ascii', 'ascii-type'))
-    kw.read()
-    click.echo("  " + template.format(kw['binary'], type(kw['binary']), kw['ascii'], type(kw['ascii'])))
-    for i in range(n):
-        kw.write(i, binary=True)
-        kw.read()
+    initial = kw.read()
+    try:
         click.echo("  " + template.format(kw['binary'], type(kw['binary']), kw['ascii'], type(kw['ascii'])))
+        for i in range(n):
+            kw.write(i, binary=True)
+            kw.read()
+            click.echo("  " + template.format(kw['binary'], type(kw['binary']), kw['ascii'], type(kw['ascii'])))
+    finally:
+        kw.write(initial, wait=False)
     
 @click.command()
 @click.option("--dispatcher/--no-dispatcher", default=False, help="Run a dispatcher.")
