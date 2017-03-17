@@ -85,7 +85,7 @@ class TaskQueue(ZMQThread):
     def put(self, task):
         """Add a task to the queue."""
         self._pending[task.request.identifier] = (time.time(), task)
-        if self.frontend.poll(flags=zmq.POLLOUT, timeout=get_timeout(None) * 100) and self.running.is_set():
+        if self.frontend.poll(flags=zmq.POLLOUT, timeout=get_timeout(None, 100.0)) and self.running.is_set():
             self.log.trace("{0!r}.put({1})".format(self, task.request))
             self.frontend.send(task.request.identifier, flags=zmq.NOBLOCK)
             self.log.trace("{0!r}.put({1}) done.".format(self, task.request))
