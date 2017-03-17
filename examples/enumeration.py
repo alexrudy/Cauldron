@@ -30,14 +30,16 @@ def dispatch(run, service='saotest'):
 def client(service, keyword, n):
     """Client side of things."""
     from Cauldron import ktl
-    svc = ktl.Service(service)
-    kw = svc[keyword]
-    template = "{0!s:20s} | {1:20s} | {2:10s}"
-    click.echo("# " + template.format('binary', 'type', 'ascii'))
+    svc = ktl.Service(str(service))
+    kw = svc[str(keyword)]
+    template = "{0!s:20s} | {1:20s} | {2:10s} | {3:10s}"
+    click.echo("# " + template.format('binary', 'type', 'ascii', 'ascii-type'))
+    kw.read()
+    click.echo("  " + template.format(kw['binary'], type(kw['binary']), kw['ascii'], type(kw['ascii'])))
     for i in range(n):
-        kw.write(i)
+        kw.write(i, binary=True)
         kw.read()
-        click.echo("  " + template.format(kw['binary'], type(kw['binary']), kw['ascii']))
+        click.echo("  " + template.format(kw['binary'], type(kw['binary']), kw['ascii'], type(kw['ascii'])))
     
 @click.command()
 @click.option("--dispatcher/--no-dispatcher", default=False, help="Run a dispatcher.")
