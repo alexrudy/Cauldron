@@ -49,7 +49,16 @@ def ktl_context(service, **kwargs):
             service[str(keyword)].write(value)
 
 class Service(object):
-    """An attribute service"""
+    """A ktl Service like object with keywords exposed via
+    attributes. This gives less precise control over the use
+    of keywords, but allows for more concise scripts::
+        
+        >>> svc = Service("testsvc")
+        >>> svc.mykeyword = "hello"
+        >>> svc.mykeyword
+        "hello"
+    
+    """
     
     _service = None
     # The KTL Service underlying this object.
