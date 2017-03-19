@@ -47,4 +47,5 @@ def service(default=None, backend=True):
         if backend:
             func = backend_option(default=backend_default)(func)
         return option(func)
+    return decorate
         
