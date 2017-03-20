@@ -67,7 +67,7 @@ def get_configuration():
     return Cauldron.configuration
     
 _timeouts = {}
-def get_timeout(timeout):
+def get_timeout(timeout, multiplier=None):
     """Get the configured default timeout."""
     if timeout is None:
         config = get_configuration()
@@ -79,6 +79,8 @@ def get_timeout(timeout):
             except configparser.NoOptionError:
                 pass
             _timeouts[id(config)] = timeout
+    if multiplier is not None and timeout is not None:
+        timeout = multiplier * timeout
     return timeout
     
 def reset_timeouts():
