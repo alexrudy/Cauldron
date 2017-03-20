@@ -161,7 +161,6 @@ class Keyword(DispatcherKeyword):
     
     def __init__(self, name, service, initial=None, period=None):
         super(Keyword, self).__init__(name, service, initial=initial, period=period)
-        self._lock = threading.RLock()
     
     def _broadcast(self, value):
         """Broadcast this keyword value."""
