@@ -80,6 +80,8 @@ class Service(object):
         
     def __setattr__(self, name, value):
         """Set an attribute on this service object."""
+        if name == "_service":
+            object.__setattr__(self, name, value)
         for obj in [self, self._service] + self._service.__class__.mro():
             if name in obj.__dict__:
                 object.__setattr__(self, name, value)
