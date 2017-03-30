@@ -112,6 +112,7 @@ ktl Reference/API
 =================
 
 .. automodapi:: Cauldron.ktl
+    :no-inheritance-diagram:
     :skip: Service, Keyword
 
 .. automodapi:: Cauldron.ktl.Keyword
