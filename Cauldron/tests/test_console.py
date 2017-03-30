@@ -90,6 +90,12 @@ def test_parse_modify_commands():
     
     with pytest.raises(ValueError):
         list(parseModifyCommands(["KEYWORD1="," ","bogus","KEYWORD2","=", "KEYWORD3"], flags))
+        
+    pairs = list(parseModifyCommands(["KEYWORD1=","=value", "KEYWORD2=", "=value", "KEYWORD3==value"], flags))
+    check_parse_modify(pairs, 3, "KEYWORD", "=value")
+
+    pairs = list(parseModifyCommands(["KEYWORD1","=val=ue", "KEYWORD3=val=ue"], flags))
+    check_parse_modify(pairs, 2, "KEYWORD", "val=ue")
     
     
 @pytest.fixture(params=[True, False], ids=['notify', 'no_notify'])
