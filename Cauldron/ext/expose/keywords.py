@@ -18,7 +18,7 @@ class ExposeAttribute(DispatcherKeywordType):
     def __init__(self, name, service, obj, attribute, *args, **kwargs):
         self._object = obj
         self._attribute = attribute
-        super(HeartbeatKeyword, self).__init__(name, service, *args, **kwargs)
+        super(ExposeAttribute, self).__init__(name, service, *args, **kwargs)
     
     def read(self):
         """Read this keyword from the target object."""

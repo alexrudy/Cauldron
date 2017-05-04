@@ -13,6 +13,8 @@ import logging
 import warnings
 import collections
 import time
+import threading
+
 from ..compat import WeakOrderedSet
 from .core import _BaseKeyword, _BaseService
 from .xml import init_xml, get_units_xml, get_initial_value, get_dispatcher_XML, setup_orphan, emit_xml_warning
@@ -38,6 +40,7 @@ class Keyword(_BaseKeyword):
         if service.get(name, None) is not None:
             raise ValueError("keyword named '%s' already exists." % name)
         self._acting = False
+        self._lock = threading.RLock()
         self._callbacks = Callbacks()
         self._history = collections.deque(maxlen=100)
         self.writeonly = False
