@@ -401,7 +401,7 @@ class Service(object):
                 dispatcher = self.dispatchers[dispatcher_name]
                 ktl_type = dispatcher.keywords[message.keyword.upper()]
             else:
-                raise KeyError
+                raise KeyError(message.keyword.upper())
         except KeyError:
             fmessage = FanMessage(self, client, message)
             self._fans[fmessage.id] = fmessage
