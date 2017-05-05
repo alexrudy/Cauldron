@@ -37,6 +37,8 @@ class CommandKeyword(Boolean, DispatcherKeywordType):
         """Write to the commands."""
         if str(value) == '1':
             self._cbs(self)
+        elif str(value) != '0':
+            self.log.debug("Received unknown command keyword value '{0}'.".format(str(value)))
     
     def postwrite(self, value):
         """Special postwrite that always sets the value to '0'."""
