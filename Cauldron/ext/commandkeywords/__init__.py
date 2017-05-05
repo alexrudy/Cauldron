@@ -22,6 +22,7 @@ class CommandKeyword(Boolean, DispatcherKeywordType):
         kwargs['initial'] = '0'
         super(CommandKeyword, self).__init__(*args, **kwargs)
         self._cbs = Callbacks()
+        self._warned_no_callbacks = False
     
     def command(self, func):
         """Add command items."""
@@ -35,6 +36,9 @@ class CommandKeyword(Boolean, DispatcherKeywordType):
     
     def write(self, value):
         """Write to the commands."""
+        if not self._warned_no_callbacks and not len(self._cbs):
+            self.log.warning("Command keyword '{0}' fired with no attached callbacks".format(self.name))
+            self._warned_no_callbacks = True
         if str(value) == '1':
             self._cbs(self)
         elif str(value) != '0':
