@@ -46,6 +46,9 @@ def fail_if_not_teardown():
     if CAULDRON_SETUP:
         raise ValueError("Cauldron is marked as 'setup'.")
     for module in sys.modules:
+        root = module.split(".")[0]
+        if root != 'Cauldron':
+            continue
         for failure in failures:
             if failure in module.split("."):
                 mod = sys.modules[module]

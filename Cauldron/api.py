@@ -257,31 +257,49 @@ def setup_client_service_module():
     from .ktl import Service
     Service.Service = registry.client.Service
     
+def popattr(obj, name):
+    """Pop an attribute during destruction."""
+    try:
+        delattr(obj, name)
+    except AttributeError as e:
+        log.debug("Failed delattr", exc_info=e)
+    
 @registry.client.teardown_for("all")
 def teardown_client_service_module():
     """Remove the service from the client module."""
     try:
         ktls = sys.modules[BASENAME + ".ktl.Service"]
-        del ktls.Service
-        ktl = sys.modules[BASENAME + ".ktl"]
-        del ktl.Service
-        del ktl.Keyword
     except KeyError as e:
         pass
+    else:
+        popattr(ktls, 'Service')
     
+    try:
+        ktl = sys.modules[BASENAME + ".ktl"]
+    except KeyError as e:
+        pass
+    else:
+        popattr(ktl, 'Service')
+        popattr(ktl, 'Keyword')
     
 @registry.dispatcher.teardown_for("all")
 def teardown_dispatcher_service_module():
     """Remove the service from the dispatcher module."""
     try:
         DFWs = sys.modules[BASENAME + ".DFW.Service"]
-        del DFWs.Service
-        DFW = sys.modules[BASENAME + ".DFW"]
-        del DFW.Service
-        del DFW.Keyword
     except KeyError as e:
         pass
+    else:
+        popattr(DFWs, 'Service')
+        
     
+    try:
+        DFW = sys.modules[BASENAME + ".DFW"]
+    except KeyError as e:
+        pass
+    else:
+        popattr(DFW, 'Service')
+        popattr(DFW, 'Keyword')
 
 @registry.dispatcher.setup_for('all')
 def setup_dispatcher_service_module():

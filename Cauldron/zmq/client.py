@@ -61,6 +61,7 @@ class _ZMQMonitorThread(ZMQThread):
         except weakref.ReferenceError:
             self.log.debug("Can't start ZMQ monitor, service has disappeared.")
             return
+        
         socket = ctx.socket(zmq.SUB)
         signal = self.get_signal_socket()
         poller = zmq.Poller()
@@ -264,6 +265,7 @@ class Keyword(ClientKeyword):
         """Handle a response, and return the payload."""
         self.log.msg("{0!r}.recv({1!s})".format(self, message))
         if message.iserror:
+            self.log.error("Dispatcher error: {0}".format(message))
             raise DispatcherError("Dispatcher error on command: {0}".format(message.payload))
         message.verify(self.service)
         self._update(message.unwrap())

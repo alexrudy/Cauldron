@@ -297,7 +297,7 @@ class Service(object):
                     dispatcher_name = self.keywords[message.keyword.upper()]
                     dispatcher = self.dispatchers[dispatcher_name]
                 except KeyError:
-                    raise NoDispatcherAvailable("No dispatcher is available for '{0}'".format(message.service))
+                    raise NoDispatcherAvailable("No dispatcher is available for {0}.{1}".format(message.service, message.keyword.upper()))
                 message.dispatcher = dispatcher.name
             else:
                 raise DispatcherError("Ambiguous dispatcher specification in message {0!s}".format(message))
@@ -401,7 +401,7 @@ class Service(object):
                 dispatcher = self.dispatchers[dispatcher_name]
                 ktl_type = dispatcher.keywords[message.keyword.upper()]
             else:
-                raise KeyError
+                raise KeyError(message.keyword.upper())
         except KeyError:
             fmessage = FanMessage(self, client, message)
             self._fans[fmessage.id] = fmessage
