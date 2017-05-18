@@ -43,6 +43,11 @@ def init_xml(service):
     """Return a ktlxml Service object"""
     try:
         service.xml = ktlxml.Service(service.name)
+    except IOError as e:
+        if str(e).startswith("cannot locate index.xml for service"):
+            emit_xml_warning(service.log, "Could not locate index.xml for service {self.name:s}. Keywords will not be validated against XML.".format(self=service), exc_info=False)
+        else:
+            raise
     except Exception as e:
         raise
     else:
