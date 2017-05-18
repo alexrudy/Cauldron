@@ -21,24 +21,29 @@ config.set("zmq", "broker", "inproc://broker")
 config.set("zmq", "publish", "inproc://publish")
 config.set("zmq", "subscribe", "inproc://subscribe")
 # config.set("zmq", "pool", "2")
-# config.set("zmq", "autobroker", "yes")
+config.set("zmq", "autobroker", "yes")
 # config.set("core", "timeout", "5")
 
-try:
+def main():
+    """Main function."""
+    try:
+        
+        from Cauldron import DFW
+        disp = DFW.Service("testsvc", config=None)
+        dtest = disp["TEST"]
+        log.info(dtest)
+        
+        from Cauldron import ktl
+        svc = ktl.Service("testsvc", populate=True)
+        log.info(svc)
+        log.info(svc.populated())
+        log.info("Done!")
+        disp.shutdown()
+        log.info("Shutdown complete.")
+    finally:
+        import threading
+        for thread in threading.enumerate():
+            print(thread)
 
-    from Cauldron import DFW
-    disp = DFW.Service("testsvc", config=None)
-    dtest = disp["TEST"]
-    log.info(dtest)
-
-    from Cauldron import ktl
-    svc = ktl.Service("testsvc", populate=True)
-    log.info(svc)
-    log.info(svc.populated())
-    log.info("Done!")
-    disp.shutdown()
-    log.info("Shutdown complete.")
-finally:
-    import threading
-    for thread in threading.enumerate():
-        print(thread)
+if __name__ == '__main__':
+    main()
