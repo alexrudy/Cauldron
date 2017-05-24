@@ -15,9 +15,12 @@ This library provides a python drop-in replacement for both clients and dispatch
 :ref:`KTL <ktl>` libraries and protocols. It is designed to seamlessly replace the need for :ref:`KTL <ktl>` tools when
 running on a local, non-production machine.
 
+Contents
+========
+
 .. toctree::
-    :maxdepth: 2
-    
+    :maxdepth: 1
+
     ktl
     api
     base
@@ -36,52 +39,52 @@ depends on :mod:`astropy`, though this is an installation and test dependency, n
 
 Cauldron also depends on the :mod:`six` module. Some Cauldron backends depend on other third party modules.
 To install all third party modules, you can use ``pip``::
-    
+
     $ pip install -r requirements.txt
-    
+
 
 To install Cauldron, use pip::
-    
+
     $ pip install git+https://github.com/alexrudy/Cauldron
-    
+
 
 Using Cauldron
 ==============
 
-To use Cauldron, you must first select a backend via :func:`use`::
-    
+To use Cauldron, you must first select a backend via :func:`~Cauldron.api.use`::
+
     import Cauldron
     Cauldron.use("local")
-    
+
 
 Then, where you would have imported a :ref:`KTL <ktl>` library, you can call::
-    
+
     from Cauldron import ktl
-    
+
 
 or for the python dispatcher framework::
-    
+
     from Cauldron import DFW
-    
+
 
 To use the standard :ref:`KTL <ktl>` implementation, use the "ktl" backend::
-    
+
     import Cauldron
     Cauldron.use("ktl")
-    
+
 To use existing code which doesn't follow the ``from Cauldron import DFW``-style, you
 can "install" the Cauldron modules into their default place on the system.::
-    
+
     from Cauldron.api import install
     install()
-    
+
 You should do this before your code imports ``ktl`` or ``DFW``. This is a very hacky way
 to install a module at runtime. Then again, most of Cauldron is a giant runtime hack, so your
 mileage may vary.
 
 Once you have done this, code which imports ``ktl`` or ``DFW`` will get the Cauldron versions, so
 the following will work::
-    
+
     import ktl, DFW
-    
+
 
