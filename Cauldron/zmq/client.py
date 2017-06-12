@@ -19,6 +19,7 @@ from ..config import get_configuration, get_timeout
 from ..logger import KeywordMessageFilter
 from ..compat import WeakSet
 
+import atexit
 import json
 import six
 import threading
@@ -44,6 +45,8 @@ def _cleanup(_registry=_service_registry):
             break
         else:
             svc.shutdown()
+atexit.register(_cleanup)
+
 
 class _ZMQMonitorThread(ZMQThread):
     """A monitoring thread for ZMQ-powered Services which listens for broadcasts."""
@@ -52,6 +55,7 @@ class _ZMQMonitorThread(ZMQThread):
         self.service = weakref.proxy(service)
         self.monitored = set()
         self.address = None
+        self.daemon = True
         
     def thread_target(self):
         """Run the monitoring thread."""
@@ -115,7 +119,6 @@ class _ZMQMonitorThread(ZMQThread):
         finally:
             signal.close(linger=0)
             self.log.debug("Stopped Monitor Thread")
-            
 
 @registry.client.service_for("zmq")
 class Service(ClientService):
@@ -138,6 +141,7 @@ class Service(ClientService):
             raise ZMQDispatcherError("Can't locate a suitable dispatcher for {0}".format(self.name))
         self._monitor = _ZMQMonitorThread(self)
         self._tasker = TaskQueue("ktl.Service.{0:s}.Tasks".format(self.name), ctx=self.ctx, log=self.log)
+        self._tasker.daemon = True
         self._tasker.start()
         address = self._synchronous_command("lookup", "subscribe", direction="CBQ")
         self._monitor.address = address
