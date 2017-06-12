@@ -73,17 +73,17 @@ class Service(DispatcherService):
         
     def _prepare(self):
         """Begin this service."""
-        self._thread = ZMQPooler(self, zmq_get_address(self._config, "broker", bind=False))
+        self._worker_pool = ZMQPooler(self, zmq_get_address(self._config, "broker", bind=False))
         self._tasker = TaskQueue(self.log.name +".Tasks", ctx=self.ctx, 
-                                 log=self.log, backend_address=self._thread.internal_address)
+                                 log=self.log, backend_address=self._worker_pool.internal_address)
         self._scheduler = ZMQScheduler(self.log.name + ".Scheduler", self.ctx)
     
     def _begin(self):
         """Allow command responses to start."""
         zmq = check_zmq()
         try:
-            if not self._thread.is_alive():
-                self._thread.start()
+            if not self._worker_pool.is_alive():
+                self._worker_pool.start()
                 self.log.trace("Started ZMQ Responder Thread.")
             if not self._scheduler.is_alive():
                 self._scheduler.start()
@@ -92,11 +92,11 @@ class Service(DispatcherService):
                 self._tasker.start()
                 self.log.trace("Started ZMQ Tasker Thread.")
             
-            self._thread.check(timeout=10)
+            self._worker_pool.check(timeout=10)
             self._scheduler.check(timeout=10)
             self._tasker.check(timeout=10)
         except:
-            self._thread.stop()
+            self._worker_pool.stop()
             self._scheduler.stop()
             raise
         else:
@@ -130,8 +130,8 @@ class Service(DispatcherService):
         if hasattr(self, '_scheduler') and self._scheduler is not None and self._scheduler.is_alive():
             self._scheduler.stop()
         
-        if hasattr(self, '_thread') and self._thread is not None and self._thread.is_alive():
-            self._thread.stop()
+        if hasattr(self, '_worker_pool') and self._worker_pool is not None and self._worker_pool.is_alive():
+            self._worker_pool.stop()
         
         for socket in self._sockets_to_close:
             socket.close()
