@@ -42,7 +42,7 @@ class TaskQueue(ZMQThread):
         self.frontend_address = "inproc://{0:s}-frontend".format(hex(id(self)))
         self._backend_address = backend_address
         self._local = threading.local()
-        self._frontend_sockets = []
+        self._frontend_sockets = set()
         
     def _check_timeout(self):
         """Check timeouts for tasks."""
@@ -74,7 +74,7 @@ class TaskQueue(ZMQThread):
         frontend = self.ctx.socket(zmq.PUSH)
         frontend.connect(self.frontend_address)
         self._local.frontend = frontend
-        self._frontend_sockets.append(frontend)
+        self._frontend_sockets.add(frontend)
         return frontend
         
     def __del__(self):
@@ -110,7 +110,13 @@ class TaskQueue(ZMQThread):
         return task.get(timeout=timeout)
         
     def thread_target(self):
-        """Run the task queue thread."""
+        """Run the task queue thread.
+        
+        The base class (ZMQThread) uses this method to run
+        inside the thread. ZMQThread uses the 'running' event
+        to signal when it is time to shutdown, and uses the 'started'
+        event to signal that is is ready to do work.
+        """
         zmq = check_zmq()
         backend = self.ctx.socket(zmq.DEALER)
         zmq_connect_socket(backend, get_configuration(), "broker", log=self.log, label='client', address=self._backend_address)
