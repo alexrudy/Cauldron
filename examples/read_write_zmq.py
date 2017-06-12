@@ -10,9 +10,18 @@ from logging import getLogger
 configure('stream')
 log = getLogger("example.zmq")
 
+from Cauldron.config import get_configuration
+config = get_configuration()
+config.set("zmq", "broker", "inproc://broker")
+config.set("zmq", "publish", "inproc://publish")
+config.set("zmq", "subscribe", "inproc://subscribe")
+# config.set("zmq", "pool", "2")
+config.set("zmq", "autobroker", "yes")
+
 # Get ready!
 from Cauldron.api import use
 use("zmq")
+
 
 from Cauldron import DFW
 
@@ -35,7 +44,7 @@ log.info("Dispatcher Keyword {0!r}".format(dtest))
 
 VALUE = "SOMEVALUE"
 time.sleep(1.0)
-log.info("Starting KTL client...")
+log.info("Starting KTL clients...")
 from Cauldron import ktl
 svc = ktl.Service("testsvc")
 log.info("Getting KTL keyword object...")
@@ -44,12 +53,14 @@ log.info("Writing '{0}'".format(VALUE))
 seq = test.write(VALUE, wait=False)
 test.wait(sequence=seq)
 log.info("'{0}' =? '{1}'".format(VALUE, test.read()))
-
 seq = test.write(VALUE+"1", wait=False, timeout=0.1)
 try:
     success = test.wait(sequence=seq, timeout=0.1)
 except Exception as e:
     print(e)
+
+RVALUE = ktl.read("testsvc", "TEST")
+log.info("'{0}' =? '{1}'".format(VALUE, RVALUE))
 
 for thread in threading.enumerate():
     print(repr(thread))
@@ -62,7 +73,7 @@ log.info("Shutdown complete.")
 for thread in threading.enumerate():
     print(repr(thread))
 
-import zmq
-ctx = zmq.Context.instance().destroy()
-
-log.info("Context terminated.")
+# log.warning("Terminating context.")
+# import zmq
+# ctx = zmq.Context.instance().destroy()
+# log.info("Context terminated.")
