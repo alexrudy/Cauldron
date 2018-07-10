@@ -167,7 +167,7 @@ def get_units_xml(xml, name):
     
     return units
 
-def emit_xml_warning(log, msg, exc_info=True):
+def emit_xml_warning(log, msg, exc_info=False):
     """Emit an XML error or warning."""
     if WARN_KTL_XML:
         if WARNINGS_KTL:
