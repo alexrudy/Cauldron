@@ -6,6 +6,7 @@ import inspect
 import random
 import warnings
 
+
 keyword_types = [
     ('boolean', '1', True, True, '1'),
     ('boolean', '0', False, False, '0'),
@@ -111,15 +112,13 @@ def test_keyword_enumerated(keyword_enumerated, dispatcher, client, modify, upda
     assert set(client[keyword_enumerated]['enumerators'].values()) == set(["ZERO", "ONE", "TWO", "THREE"])
 
 @pytest.mark.parametrize("kwtype", ['mask', 'integer array', 'float array', 'double array'])
-def test_keyword_type_not_implemented(kwtype, dispatcher_args, dispatcher_setup, recwarn):
+def test_keyword_type_not_implemented(kwtype, dispatcher_args, dispatcher_setup):
     """Test not-implemented keyword types"""
-    warnings.filterwarnings('always')
     from Cauldron import DFW
     from Cauldron.exc import CauldronAPINotImplementedWarning
     def setup(dispatcher):
-        kwd = DFW.Keyword.types[kwtype]("MYNOTIMPLEMENTED{0}".format(kwtype.upper().replace(" ","")), dispatcher)
-        w = recwarn.pop()
-        assert issubclass(w.category, CauldronAPINotImplementedWarning)
+        with pytest.warns(CauldronAPINotImplementedWarning):
+            kwd = DFW.Keyword.types[kwtype]("MYNOTIMPLEMENTED{0}".format(kwtype.upper().replace(" ","")), dispatcher)
     dispatcher_setup.append(setup)
     svc = DFW.Service(*dispatcher_args)
     svc.shutdown()

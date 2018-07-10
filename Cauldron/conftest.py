@@ -101,8 +101,7 @@ def setup_zmq_sigabrt_handler():
         pass
     else:
         #TODO: Version bound this, once the problem is fixed.
-        # signal.signal(signal.SIGABRT, _handle_zmq_sigabrt)
-        pass
+        signal.signal(signal.SIGABRT, _handle_zmq_sigabrt)
         
 setup_zmq_sigabrt_handler()
 
@@ -139,8 +138,8 @@ def config(tmpdir):
     cauldron_configuration.set("zmq", "publish", "inproc://publish")
     cauldron_configuration.set("zmq", "subscribe", "inproc://subscribe")
     cauldron_configuration.set("zmq", "pool", "2")
-    cauldron_configuration.set("zmq", "timeout", "5")
-    cauldron_configuration.set("core", "timeout", "5")
+    cauldron_configuration.set("zmq", "timeout", "10")
+    cauldron_configuration.set("core", "timeout", "10")
     return cauldron_configuration
     
 @pytest.fixture
