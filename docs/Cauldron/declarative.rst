@@ -40,12 +40,6 @@ To use this declarative class, you must bind the class to a KTL Service object::
     >>> athingy.enabled = True
     >>> athingy.enabled
     'True'
-    >>> anotherthingy = Thing()
-    >>> anotherthingy.enabled
-    'True'
-    >>> athingy.enabled = False
-    >>> anotherthingy.enabled
-    'False'
 
 
 Events

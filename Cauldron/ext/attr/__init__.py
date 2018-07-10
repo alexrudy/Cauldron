@@ -53,9 +53,9 @@ class Service(object):
     attributes. This gives less precise control over the use
     of keywords, but allows for more concise scripts::
         
-        >>> svc = Service("testsvc")
-        >>> svc.mykeyword = "hello"
-        >>> svc.mykeyword
+        svc = Service("testsvc")
+        svc.mykeyword = "hello"
+        svc.mykeyword
         "hello"
     
     """
