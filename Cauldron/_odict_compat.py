@@ -13,6 +13,8 @@ from collections import MutableMapping
 from operator import eq as _eq
 from itertools import imap as _imap
 
+import six
+
 try:
     from thread import get_ident
 except ImportError:
@@ -137,9 +139,15 @@ class OrderedDict(dict, MutableMapping):
     keys = MutableMapping.keys
     values = MutableMapping.values
     items = MutableMapping.items
-    iterkeys = MutableMapping.iterkeys
-    itervalues = MutableMapping.itervalues
-    iteritems = MutableMapping.iteritems
+
+    if six.PY2:
+        iterkeys = MutableMapping.iterkeys
+        itervalues = MutableMapping.itervalues
+        iteritems = MutableMapping.iteritems
+    else:
+        iterkeys = keys
+        itervalues = values
+        iteritems = items
     __ne__ = MutableMapping.__ne__
 
     def popitem(self, last=True):
