@@ -64,6 +64,7 @@ addons:
             - graphviz
             - texlive-latex-extra
             - dvipng
+            - libzmq-dev
 
 install:
     # CI-Helpers
