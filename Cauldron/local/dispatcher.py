@@ -23,6 +23,8 @@ _registry = weakref.WeakValueDictionary()
 @registry.dispatcher.teardown_for("local")
 def clear():
     """Clear the registry."""
+    for service in _registry.values():
+        service.shutdown()
     _registry.clear()
 
 class LocalScheduler(Scheduler, threading.Thread):
